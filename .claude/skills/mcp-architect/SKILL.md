@@ -317,6 +317,9 @@ Response:
 
 ## Resources
 
+**Quick Start:**
+- `QUICKSTART.md` - Get your first MCP server running in 5 minutes
+
 **Templates:**
 - `templates/minimal-server.py` - Basic MCP server structure
 - `templates/advanced-server.py` - Production server with lifecycle
@@ -328,11 +331,13 @@ Response:
 - `checklists/mcp-vs-alternatives.md` - Decision matrix for MCP vs CLI/scripts/skills
 - `checklists/deployment.md` - Production deployment checklist
 - `checklists/common-errors.md` - Troubleshooting guide
+- `checklists/uv-cheatsheet.md` - Complete UV commands reference
 
 **Examples:**
-- `examples/readonly-api.py` - Simple API integration
-- `examples/database-server.py` - Database with connection pooling
-- `examples/cli-alternative.py` - CLI approach for comparison
+- `examples/readonly-api.py` - Simple API integration with caching
+- `examples/database-server.py` - Database with connection pooling and security
+- `examples/cli-alternative.py` - CLI approach for comparison with MCP
+- `examples/validate-templates.py` - Validation script for templates
 
 ## Key Principles
 

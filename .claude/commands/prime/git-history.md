@@ -3,5 +3,6 @@
 RUN:
 !git ls-files
 !git log --oneline --graph --decorate -20
-!git log --stat -5
-!git log -p -2
+!git log --stat -10
+
+If you need additional information about specific commits please investigate further. 
