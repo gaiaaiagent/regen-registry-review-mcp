@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "registry-review": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/home/ygg/Workspace/RegenAI/regen-registry-review-mcp",
+        "run",
+        "python",
+        "-m",
+        "registry_review_mcp.server"
+      ],
+      "env": {
+        "REGISTRY_REVIEW_LOG_LEVEL": "INFO"
+      }
+    }
+  }
+}
