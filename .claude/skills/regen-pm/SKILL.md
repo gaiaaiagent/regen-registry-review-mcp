@@ -48,7 +48,10 @@ ls -lt src/ 2>/dev/null || echo "No src/ yet"
 Read key documents if needed:
 - `docs/transcripts/2025-11-11-transcript-synthesis.md` (complete vision)
 - `docs/specs/2025-11-11-registry-review-mvp-workflow.md` (8 user stories)
+- `docs/specs/2025-11-12-registry-review-mcp-REFINED.md` (latest consolidated spec)
 - `docs/specs/2025-10-30-regen-knowledge-commons-registry-review-agent-infrastructure.md` (architecture)
+
+**Quick-load examples**: Use `/prime/examples` command to load all Botany Farm documentation (markdown versions) at once
 
 ### 2. Requirements Gathering
 
@@ -121,8 +124,9 @@ When coordinating multiple workstreams:
 1. **Identify parallel work**: What can happen simultaneously?
 2. **Define interfaces**: How do components connect?
 3. **Manage dependencies**: Who's waiting on whom?
-4. **Use sub-agents strategically**: Launch Task agents for complex, independent work
-5. **Synchronize regularly**: Daily standups, weekly reviews
+4. **Collaborate with specialists**: Use `mcp-architect` skill for technical implementation, `marker` for PDF conversion
+5. **Use sub-agents strategically**: Launch Task agents for complex, independent work
+6. **Synchronize regularly**: Daily standups, weekly reviews
 
 ### 7. Quality Assurance
 
@@ -154,8 +158,12 @@ Quick reference to critical project documents:
 | MVP Workflow | 8 user stories for MVP | `docs/specs/2025-11-11-registry-review-mvp-workflow.md` |
 | Infrastructure | Architecture & tech stack | `docs/specs/2025-10-30-regen-knowledge-commons-registry-review-agent-infrastructure.md` |
 | High-Level Spec | Original requirements | `docs/specs/2025-09-09-high-level-spec-for-registry-ai-agents.md` |
-| Example Project | Real review data | `examples/22-23/` (Botany Farm) |
+| Refined Spec | Latest consolidated spec | `docs/specs/2025-11-12-registry-review-mcp-REFINED.md` |
+| Example Project | Real review data (markdown) | `examples/22-23/` (Botany Farm) |
+| Examples Command | Load all example docs | `.claude/commands/prime/examples.md` |
 | Checklist Template | Review structure | `examples/checklist.md` |
+
+**Note**: Example PDFs have been converted to markdown using the `marker` skill for easier analysis. Each document directory includes extracted images and conversion metadata.
 
 ## Decision Framework
 
@@ -195,15 +203,26 @@ Track these KPIs:
 
 ## Resources
 
-Access templates:
+### Templates
 - `templates/requirement-template.md` - For new requirement documents
 - `templates/roadmap-template.md` - For roadmap planning
 - `templates/architecture-decision-record.md` - For design decisions
 - `templates/status-update-template.md` - For progress reports
 - `templates/user-story-template.md` - For feature stories
 
-Access scripts:
+### Scripts
 - `scripts/check-progress.sh` - Quick status check (git, structure, todos)
+
+### Skills & Commands
+Collaborate with these specialized skills:
+
+- **marker** - Convert additional PDFs to markdown for analysis (all example PDFs already converted)
+- **mcp-architect** - Expert guidance for building MCP servers, implementing tools/resources/prompts, testing strategies, deployment, and best practices
+- **skill-builder** - Create new skills when packaging reusable functionality
+
+Quick-load commands:
+- `/prime/examples` - Load all Botany Farm example documentation (markdown versions)
+- `/development/initialize` - Initialize development session with mcp-architect and regen-pm
 
 ## Example Workflows
 

@@ -138,11 +138,12 @@ The skill helps track:
 
 This skill can:
 
-- Use other skills (like skill-builder, mcp-architect)
-- Invoke slash commands for specific tasks
+- Use other skills (marker for PDF conversion, mcp-architect for MCP development, skill-builder for creating new skills)
+- Invoke slash commands (/prime/examples to load Botany Farm docs, /development/initialize to start dev sessions)
 - Launch Task sub-agents for complex parallel work
 - Read/Write files for documentation
 - Run scripts for status checks
+- Access markdown versions of all example PDFs (already converted via marker skill)
 
 ## Principles
 

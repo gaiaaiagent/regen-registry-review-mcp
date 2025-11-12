@@ -149,19 +149,41 @@ docs/
   specs/                        # Requirements & architecture
   transcripts/                  # Meeting notes & vision
 examples/
-  22-23/                       # Botany Farm real data
+  22-23/                       # Botany Farm real data (markdown versions)
+    */                         # Each document includes extracted images
   checklist.md                 # Review template
 .claude/
-  skills/regen-pm/             # This skill
+  commands/
+    prime/examples.md          # Quick-load all example docs
+    development/initialize.md  # Initialize dev session
+  skills/
+    regen-pm/                  # This project management skill
+    marker/                    # PDF to markdown conversion
+    mcp-architect/             # MCP development expertise
 src/                           # Implementation (TBD)
 ```
+
+**Note**: All example PDFs have been converted to markdown via the `marker` skill for easier analysis.
 
 ## Essential Reading
 
 1. **Vision**: `docs/transcripts/2025-11-11-transcript-synthesis.md`
-2. **MVP Stories**: `docs/specs/2025-11-11-registry-review-mvp-workflow.md`
-3. **Architecture**: `docs/specs/2025-10-30-regen-knowledge-commons-registry-review-agent-infrastructure.md`
-4. **Example Review**: `examples/22-23/Botany_Farm_Project_Registration_Registry_Agent_Review/`
+2. **Refined Spec**: `docs/specs/2025-11-12-registry-review-mcp-REFINED.md`
+3. **MVP Stories**: `docs/specs/2025-11-11-registry-review-mvp-workflow.md`
+4. **Architecture**: `docs/specs/2025-10-30-regen-knowledge-commons-registry-review-agent-infrastructure.md`
+5. **Example Review**: `examples/22-23/Botany_Farm_Project_Registration_Registry_Agent_Review/` (markdown)
+
+## Available Skills & Commands
+
+**Skills** (specialized agents):
+- `marker` - Convert PDFs to markdown (examples already converted)
+- `mcp-architect` - MCP server development, testing, deployment
+- `skill-builder` - Create new skills
+- `regen-pm` - Project management (this skill)
+
+**Commands** (quick operations):
+- `/prime/examples` - Load all Botany Farm documentation
+- `/development/initialize` - Start dev session with mcp-architect and regen-pm
 
 ## Contact
 
