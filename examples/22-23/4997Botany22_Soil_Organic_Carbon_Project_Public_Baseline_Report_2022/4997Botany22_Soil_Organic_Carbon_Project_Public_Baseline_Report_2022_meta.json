@@ -1,0 +1,1477 @@
+{
+  "table_of_contents": [
+    {
+      "title": "Soil Organic Carbon Project Report",
+      "heading_level": null,
+      "page_id": 0,
+      "polygon": [
+        [
+          69.38400268554688,
+          92.916015625
+        ],
+        [
+          520.4149780273438,
+          92.916015625
+        ],
+        [
+          520.4149780273438,
+          116.8350830078125
+        ],
+        [
+          69.38400268554688,
+          116.8350830078125
+        ]
+      ]
+    },
+    {
+      "title": "BOTANY FARM PARTNERSHIP",
+      "heading_level": null,
+      "page_id": 0,
+      "polygon": [
+        [
+          162.02000427246094,
+          212.46588134765625
+        ],
+        [
+          427.482666015625,
+          211.322265625
+        ],
+        [
+          427.482666015625,
+          228.42584228515625
+        ],
+        [
+          162.02000427246094,
+          228.42584228515625
+        ]
+      ]
+    },
+    {
+      "title": "Executive Summary",
+      "heading_level": null,
+      "page_id": 1,
+      "polygon": [
+        [
+          169.45999145507812,
+          124.39501953125
+        ],
+        [
+          425.2961730957031,
+          123.33984375
+        ],
+        [
+          425.2961730957031,
+          147.43505859375
+        ],
+        [
+          169.45999145507812,
+          148.0078125
+        ]
+      ]
+    },
+    {
+      "title": "Contents",
+      "heading_level": null,
+      "page_id": 3,
+      "polygon": [
+        [
+          69.80856423173803,
+          74.97773820124665
+        ],
+        [
+          135.11335012594458,
+          74.97773820124665
+        ],
+        [
+          135.11335012594458,
+          94.47195013357079
+        ],
+        [
+          69.80856423173803,
+          94.47195013357079
+        ]
+      ]
+    },
+    {
+      "title": "List of Tables",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          71.58984375,
+          75.37005615234375
+        ],
+        [
+          155.43093872070312,
+          74.00390625
+        ],
+        [
+          155.43093872070312,
+          91.33001708984375
+        ],
+        [
+          71.58984375,
+          91.33001708984375
+        ]
+      ]
+    },
+    {
+      "title": "List of Terms",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          71.58984375,
+          217.45001220703125
+        ],
+        [
+          157.82696533203125,
+          217.078125
+        ],
+        [
+          157.82696533203125,
+          233.40997314453125
+        ],
+        [
+          71.58984375,
+          233.40997314453125
+        ]
+      ]
+    },
+    {
+      "title": "Soil Organic Carbon",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          72.02399444580078,
+          235.990234375
+        ],
+        [
+          178.4500732421875,
+          234.345703125
+        ],
+        [
+          178.4500732421875,
+          247.57928466796875
+        ],
+        [
+          71.0078125,
+          247.57928466796875
+        ]
+      ]
+    },
+    {
+      "title": "Soil Organic Carbon Stock",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          72.02399444580078,
+          279.5703125
+        ],
+        [
+          211.31570434570312,
+          277.92578125
+        ],
+        [
+          211.31570434570312,
+          291.64923095703125
+        ],
+        [
+          71.58984375,
+          291.64923095703125
+        ]
+      ]
+    },
+    {
+      "title": "Carbon Dioxide Equivalent",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          72.02399444580078,
+          330.5292663574219
+        ],
+        [
+          213.0234375,
+          328.90625
+        ],
+        [
+          211.97134399414062,
+          341.56927490234375
+        ],
+        [
+          71.0078125,
+          342.0625
+        ]
+      ]
+    },
+    {
+      "title": "Carbon Balance",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          72.02399444580078,
+          386.8759765625
+        ],
+        [
+          155.927978515625,
+          385.2314453125
+        ],
+        [
+          155.927978515625,
+          398.08929443359375
+        ],
+        [
+          71.298828125,
+          398.08929443359375
+        ]
+      ]
+    },
+    {
+      "title": "Mean Absolute Percentage Error",
+      "heading_level": null,
+      "page_id": 4,
+      "polygon": [
+        [
+          72.02399444580078,
+          469.0292663574219
+        ],
+        [
+          242.998046875,
+          468.2802734375
+        ],
+        [
+          242.75711059570312,
+          480.06927490234375
+        ],
+        [
+          71.298828125,
+          480.06927490234375
+        ]
+      ]
+    },
+    {
+      "title": "Project Information",
+      "heading_level": null,
+      "page_id": 5,
+      "polygon": [
+        [
+          233.57000732421875,
+          73.5927734375
+        ],
+        [
+          361.8394470214844,
+          73.5927734375
+        ],
+        [
+          361.8394470214844,
+          87.82427978515625
+        ],
+        [
+          233.57000732421875,
+          87.82427978515625
+        ]
+      ]
+    },
+    {
+      "title": "Results",
+      "heading_level": null,
+      "page_id": 6,
+      "polygon": [
+        [
+          71.880859375,
+          73.7843017578125
+        ],
+        [
+          122.65223693847656,
+          73.181640625
+        ],
+        [
+          122.65223693847656,
+          87.82427978515625
+        ],
+        [
+          71.880859375,
+          87.82427978515625
+        ]
+      ]
+    },
+    {
+      "title": "Carbon Balance",
+      "heading_level": null,
+      "page_id": 8,
+      "polygon": [
+        [
+          72.02399444580078,
+          79.7843017578125
+        ],
+        [
+          178.68588256835938,
+          78.9375
+        ],
+        [
+          178.68588256835938,
+          93.82427978515625
+        ],
+        [
+          71.0078125,
+          93.82427978515625
+        ]
+      ]
+    },
+    {
+      "title": "GHG Emissions",
+      "heading_level": null,
+      "page_id": 8,
+      "polygon": [
+        [
+          71.0078125,
+          497.470703125
+        ],
+        [
+          162.78799438476562,
+          495.826171875
+        ],
+        [
+          162.78799438476562,
+          510.1300964355469
+        ],
+        [
+          71.0078125,
+          510.1300964355469
+        ]
+      ]
+    },
+    {
+      "title": "Appendix-A Methodology",
+      "heading_level": null,
+      "page_id": 9,
+      "polygon": [
+        [
+          198.47265625,
+          73.7843017578125
+        ],
+        [
+          395.19921875,
+          72.7705078125
+        ],
+        [
+          395.09588623046875,
+          87.82427978515625
+        ],
+        [
+          197.30859375,
+          88.3935546875
+        ]
+      ]
+    },
+    {
+      "title": "Sampling Method",
+      "heading_level": null,
+      "page_id": 9,
+      "polygon": [
+        [
+          70.716796875,
+          95.7200927734375
+        ],
+        [
+          172.07998657226562,
+          94.1494140625
+        ],
+        [
+          172.07998657226562,
+          107.7200927734375
+        ],
+        [
+          69.552734375,
+          108.1279296875
+        ]
+      ]
+    },
+    {
+      "title": "Laboratory Analysis",
+      "heading_level": null,
+      "page_id": 9,
+      "polygon": [
+        [
+          71.298828125,
+          405.7880859375
+        ],
+        [
+          187.4399871826172,
+          404.1435546875
+        ],
+        [
+          187.4399871826172,
+          417.8301086425781
+        ],
+        [
+          71.298828125,
+          418.1220703125
+        ]
+      ]
+    },
+    {
+      "title": "SOCS Calculation",
+      "heading_level": null,
+      "page_id": 9,
+      "polygon": [
+        [
+          71.880859375,
+          691.4800872802734
+        ],
+        [
+          174.11997985839844,
+          690.2919921875
+        ],
+        [
+          174.11997985839844,
+          703.4800872802734
+        ],
+        [
+          71.880859375,
+          703.4800872802734
+        ]
+      ]
+    },
+    {
+      "title": "AI Processing",
+      "heading_level": null,
+      "page_id": 10,
+      "polygon": [
+        [
+          70.716796875,
+          91.6826171875
+        ],
+        [
+          152.13600158691406,
+          90.0380859375
+        ],
+        [
+          152.13600158691406,
+          104.24005126953125
+        ],
+        [
+          70.716796875,
+          104.24005126953125
+        ]
+      ]
+    },
+    {
+      "title": "Accuracy",
+      "heading_level": null,
+      "page_id": 10,
+      "polygon": [
+        [
+          71.58984375,
+          350.6962890625
+        ],
+        [
+          126.07199096679688,
+          349.0517578125
+        ],
+        [
+          126.07199096679688,
+          363.110107421875
+        ],
+        [
+          70.42578125,
+          363.110107421875
+        ]
+      ]
+    },
+    {
+      "title": "Greenhouse Gas Emissions Monitoring",
+      "heading_level": null,
+      "page_id": 10,
+      "polygon": [
+        [
+          72.02399444580078,
+          440.17010498046875
+        ],
+        [
+          296.9179992675781,
+          439.08984375
+        ],
+        [
+          296.9179992675781,
+          452.17010498046875
+        ],
+        [
+          71.298828125,
+          452.24609375
+        ]
+      ]
+    },
+    {
+      "title": "Monitored Impact Information",
+      "heading_level": null,
+      "page_id": 10,
+      "polygon": [
+        [
+          72.02399444580078,
+          552.9736328125
+        ],
+        [
+          269.6369934082031,
+          551.3291015625
+        ],
+        [
+          269.6369934082031,
+          568.7143249511719
+        ],
+        [
+          71.0078125,
+          568.7143249511719
+        ]
+      ]
+    },
+    {
+      "title": "Carbon Balance",
+      "heading_level": null,
+      "page_id": 10,
+      "polygon": [
+        [
+          71.58984375,
+          694.5043029785156
+        ],
+        [
+          178.68588256835938,
+          693.169921875
+        ],
+        [
+          178.68588256835938,
+          708.5442962646484
+        ],
+        [
+          71.58984375,
+          708.5442962646484
+        ]
+      ]
+    },
+    {
+      "title": "Appendix-B Soil Organic Carbon Project Report Notes",
+      "heading_level": null,
+      "page_id": 11,
+      "polygon": [
+        [
+          104.41999816894531,
+          73.5927734375
+        ],
+        [
+          490.7368469238281,
+          73.5927734375
+        ],
+        [
+          490.7368469238281,
+          87.82427978515625
+        ],
+        [
+          104.18359375,
+          87.82427978515625
+        ]
+      ]
+    },
+    {
+      "title": "Accredited Ecometric Methodology:",
+      "heading_level": null,
+      "page_id": 11,
+      "polygon": [
+        [
+          71.58984375,
+          94.9716796875
+        ],
+        [
+          280.739990234375,
+          94.9716796875
+        ],
+        [
+          280.739990234375,
+          107.7200927734375
+        ],
+        [
+          70.42578125,
+          107.7200927734375
+        ]
+      ]
+    },
+    {
+      "title": "Accredited Ecometric Credit Class:",
+      "heading_level": null,
+      "page_id": 11,
+      "polygon": [
+        [
+          71.0078125,
+          146.84002685546875
+        ],
+        [
+          272.83197021484375,
+          145.541015625
+        ],
+        [
+          272.83197021484375,
+          158.84002685546875
+        ],
+        [
+          69.84375,
+          158.84002685546875
+        ]
+      ]
+    },
+    {
+      "title": "GHG Emissions Calculation",
+      "heading_level": null,
+      "page_id": 11,
+      "polygon": [
+        [
+          71.880859375,
+          185.24005126953125
+        ],
+        [
+          230.74798583984375,
+          184.1875
+        ],
+        [
+          230.74798583984375,
+          197.24005126953125
+        ],
+        [
+          70.716796875,
+          197.24005126953125
+        ]
+      ]
+    },
+    {
+      "title": "Regen Network",
+      "heading_level": null,
+      "page_id": 11,
+      "polygon": [
+        [
+          71.0078125,
+          287.030029296875
+        ],
+        [
+          159.41998291015625,
+          286.1484375
+        ],
+        [
+          159.41998291015625,
+          299.030029296875
+        ],
+        [
+          71.0078125,
+          299.3046875
+        ]
+      ]
+    },
+    {
+      "title": "Regen Registry",
+      "heading_level": null,
+      "page_id": 11,
+      "polygon": [
+        [
+          71.298828125,
+          363.35009765625
+        ],
+        [
+          160.16400146484375,
+          362.2080078125
+        ],
+        [
+          160.16400146484375,
+          375.35009765625
+        ],
+        [
+          71.298828125,
+          376.1865234375
+        ]
+      ]
+    },
+    {
+      "title": "Regen Marketplace",
+      "heading_level": null,
+      "page_id": 11,
+      "polygon": [
+        [
+          71.298828125,
+          439.81011962890625
+        ],
+        [
+          184.1719970703125,
+          439.5009765625
+        ],
+        [
+          184.1719970703125,
+          452.5500183105469
+        ],
+        [
+          71.298828125,
+          452.5500183105469
+        ]
+      ]
+    },
+    {
+      "title": "Regen Ledger",
+      "heading_level": null,
+      "page_id": 11,
+      "polygon": [
+        [
+          71.298828125,
+          490.93011474609375
+        ],
+        [
+          152.201171875,
+          490.892578125
+        ],
+        [
+          152.201171875,
+          502.93011474609375
+        ],
+        [
+          71.298828125,
+          502.93011474609375
+        ]
+      ]
+    },
+    {
+      "title": "Ecometric Roles and Responsibilities",
+      "heading_level": null,
+      "page_id": 11,
+      "polygon": [
+        [
+          71.880859375,
+          554.6500854492188
+        ],
+        [
+          286.1119689941406,
+          554.20703125
+        ],
+        [
+          286.1119689941406,
+          566.6500854492188
+        ],
+        [
+          70.716796875,
+          566.6500854492188
+        ]
+      ]
+    },
+    {
+      "title": "Definitions - Regen Registry",
+      "heading_level": null,
+      "page_id": 11,
+      "polygon": [
+        [
+          71.298828125,
+          605.5892791748047
+        ],
+        [
+          209.240234375,
+          604.365234375
+        ],
+        [
+          209.240234375,
+          616.6292877197266
+        ],
+        [
+          71.298828125,
+          616.6292877197266
+        ]
+      ]
+    },
+    {
+      "title": "Verifier",
+      "heading_level": null,
+      "page_id": 11,
+      "polygon": [
+        [
+          70.716796875,
+          655.7200927734375
+        ],
+        [
+          113.4959945678711,
+          654.9345703125
+        ],
+        [
+          113.4959945678711,
+          667.7200927734375
+        ],
+        [
+          70.716796875,
+          667.7200927734375
+        ]
+      ]
+    },
+    {
+      "title": "Ecometric",
+      "heading_level": null,
+      "page_id": 12,
+      "polygon": [
+        [
+          270.64453125,
+          203.5107421875
+        ],
+        [
+          322.1103210449219,
+          203.5107421875
+        ],
+        [
+          322.1103210449219,
+          215.05926513671875
+        ],
+        [
+          270.64453125,
+          215.05926513671875
+        ]
+      ]
+    }
+  ],
+  "page_stats": [
+    {
+      "page_id": 0,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          15
+        ],
+        [
+          "Line",
+          6
+        ],
+        [
+          "Text",
+          3
+        ],
+        [
+          "SectionHeader",
+          2
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "Figure",
+          1
+        ],
+        [
+          "Caption",
+          1
+        ],
+        [
+          "FigureGroup",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 1,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          107
+        ],
+        [
+          "TableCell",
+          44
+        ],
+        [
+          "Line",
+          25
+        ],
+        [
+          "Table",
+          3
+        ],
+        [
+          "Footnote",
+          2
+        ],
+        [
+          "Reference",
+          2
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "SectionHeader",
+          1
+        ],
+        [
+          "Figure",
+          1
+        ],
+        [
+          "Caption",
+          1
+        ],
+        [
+          "Text",
+          1
+        ],
+        [
+          "FigureGroup",
+          1
+        ],
+        [
+          "TableGroup",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 2,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          22
+        ],
+        [
+          "Line",
+          4
+        ],
+        [
+          "Figure",
+          2
+        ],
+        [
+          "Caption",
+          2
+        ],
+        [
+          "FigureGroup",
+          2
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "Footnote",
+          1
+        ],
+        [
+          "PageFooter",
+          1
+        ],
+        [
+          "Reference",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 3,
+      "text_extraction_method": "surya",
+      "block_counts": [
+        [
+          "TableCell",
+          40
+        ],
+        [
+          "Line",
+          4
+        ],
+        [
+          "Span",
+          2
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "SectionHeader",
+          1
+        ],
+        [
+          "TableOfContents",
+          1
+        ],
+        [
+          "PageFooter",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 4,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          133
+        ],
+        [
+          "Line",
+          39
+        ],
+        [
+          "TableCell",
+          16
+        ],
+        [
+          "SectionHeader",
+          7
+        ],
+        [
+          "Text",
+          5
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "TableOfContents",
+          1
+        ],
+        [
+          "Equation",
+          1
+        ],
+        [
+          "PageFooter",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 5,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          57
+        ],
+        [
+          "Line",
+          18
+        ],
+        [
+          "Text",
+          15
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "SectionHeader",
+          1
+        ],
+        [
+          "PageFooter",
+          1
+        ],
+        [
+          "Reference",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 6,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          421
+        ],
+        [
+          "TableCell",
+          208
+        ],
+        [
+          "Line",
+          41
+        ],
+        [
+          "Reference",
+          2
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "SectionHeader",
+          1
+        ],
+        [
+          "Text",
+          1
+        ],
+        [
+          "Caption",
+          1
+        ],
+        [
+          "Table",
+          1
+        ],
+        [
+          "PageFooter",
+          1
+        ],
+        [
+          "TableGroup",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 7,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          15
+        ],
+        [
+          "Line",
+          5
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "Figure",
+          1
+        ],
+        [
+          "Caption",
+          1
+        ],
+        [
+          "PageFooter",
+          1
+        ],
+        [
+          "FigureGroup",
+          1
+        ],
+        [
+          "Reference",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 8,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          133
+        ],
+        [
+          "TableCell",
+          98
+        ],
+        [
+          "Line",
+          36
+        ],
+        [
+          "Reference",
+          5
+        ],
+        [
+          "SectionHeader",
+          2
+        ],
+        [
+          "Caption",
+          2
+        ],
+        [
+          "Table",
+          2
+        ],
+        [
+          "TableGroup",
+          2
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "Text",
+          1
+        ],
+        [
+          "Footnote",
+          1
+        ],
+        [
+          "PageFooter",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 9,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          200
+        ],
+        [
+          "Line",
+          47
+        ],
+        [
+          "ListItem",
+          10
+        ],
+        [
+          "Text",
+          6
+        ],
+        [
+          "SectionHeader",
+          4
+        ],
+        [
+          "Reference",
+          3
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "Equation",
+          1
+        ],
+        [
+          "PageFooter",
+          1
+        ],
+        [
+          "ListGroup",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 10,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          174
+        ],
+        [
+          "Line",
+          46
+        ],
+        [
+          "Text",
+          9
+        ],
+        [
+          "ListItem",
+          6
+        ],
+        [
+          "SectionHeader",
+          5
+        ],
+        [
+          "Reference",
+          5
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "PageFooter",
+          1
+        ],
+        [
+          "ListGroup",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 11,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          258
+        ],
+        [
+          "Line",
+          39
+        ],
+        [
+          "Text",
+          12
+        ],
+        [
+          "SectionHeader",
+          11
+        ],
+        [
+          "Reference",
+          10
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "PageFooter",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 12,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          5
+        ],
+        [
+          "Line",
+          3
+        ],
+        [
+          "Text",
+          2
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "SectionHeader",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    }
+  ],
+  "debug_data_path": "debug_data/4997Botany22_Soil_Organic_Carbon_Project_Public_Baseline_Report_2022"
+}

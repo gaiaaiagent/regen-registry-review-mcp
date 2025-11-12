@@ -1,0 +1,808 @@
+{
+  "table_of_contents": [
+    {
+      "title": "REGISTRY AGENT REVIEW",
+      "heading_level": null,
+      "page_id": 0,
+      "polygon": [
+        [
+          301.3082275390625,
+          77.296875
+        ],
+        [
+          495.6655578613281,
+          77.296875
+        ],
+        [
+          495.6655578613281,
+          101.296875
+        ],
+        [
+          300.48046875,
+          101.296875
+        ]
+      ]
+    },
+    {
+      "title": "Credit Issuance",
+      "heading_level": null,
+      "page_id": 0,
+      "polygon": [
+        [
+          350.75390625,
+          107.31640625
+        ],
+        [
+          441.456787109375,
+          106.3828125
+        ],
+        [
+          441.456787109375,
+          121.31640625
+        ],
+        [
+          350.75390625,
+          121.31640625
+        ]
+      ]
+    },
+    {
+      "title": "1 Registry Agent Review Overview",
+      "heading_level": null,
+      "page_id": 1,
+      "polygon": [
+        [
+          71.15625,
+          179.259765625
+        ],
+        [
+          312.7732849121094,
+          178.69921875
+        ],
+        [
+          312.7732849121094,
+          195.259765625
+        ],
+        [
+          71.15625,
+          195.259765625
+        ]
+      ]
+    },
+    {
+      "title": "Registry Agent Role in Credit Issuance",
+      "heading_level": null,
+      "page_id": 1,
+      "polygon": [
+        [
+          72.0,
+          209.44207763671875
+        ],
+        [
+          292.48089599609375,
+          208.880859375
+        ],
+        [
+          292.48089599609375,
+          223.44207763671875
+        ],
+        [
+          70.76953125,
+          223.44207763671875
+        ]
+      ]
+    },
+    {
+      "title": "Registry Agent Review Checklist",
+      "heading_level": null,
+      "page_id": 1,
+      "polygon": [
+        [
+          71.54296875,
+          312.7470703125
+        ],
+        [
+          257.84228515625,
+          312.275390625
+        ],
+        [
+          257.84228515625,
+          326.7470703125
+        ],
+        [
+          71.54296875,
+          326.7470703125
+        ]
+      ]
+    },
+    {
+      "title": "Approval Categories",
+      "heading_level": null,
+      "page_id": 1,
+      "polygon": [
+        [
+          71.15625,
+          434.311767578125
+        ],
+        [
+          190.51234436035156,
+          433.8984375
+        ],
+        [
+          190.51234436035156,
+          448.311767578125
+        ],
+        [
+          71.15625,
+          448.311767578125
+        ]
+      ]
+    },
+    {
+      "title": "2 Review Outcome",
+      "heading_level": null,
+      "page_id": 2,
+      "polygon": [
+        [
+          64.96875,
+          199.6171875
+        ],
+        [
+          202.44715881347656,
+          198.421875
+        ],
+        [
+          202.44715881347656,
+          215.9239501953125
+        ],
+        [
+          64.96875,
+          215.9239501953125
+        ]
+      ]
+    },
+    {
+      "title": "Review Status",
+      "heading_level": null,
+      "page_id": 2,
+      "polygon": [
+        [
+          64.96875,
+          230.106201171875
+        ],
+        [
+          148.4130859375,
+          229.201171875
+        ],
+        [
+          148.4130859375,
+          244.106201171875
+        ],
+        [
+          63.421875,
+          244.106201171875
+        ]
+      ]
+    },
+    {
+      "title": "Outcome Summary",
+      "heading_level": null,
+      "page_id": 2,
+      "polygon": [
+        [
+          64.58203125,
+          312.7574462890625
+        ],
+        [
+          179.44422912597656,
+          312.275390625
+        ],
+        [
+          179.44422912597656,
+          326.7574462890625
+        ],
+        [
+          64.58203125,
+          326.7574462890625
+        ]
+      ]
+    },
+    {
+      "title": "Required Actions:",
+      "heading_level": null,
+      "page_id": 2,
+      "polygon": [
+        [
+          64.58203125,
+          458.40234375
+        ],
+        [
+          168.1017608642578,
+          458.40234375
+        ],
+        [
+          168.1017608642578,
+          472.4135437011719
+        ],
+        [
+          64.58203125,
+          472.4135437011719
+        ]
+      ]
+    },
+    {
+      "title": "2.2 3 Registry Agent Review Checklist",
+      "heading_level": null,
+      "page_id": 3,
+      "polygon": [
+        [
+          72.0,
+          118.037109375
+        ],
+        [
+          356.45611572265625,
+          116.841796875
+        ],
+        [
+          356.45611572265625,
+          134.2435302734375
+        ],
+        [
+          71.54296875,
+          134.2435302734375
+        ]
+      ]
+    }
+  ],
+  "page_stats": [
+    {
+      "page_id": 0,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          247
+        ],
+        [
+          "Line",
+          30
+        ],
+        [
+          "TableCell",
+          18
+        ],
+        [
+          "SectionHeader",
+          2
+        ],
+        [
+          "PageHeader",
+          1
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "Table",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 1,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          493
+        ],
+        [
+          "Line",
+          25
+        ],
+        [
+          "SectionHeader",
+          4
+        ],
+        [
+          "Text",
+          4
+        ],
+        [
+          "PageHeader",
+          1
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "Figure",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 2,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          420
+        ],
+        [
+          "Line",
+          20
+        ],
+        [
+          "Text",
+          7
+        ],
+        [
+          "SectionHeader",
+          4
+        ],
+        [
+          "Picture",
+          2
+        ],
+        [
+          "ListItem",
+          2
+        ],
+        [
+          "ListGroup",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 3,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          299
+        ],
+        [
+          "Line",
+          51
+        ],
+        [
+          "TableCell",
+          19
+        ],
+        [
+          "PageHeader",
+          1
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "SectionHeader",
+          1
+        ],
+        [
+          "Table",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 4,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          474
+        ],
+        [
+          "Line",
+          76
+        ],
+        [
+          "TableCell",
+          36
+        ],
+        [
+          "PageHeader",
+          1
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "Table",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 5,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          264
+        ],
+        [
+          "TableCell",
+          174
+        ],
+        [
+          "Line",
+          55
+        ],
+        [
+          "PageHeader",
+          1
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "Table",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 6,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          426
+        ],
+        [
+          "TableCell",
+          184
+        ],
+        [
+          "Line",
+          70
+        ],
+        [
+          "PageHeader",
+          1
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "Table",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 7,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          302
+        ],
+        [
+          "Line",
+          56
+        ],
+        [
+          "TableCell",
+          22
+        ],
+        [
+          "PageHeader",
+          1
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "Table",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 8,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          476
+        ],
+        [
+          "Line",
+          69
+        ],
+        [
+          "TableCell",
+          24
+        ],
+        [
+          "PageHeader",
+          1
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "Table",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 9,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          289
+        ],
+        [
+          "Line",
+          47
+        ],
+        [
+          "TableCell",
+          24
+        ],
+        [
+          "PageHeader",
+          1
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "Table",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 10,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          329
+        ],
+        [
+          "TableCell",
+          186
+        ],
+        [
+          "Line",
+          56
+        ],
+        [
+          "PageHeader",
+          1
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "Table",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 11,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          340
+        ],
+        [
+          "TableCell",
+          168
+        ],
+        [
+          "Line",
+          57
+        ],
+        [
+          "PageHeader",
+          1
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "Table",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 12,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          363
+        ],
+        [
+          "Line",
+          59
+        ],
+        [
+          "TableCell",
+          24
+        ],
+        [
+          "PageHeader",
+          1
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "Table",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 13,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          168
+        ],
+        [
+          "Line",
+          27
+        ],
+        [
+          "TableCell",
+          12
+        ],
+        [
+          "PageHeader",
+          1
+        ],
+        [
+          "Picture",
+          1
+        ],
+        [
+          "Table",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    }
+  ],
+  "debug_data_path": "debug_data/Botany_Farm_Credit_Issuance_Registry_Agent_Review_2023_Monitoring"
+}
