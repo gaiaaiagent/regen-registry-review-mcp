@@ -223,6 +223,76 @@ async def list_sessions() -> str:
 
 
 @mcp.tool()
+async def start_review(
+    project_name: str,
+    documents_path: str,
+    methodology: str = "soil-carbon-v1.2.2",
+    project_id: str | None = None,
+) -> str:
+    """Quick-start: Create session and discover documents in one step.
+
+    This is a convenience tool that combines create_session and discover_documents
+    for a streamlined workflow.
+
+    Args:
+        project_name: Name of the project being reviewed
+        documents_path: Absolute path to directory containing project documents
+        methodology: Methodology identifier (default: soil-carbon-v1.2.2)
+        project_id: Project ID if known (e.g., C06-4997)
+
+    Returns:
+        Combined session creation and document discovery results
+    """
+    try:
+        logger.info(f"Starting review for project: {project_name}")
+
+        # Create session
+        session_result = await session_tools.create_session(
+            project_name=project_name,
+            documents_path=documents_path,
+            methodology=methodology,
+            project_id=project_id,
+        )
+
+        session_id = session_result["session_id"]
+        logger.info(f"Session created: {session_id}")
+
+        # Discover documents
+        discovery_result = await document_tools.discover_documents(session_id)
+
+        # Format summary
+        summary_lines = []
+        for doc_type, count in sorted(discovery_result["classification_summary"].items()):
+            summary_lines.append(f"  - {doc_type}: {count}")
+
+        summary = "\n".join(summary_lines) if summary_lines else "  (none found)"
+
+        return f"""✓ Review Started Successfully
+
+Session ID: {session_id}
+Project: {project_name}
+Methodology: {methodology}
+Documents Path: {documents_path}
+Created: {session_result['created_at']}
+
+Document Discovery Complete:
+  Found {discovery_result['documents_found']} document(s)
+
+Classification Summary:
+{summary}
+
+Next Steps:
+  - Review the document classifications
+  - Use the /document-discovery prompt for detailed results
+  - Or proceed to evidence extraction (Phase 3)
+"""
+
+    except Exception as e:
+        logger.error(f"Failed to start review: {e}", exc_info=True)
+        return f"✗ Error: {str(e)}"
+
+
+@mcp.tool()
 async def delete_session(session_id: str) -> str:
     """Delete a review session and all its data.
 
@@ -400,6 +470,7 @@ def list_capabilities() -> list[TextContent]:
 ### Tools Available
 
 **Session Management:**
+- `start_review` - Quick-start: Create session and discover documents in one step
 - `create_session` - Create new review session
 - `load_session` - Load existing session
 - `update_session_state` - Update session progress
@@ -439,16 +510,25 @@ def list_capabilities() -> list[TextContent]:
 
 ## Getting Started
 
-1. Create a session:
-   ```
-   create_session(
-       project_name="Botany Farm",
-       documents_path="/absolute/path/to/documents",
-       methodology="soil-carbon-v1.2.2"
-   )
-   ```
+**Quick Start (Recommended):**
+```
+start_review(
+    project_name="Botany Farm",
+    documents_path="/absolute/path/to/documents",
+    methodology="soil-carbon-v1.2.2"
+)
+```
+This creates a session and discovers all documents in one step.
 
-2. Next steps will be provided after session creation
+**Or use the prompt directly:**
+```
+/document-discovery
+```
+This will auto-select your most recent session, or guide you to create one if none exists.
+
+**Manual workflow:**
+1. Create a session with `create_session`
+2. Discover documents with `discover_documents` or `/document-discovery` prompt
 
 ## Status
 
@@ -465,11 +545,11 @@ def list_capabilities() -> list[TextContent]:
 
 
 @mcp.prompt()
-async def document_discovery_workflow(session_id: str) -> list[TextContent]:
+async def document_discovery_workflow(session_id: str | None = None) -> list[TextContent]:
     """Run the document discovery workflow for a session.
 
     Args:
-        session_id: Unique session identifier
+        session_id: Optional session identifier. If not provided, uses most recent session.
 
     Returns:
         Detailed document discovery results with next steps

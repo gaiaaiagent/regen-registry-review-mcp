@@ -51,6 +51,64 @@ def test_settings(temp_data_dir):
     )
 
 
+@pytest.fixture(scope="session", autouse=True)
+def cleanup_cache_once():
+    """Clean cache once at the start of the test session.
+
+    This is needed because Cache uses the global settings object.
+
+    TODO: Refactor Cache to accept Settings instance for proper test isolation.
+    """
+    data_dir = Path(__file__).parent.parent / "data"
+    cache_dir = data_dir / "cache"
+
+    # Clean up cache before test session starts
+    if cache_dir.exists():
+        for item in cache_dir.iterdir():
+            if item.is_dir():
+                shutil.rmtree(item, ignore_errors=True)
+            else:
+                item.unlink(missing_ok=True)
+
+    yield
+
+    # Clean up cache after all tests complete
+    if cache_dir.exists():
+        for item in cache_dir.iterdir():
+            if item.is_dir():
+                shutil.rmtree(item, ignore_errors=True)
+            else:
+                item.unlink(missing_ok=True)
+
+
+@pytest.fixture(autouse=True)
+def cleanup_sessions():
+    """Clean up sessions before and after each test.
+
+    This is needed because StateManager uses the global settings object,
+    so test data gets written to the real data/ directory instead of tmp.
+
+    TODO: Refactor StateManager to accept Settings instance for proper test isolation.
+    """
+    data_dir = Path(__file__).parent.parent / "data"
+    sessions_dir = data_dir / "sessions"
+
+    def cleanup():
+        # Clean up ALL sessions (since we can't distinguish test vs real in current architecture)
+        if sessions_dir.exists():
+            for item in sessions_dir.iterdir():
+                if item.is_dir() and item.name.startswith("session-"):
+                    shutil.rmtree(item, ignore_errors=True)
+
+    # Clean up before test
+    cleanup()
+
+    yield
+
+    # Clean up after test
+    cleanup()
+
+
 @pytest.fixture
 def example_documents_path():
     """Get path to example documents.

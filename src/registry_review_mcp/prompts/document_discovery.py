@@ -2,27 +2,78 @@
 
 from mcp.types import TextContent
 
-from ..tools import document_tools
+from ..tools import document_tools, session_tools
 from ..utils.state import StateManager
 
 
-async def document_discovery_prompt(session_id: str) -> list[TextContent]:
+async def document_discovery_prompt(session_id: str | None = None) -> list[TextContent]:
     """Discover and classify all project documents.
 
     Args:
-        session_id: Unique session identifier
+        session_id: Optional session identifier. If not provided, uses most recent session.
 
     Returns:
         Formatted workflow guidance with results
     """
+    # Auto-select session if not provided
+    if not session_id:
+        sessions = await session_tools.list_sessions()
+
+        if not sessions:
+            # No sessions exist - provide helpful guidance
+            error_message = """# Welcome to Registry Review MCP
+
+No sessions found. Let's get started!
+
+## Step 1: Create a Review Session
+
+Use the `create_session` tool to begin:
+
+**Example for the Botany Farm project:**
+```
+create_session(
+    project_name="Botany Farm 2022-2023",
+    documents_path="/absolute/path/to/examples/22-23",
+    methodology="soil-carbon-v1.2.2"
+)
+```
+
+**Or create your own:**
+```
+create_session(
+    project_name="Your Project Name",
+    documents_path="/absolute/path/to/your/documents",
+    methodology="soil-carbon-v1.2.2"
+)
+```
+
+Once you have a session, this prompt will automatically discover and classify all documents.
+"""
+            return [TextContent(type="text", text=error_message)]
+
+        # Use most recent session
+        session_id = sessions[0]["session_id"]
+        auto_selected = True
+    else:
+        auto_selected = False
+
     # Validate session exists
     state_manager = StateManager(session_id)
     if not state_manager.exists():
+        # List available sessions to help user
+        sessions = await session_tools.list_sessions()
+        session_list = "\n".join([f"  • {s['session_id']} - {s.get('project_name', 'Unknown')}"
+                                   for s in sessions])
+
         error_message = f"""✗ Error: Session Not Found
 
 Session ID: {session_id}
 
-The specified session does not exist. Create a new session first using the create_session tool.
+This session does not exist. Available sessions:
+
+{session_list if sessions else "  (none)"}
+
+Create a new session using the create_session tool.
 """
         return [TextContent(type="text", text=error_message)]
 
@@ -75,8 +126,13 @@ Please verify:
 The system found {results['documents_found']} document(s) and is ready to extract evidence.
 """
 
-        response = f"""# Document Discovery Complete
+        # Add auto-selection notice if applicable
+        auto_notice = ""
+        if auto_selected:
+            auto_notice = f"\n*Note: Auto-selected most recent session*\n"
 
+        response = f"""# Document Discovery Complete
+{auto_notice}
 **Project:** {project_name}
 **Session:** {session_id}
 **Documents Path:** {documents_path}

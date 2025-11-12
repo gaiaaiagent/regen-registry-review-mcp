@@ -81,7 +81,12 @@ class TestStateManager:
 
     def test_exists(self, test_settings):
         """Test checking file existence."""
-        manager = StateManager("test-session")
+        manager = StateManager("test-session-exists")
+
+        # Ensure clean state (cleanup fixture may not have run yet)
+        if manager.exists():
+            import shutil
+            shutil.rmtree(manager.session_dir, ignore_errors=True)
 
         assert not manager.exists()  # Session doesn't exist yet
 
@@ -110,7 +115,10 @@ class TestCache:
 
     def test_cache_exists(self, test_settings):
         """Test checking if key exists."""
-        cache = Cache("test")
+        cache = Cache("test-exists")
+
+        # Ensure clean state
+        cache.delete("key1")
 
         assert not cache.exists("key1")
 

@@ -96,6 +96,9 @@ class Cache:
         ttl = ttl or settings.pdf_cache_ttl
         cache_path = self._get_cache_path(key)
 
+        # Ensure cache directory exists (may have been deleted)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+
         cache_data = {
             "key": key,
             "value": value,
