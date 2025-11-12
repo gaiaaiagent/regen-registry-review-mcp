@@ -3,6 +3,7 @@
 READ TRANSCRIPTS:
 @docs/transcripts/2025-09-17-regen-network-ai-agents.md                                         │
 @docs/transcripts/2025-10-21-project-registration-review-process.md                             │
+@docs/transcripts/2025-11-07-regen-network-community-call.md                                    │
 @docs/transcripts/2025-11-11-transcript-synthesis.md        
 
 READ SPECS:
