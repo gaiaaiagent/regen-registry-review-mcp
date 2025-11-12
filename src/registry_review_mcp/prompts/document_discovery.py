@@ -6,56 +6,87 @@ from ..tools import document_tools, session_tools
 from ..utils.state import StateManager
 
 
-async def document_discovery_prompt(session_id: str | None = None) -> list[TextContent]:
+async def document_discovery_prompt(
+    project_name: str | None = None,
+    documents_path: str | None = None,
+    session_id: str | None = None
+) -> list[TextContent]:
     """Discover and classify all project documents.
 
+    Can either use an existing session or create a new one.
+
     Args:
-        session_id: Optional session identifier. If not provided, uses most recent session.
+        project_name: Project name (creates new session if provided with documents_path)
+        documents_path: Path to documents (creates new session if provided with project_name)
+        session_id: Optional existing session ID (overrides project_name/documents_path)
 
     Returns:
         Formatted workflow guidance with results
     """
-    # Auto-select session if not provided
-    if not session_id:
+    auto_selected = False
+
+    # Case 1: Session ID provided explicitly
+    if session_id:
+        auto_selected = False
+
+    # Case 2: Project details provided - create new session
+    elif project_name and documents_path:
+        try:
+            result = await session_tools.create_session(
+                project_name=project_name,
+                documents_path=documents_path,
+                methodology="soil-carbon-v1.2.2"
+            )
+            session_id = result["session_id"]
+            auto_selected = False
+        except Exception as e:
+            error_message = f"""# ❌ Error Creating Session
+
+Failed to create session: {str(e)}
+
+Please check your inputs and try again.
+"""
+            return [TextContent(type="text", text=error_message)]
+
+    # Case 3: No parameters - try to use most recent session
+    else:
         sessions = await session_tools.list_sessions()
 
         if not sessions:
-            # No sessions exist - provide helpful guidance
-            error_message = """# Welcome to Registry Review MCP
+            # No sessions exist - provide usage help
+            error_message = """# Registry Review Workflow - Document Discovery
 
-No sessions found. Let's get started!
+No review sessions found. You can either:
 
-## Step 1: Create a Review Session
+## Option 1: Create Session & Discover (Recommended)
 
-Use the `create_session` tool to begin:
+Provide project details directly to this prompt:
 
-**Example for the Botany Farm project:**
-```
-create_session(
-    project_name="Botany Farm 2022-2023",
-    documents_path="/absolute/path/to/examples/22-23",
-    methodology="soil-carbon-v1.2.2"
-)
-```
+`/document-discovery Your Project Name, /absolute/path/to/documents`
 
-**Or create your own:**
-```
-create_session(
-    project_name="Your Project Name",
-    documents_path="/absolute/path/to/your/documents",
-    methodology="soil-carbon-v1.2.2"
-)
-```
+**Example:**
+`/document-discovery Botany Farm 2022-2023, /home/ygg/Workspace/RegenAI/regen-registry-review-mcp/examples/22-23`
 
-Once you have a session, this prompt will automatically discover and classify all documents.
+This will:
+1. ✅ Create a new session
+2. ✅ Discover all documents
+3. ✅ Classify files by type
+
+All in one step!
+
+## Option 2: Use Initialize First
+
+Alternatively, create a session with `/initialize` first:
+
+`/initialize Botany Farm 2022-2023, /path/to/documents`
+
+Then run `/document-discovery` again.
 """
             return [TextContent(type="text", text=error_message)]
 
         # Use most recent session
         session_id = sessions[0]["session_id"]
         auto_selected = True
-    else:
-        auto_selected = False
 
     # Validate session exists
     state_manager = StateManager(session_id)

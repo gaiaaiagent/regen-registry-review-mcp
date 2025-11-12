@@ -274,7 +274,9 @@ async def map_requirement(
 
     # Load checklist
     checklist_path = settings.get_checklist_path("soil-carbon-v1.2.2")
-    checklist_data = state_manager._read_json_file(checklist_path)  # Direct read from checklist dir
+    import json
+    with open(checklist_path, "r") as f:
+        checklist_data = json.load(f)
     requirements = checklist_data.get("requirements", [])
 
     # Find the requirement
@@ -440,7 +442,7 @@ async def extract_structured_field(
             continue
 
         for pattern in field_patterns:
-            match = re.search(pattern, content, re.IGNORECASE | re.MULTILINE)
+            match = re.search(pattern, content, re.IGNORECASE | re.MULTILINE | re.DOTALL)
             if match:
                 value = match.group(1) if match.groups() else match.group(0)
 

@@ -10,7 +10,7 @@ from registry_review_mcp.utils.state import StateManager
 class TestKeywordExtraction:
     """Test keyword extraction from requirements."""
 
-    def test_extract_keywords_from_requirement():
+    def test_extract_keywords_from_requirement(self):
         """Test extracting search keywords from requirement text."""
         requirement = {
             "requirement_id": "REQ-002",
@@ -212,8 +212,9 @@ class TestStructuredFieldExtraction:
                 session_id=session_id,
                 field_name="project_start_date",
                 field_patterns=[
-                    r"Project Start Date[:\s]+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
-                    r"Start Date[:\s]+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})"
+                    r"1\.8\.\s+Project Start Date.*?(\d{1,2}/\d{1,2}/\d{4})",
+                    r"Project Start Date.*?(\d{1,2}/\d{1,2}/\d{4})",
+                    r"project start date.*?(\d{1,2}/\d{1,2}/\d{4})"
                 ]
             )
 

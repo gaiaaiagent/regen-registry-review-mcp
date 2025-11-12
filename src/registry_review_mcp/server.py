@@ -13,8 +13,8 @@ from mcp.types import TextContent
 
 from .config.settings import settings
 from .models import errors as mcp_errors
-from .tools import session_tools, document_tools
-from .prompts import document_discovery
+from .tools import session_tools, document_tools, evidence_tools
+from .prompts import initialize, document_discovery, evidence_extraction
 
 # ============================================================================
 # Logging Setup (CRITICAL: Must write to stderr, NOT stdout)
@@ -449,6 +449,123 @@ Schema: {results.get('schema', 'Not available')}
 
 
 # ============================================================================
+# Evidence Extraction Tools (Phase 3)
+# ============================================================================
+
+
+@mcp.tool()
+async def extract_evidence(session_id: str) -> str:
+    """Extract evidence for all requirements from discovered documents.
+
+    This tool maps each requirement in the checklist to relevant documents,
+    extracts evidence snippets with page citations, and calculates coverage statistics.
+
+    Args:
+        session_id: Unique session identifier
+
+    Returns:
+        Summary of evidence extraction results with coverage statistics
+    """
+    try:
+        logger.info(f"Extracting evidence for session: {session_id}")
+
+        results = await evidence_tools.extract_all_evidence(session_id)
+
+        # Format summary
+        return f"""✓ Evidence Extraction Complete
+
+Session: {session_id}
+
+Coverage Summary:
+  Total Requirements: {results['requirements_total']}
+  ✅ Covered: {results['requirements_covered']} ({results['requirements_covered']/results['requirements_total']*100:.1f}%)
+  ⚠️  Partial: {results['requirements_partial']} ({results['requirements_partial']/results['requirements_total']*100:.1f}%)
+  ❌ Missing: {results['requirements_missing']} ({results['requirements_missing']/results['requirements_total']*100:.1f}%)
+  Overall Coverage: {results['overall_coverage']*100:.1f}%
+
+Results saved to: evidence.json
+Session updated with coverage statistics
+
+Use the /evidence-extraction prompt for detailed results and next steps.
+"""
+
+    except mcp_errors.SessionNotFoundError:
+        return f"✗ Session not found: {session_id}"
+
+    except Exception as e:
+        logger.error(f"Failed to extract evidence: {e}", exc_info=True)
+        return f"✗ Error: {str(e)}"
+
+
+@mcp.tool()
+async def map_requirement(session_id: str, requirement_id: str) -> str:
+    """Map a single requirement to documents and extract evidence.
+
+    Args:
+        session_id: Unique session identifier
+        requirement_id: Requirement ID (e.g., "REQ-002", "REQ-007")
+
+    Returns:
+        Evidence details for the specific requirement
+    """
+    try:
+        logger.info(f"Mapping requirement {requirement_id} for session: {session_id}")
+
+        result = await evidence_tools.map_requirement(session_id, requirement_id)
+
+        # Format response
+        status_emoji = {
+            "covered": "✅",
+            "partial": "⚠️",
+            "missing": "❌",
+            "flagged": "🚩"
+        }
+
+        emoji = status_emoji.get(result['status'], "❓")
+
+        response = f"""✓ Requirement Mapping Complete
+
+{emoji} {result['requirement_id']}: {result['requirement_text']}
+
+Status: {result['status'].upper()}
+Confidence: {result['confidence']:.2f}
+Category: {result['category']}
+
+Mapped Documents ({len(result['mapped_documents'])}):
+"""
+
+        for doc in result['mapped_documents'][:5]:
+            response += f"  - {doc['document_name']} (relevance: {doc['relevance_score']:.2f})\n"
+
+        if len(result['mapped_documents']) > 5:
+            response += f"  ... and {len(result['mapped_documents']) - 5} more\n"
+
+        response += f"\nEvidence Snippets ({len(result['evidence_snippets'])}):\n"
+
+        for idx, snippet in enumerate(result['evidence_snippets'][:3], 1):
+            page_info = f" (page {snippet['page']})" if snippet.get('page') else ""
+            section_info = f" - {snippet['section']}" if snippet.get('section') else ""
+            response += f"\n{idx}. {snippet['document_name']}{page_info}{section_info}\n"
+            response += f"   {snippet['text'][:150]}...\n"
+            response += f"   Confidence: {snippet['confidence']:.2f}\n"
+
+        if len(result['evidence_snippets']) > 3:
+            response += f"\n... and {len(result['evidence_snippets']) - 3} more snippets\n"
+
+        return response
+
+    except mcp_errors.SessionNotFoundError:
+        return f"✗ Session not found: {session_id}"
+
+    except ValueError as e:
+        return f"✗ {str(e)}"
+
+    except Exception as e:
+        logger.error(f"Failed to map requirement: {e}", exc_info=True)
+        return f"✗ Error: {str(e)}"
+
+
+# ============================================================================
 # Prompts
 # ============================================================================
 
@@ -482,8 +599,11 @@ def list_capabilities() -> list[TextContent]:
 - `extract_pdf_text` - Extract text from PDF files
 - `extract_gis_metadata` - Extract GIS shapefile metadata
 
-**Coming Soon (Phase 3-5):**
-- Evidence extraction and requirement mapping
+**Evidence Extraction (Phase 3):**
+- `extract_evidence` - Map all requirements to documents and extract evidence
+- `map_requirement` - Map a single requirement to documents with evidence snippets
+
+**Coming Soon (Phase 4-5):**
 - Cross-document validation
 - Report generation
 
@@ -520,21 +640,23 @@ start_review(
 ```
 This creates a session and discovers all documents in one step.
 
-**Or use the prompt directly:**
+**Or use the prompts directly:**
 ```
 /document-discovery
+/evidence-extraction
 ```
-This will auto-select your most recent session, or guide you to create one if none exists.
+These will auto-select your most recent session, or guide you to create one if none exists.
 
 **Manual workflow:**
 1. Create a session with `create_session`
 2. Discover documents with `discover_documents` or `/document-discovery` prompt
+3. Extract evidence with `extract_evidence` or `/evidence-extraction` prompt
 
 ## Status
 
 - **Phase 1 (Foundation):** ✅ Complete (Session management, infrastructure)
-- **Phase 2 (Document Processing):** 🚧 In Progress
-- **Phase 3 (Evidence Extraction):** 📋 Planned
+- **Phase 2 (Document Processing):** ✅ Complete (Document discovery, classification, PDF/GIS extraction)
+- **Phase 3 (Evidence Extraction):** ✅ Complete (Requirement mapping, evidence snippets, coverage analysis)
 - **Phase 4 (Validation & Reporting):** 📋 Planned
 - **Phase 5 (Integration & Polish):** 📋 Planned
 
@@ -545,16 +667,68 @@ This will auto-select your most recent session, or guide you to create one if no
 
 
 @mcp.prompt()
-async def document_discovery_workflow(session_id: str | None = None) -> list[TextContent]:
-    """Run the document discovery workflow for a session.
+async def initialize_workflow(
+    project_name: str | None = None,
+    documents_path: str | None = None
+) -> list[TextContent]:
+    """Initialize a new registry review session (Stage 1).
+
+    Creates a new review session with project metadata and prepares for document discovery.
+
+    Args:
+        project_name: Name of the project being reviewed
+        documents_path: Absolute path to directory containing project documents
+
+    Returns:
+        Session creation results with next step guidance
+
+    Examples:
+        /initialize Botany Farm 2022-2023, /path/to/documents/22-23
+        /initialize My Project, /home/user/projects/my-project
+    """
+    return await initialize.initialize_prompt(project_name, documents_path)
+
+
+@mcp.prompt()
+async def document_discovery_workflow(
+    project_name: str | None = None,
+    documents_path: str | None = None,
+    session_id: str | None = None
+) -> list[TextContent]:
+    """Run the document discovery workflow for a session (Stage 2).
+
+    Can create a new session or use an existing one.
+
+    Args:
+        project_name: Project name (creates session if provided with documents_path)
+        documents_path: Absolute path to documents (creates session if provided with project_name)
+        session_id: Optional session ID (overrides project_name/documents_path)
+
+    Returns:
+        Detailed document discovery results with next steps
+
+    Examples:
+        /document-discovery Botany Farm 2022-2023, /path/to/documents
+        /document-discovery (uses most recent session)
+    """
+    return await document_discovery.document_discovery_prompt(project_name, documents_path, session_id)
+
+
+@mcp.prompt()
+async def evidence_extraction_workflow(session_id: str | None = None) -> list[TextContent]:
+    """Run the evidence extraction workflow for a session.
+
+    This prompt maps checklist requirements to discovered documents, extracts evidence
+    snippets with page citations, and calculates coverage statistics.
 
     Args:
         session_id: Optional session identifier. If not provided, uses most recent session.
 
     Returns:
-        Detailed document discovery results with next steps
+        Detailed evidence extraction results with coverage analysis
     """
-    return await document_discovery.document_discovery_prompt(session_id)
+    result = await evidence_extraction.evidence_extraction(session_id)
+    return [TextContent(type="text", text=result)]
 
 
 # ============================================================================
