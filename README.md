@@ -22,7 +22,7 @@ The Registry Review MCP Server automates the manual document review process for 
 
 ## Quick Start
 
-\`\`\`bash
+```bash
 # Install dependencies
 uv sync
 
@@ -31,12 +31,12 @@ uv run python -m registry_review_mcp.server
 
 # Or run tests
 uv run pytest
-\`\`\`
+```
 
 Once integrated with Claude Desktop, try:
-\`\`\`
+```
 /document-discovery
-\`\`\`
+```
 
 The prompt will guide you through creating a session if needed, then discover and classify all project documents automatically.
 
@@ -81,7 +81,7 @@ The prompt will guide you through creating a session if needed, then discover an
 
 ### Setup
 
-\`\`\`bash
+```bash
 # Clone repository
 cd regen-registry-review-mcp
 
@@ -90,7 +90,7 @@ uv sync
 
 # Verify installation
 uv run python -m registry_review_mcp.server
-\`\`\`
+```
 
 ---
 
@@ -100,7 +100,7 @@ uv run python -m registry_review_mcp.server
 
 Add to \`claude_desktop_config.json\`:
 
-\`\`\`json
+```json
 {
   "mcpServers": {
     "registry-review": {
@@ -119,7 +119,7 @@ Add to \`claude_desktop_config.json\`:
     }
   }
 }
-\`\`\`
+```
 
 Restart Claude Desktop to load the server.
 
@@ -132,9 +132,9 @@ Restart Claude Desktop to load the server.
 **1. Easiest: Use the Document Discovery Prompt**
 
 Simply call the prompt without any parameters:
-\`\`\`
+```
 /document-discovery
-\`\`\`
+```
 
 The prompt will:
 - Auto-select your most recent session, or
@@ -145,18 +145,18 @@ The prompt will:
 **2. Quick-Start Tool (Recommended for New Projects)**
 
 Create a session and discover documents in one command:
-\`\`\`
+```
 start_review(
     project_name="Botany Farm 2022-2023",
     documents_path="/absolute/path/to/examples/22-23",
     methodology="soil-carbon-v1.2.2"
 )
-\`\`\`
+```
 
 **3. Manual Workflow (Most Control)**
 
 Step-by-step control over the process:
-\`\`\`
+```
 # Step 1: Create a session
 create_session(
     project_name="My Project",
@@ -177,7 +177,7 @@ extract_pdf_text(
 
 # Step 4: Get GIS metadata
 extract_gis_metadata(filepath="/path/to/boundary.shp")
-\`\`\`
+```
 
 ### Available Tools
 
@@ -198,7 +198,7 @@ extract_gis_metadata(filepath="/path/to/boundary.shp")
 
 ### Example Session
 
-\`\`\`
+```
 # Start a new review (auto-creates session + discovers docs)
 > start_review(
     project_name="Botany Farm",
@@ -254,7 +254,7 @@ Found **7 document(s)**
 Next Steps:
 1. Review the document classification above
 2. Proceed to evidence extraction (Phase 3)
-\`\`\`
+```
 
 ---
 
@@ -262,7 +262,7 @@ Next Steps:
 
 ### Running Tests
 
-\`\`\`bash
+```bash
 # Run all tests
 uv run pytest
 
@@ -274,7 +274,7 @@ uv run pytest tests/test_infrastructure.py -v
 uv run pytest tests/test_document_processing.py -v
 uv run pytest tests/test_locking.py -v
 uv run pytest tests/test_user_experience.py -v
-\`\`\`
+```
 
 **Current Test Coverage:**
 - 36 total tests
@@ -285,19 +285,19 @@ uv run pytest tests/test_user_experience.py -v
 
 ### Code Quality
 
-\`\`\`bash
+```bash
 # Format code
 uv run black src/ tests/
 
 # Lint code
 uv run ruff check src/ tests/
-\`\`\`
+```
 
 ---
 
 ## Project Structure
 
-\`\`\`
+```
 regen-registry-review-mcp/
 ├── src/registry_review_mcp/   # Main package
 │   ├── server.py               # MCP entry point
@@ -325,7 +325,7 @@ regen-registry-review-mcp/
 ├── pyproject.toml
 ├── ROADMAP.md
 └── README.md
-\`\`\`
+```
 
 ---
 
