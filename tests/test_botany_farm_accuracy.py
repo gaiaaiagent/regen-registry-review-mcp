@@ -8,6 +8,11 @@ import pytest
 from pathlib import Path
 
 from registry_review_mcp.config.settings import settings
+from registry_review_mcp.extractors.llm_extractors import (
+    DateExtractor,
+    LandTenureExtractor,
+    ProjectIDExtractor,
+)
 
 
 pytestmark = pytest.mark.skipif(
