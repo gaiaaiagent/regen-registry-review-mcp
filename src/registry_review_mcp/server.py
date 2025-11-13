@@ -13,8 +13,8 @@ from mcp.types import TextContent
 
 from .config.settings import settings
 from .models import errors as mcp_errors
-from .tools import session_tools, document_tools, evidence_tools
-from .prompts import initialize, document_discovery, evidence_extraction
+from .tools import session_tools, document_tools, evidence_tools, validation_tools, report_tools
+from .prompts import initialize, document_discovery, evidence_extraction, cross_validation, report_generation
 
 # ============================================================================
 # Logging Setup (CRITICAL: Must write to stderr, NOT stdout)
@@ -657,7 +657,7 @@ These will auto-select your most recent session, or guide you to create one if n
 - **Phase 1 (Foundation):** ✅ Complete (Session management, infrastructure)
 - **Phase 2 (Document Processing):** ✅ Complete (Document discovery, classification, PDF/GIS extraction)
 - **Phase 3 (Evidence Extraction):** ✅ Complete (Requirement mapping, evidence snippets, coverage analysis)
-- **Phase 4 (Validation & Reporting):** 📋 Planned
+- **Phase 4 (Validation & Reporting):** ✅ Complete (Cross-validation, report generation in Markdown/JSON)
 - **Phase 5 (Integration & Polish):** 📋 Planned
 
 **Last Updated:** {datetime.now().strftime("%Y-%m-%d %H:%M UTC")}
@@ -716,7 +716,7 @@ async def document_discovery_workflow(
 
 @mcp.prompt()
 async def evidence_extraction_workflow(session_id: str | None = None) -> list[TextContent]:
-    """Run the evidence extraction workflow for a session.
+    """Run the evidence extraction workflow for a session (Stage 3).
 
     This prompt maps checklist requirements to discovered documents, extracts evidence
     snippets with page citations, and calculates coverage statistics.
@@ -726,9 +726,53 @@ async def evidence_extraction_workflow(session_id: str | None = None) -> list[Te
 
     Returns:
         Detailed evidence extraction results with coverage analysis
+
+    Examples:
+        /evidence-extraction (uses most recent session)
+        /evidence-extraction session-abc123
     """
     result = await evidence_extraction.evidence_extraction(session_id)
     return [TextContent(type="text", text=result)]
+
+
+@mcp.prompt()
+async def cross_validation_workflow(session_id: str | None = None) -> list[TextContent]:
+    """Run cross-document validation checks for a session (Stage 4).
+
+    Validates consistency across documents including date alignment, land tenure,
+    and project ID consistency. Flags discrepancies for human review.
+
+    Args:
+        session_id: Optional session identifier. If not provided, uses most recent session.
+
+    Returns:
+        Validation results with summary statistics and flagged items
+
+    Examples:
+        /cross-validation (uses most recent session)
+        /cross-validation session-abc123
+    """
+    return await cross_validation.cross_validation_prompt(session_id)
+
+
+@mcp.prompt()
+async def report_generation_workflow(session_id: str | None = None) -> list[TextContent]:
+    """Generate complete review report in multiple formats (Stage 5).
+
+    Creates Markdown and JSON reports with all findings, evidence citations,
+    validation results, and items requiring human review.
+
+    Args:
+        session_id: Optional session identifier. If not provided, uses most recent session.
+
+    Returns:
+        Report generation summary with paths to generated files
+
+    Examples:
+        /report-generation (uses most recent session)
+        /report-generation session-abc123
+    """
+    return await report_generation.report_generation_prompt(session_id)
 
 
 # ============================================================================

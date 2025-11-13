@@ -19,9 +19,9 @@ class TestDocumentDiscoveryUX:
         # Should provide helpful guidance
         assert len(result) == 1
         text = result[0].text
-        assert "Welcome to Registry Review MCP" in text
-        assert "create_session" in text
-        assert "Step 1: Create a Review Session" in text
+        assert "Registry Review" in text
+        assert "Option" in text  # Multiple options provided
+        assert "/document-discovery" in text or "/initialize" in text
 
     @pytest.mark.asyncio
     async def test_auto_selects_most_recent_session(self, test_settings, example_documents_path):

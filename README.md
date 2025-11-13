@@ -1,8 +1,8 @@
 # Registry Review MCP Server
 
 **Version:** 2.0.0
-**Status:** Phase 3 Complete (Evidence Extraction)
-**Next:** Phase 4 (Cross-Validation & Reporting)
+**Status:** Phase 4 Complete (Cross-Validation & Report Generation)
+**Next:** Phase 5 (Integration & Polish)
 
 Automated registry review workflows for carbon credit project registration using the Model Context Protocol (MCP).
 
@@ -39,6 +39,8 @@ Once integrated with Claude Desktop, try the complete workflow:
 /initialize Botany Farm 2022-2023, /absolute/path/to/examples/22-23
 /document-discovery
 /evidence-extraction
+/cross-validation
+/report-generation
 ```
 
 The prompts guide you through the entire review process automatically!
@@ -79,12 +81,20 @@ The prompts guide you through the entire review process automatically!
 - **Coverage Analysis** - Overall statistics with confidence scores (85-90% accuracy on test data)
 - **Structured Field Extraction** - Extract specific data fields (dates, IDs) using regex patterns
 
-### 🚧 Phase 4-5: Planned
+### ✅ Phase 4: Validation & Reporting (Complete)
 
-- Cross-document validation (dates, land tenure, project IDs) - Phase 4
-- Contradiction detection - Phase 4
-- Report generation - Markdown, JSON, PDF - Phase 4
-- Human review workflow - Phase 5
+- **Cross-Document Validation** - Date alignment (120-day rule), land tenure (fuzzy matching), project ID consistency
+- **Validation Results** - Status indicators (pass/warning/fail) with flagged items for review
+- **Report Generation** - Markdown and JSON formats with complete findings and evidence
+- **Structured Output** - Machine-readable reports with all evidence, validations, and citations
+- **Summary Statistics** - Requirements coverage, validation results, items for human review
+
+### 📋 Phase 5: Planned
+
+- Human review workflow and approval decision support
+- Export to additional formats (PDF, CSV)
+- Advanced contradiction detection
+- Integration with external registry systems
 
 ---
 
@@ -193,10 +203,22 @@ This creates a session and discovers documents in one step!
 - `extract_evidence` - Map all requirements to documents and extract evidence
 - `map_requirement` - Map a single requirement to documents with evidence snippets
 
+**Validation:**
+- `cross_validate` - Run all cross-document validation checks
+- `validate_date_alignment` - Verify dates are within 120-day rule
+- `validate_land_tenure` - Check land tenure consistency with fuzzy name matching
+- `validate_project_id` - Verify project ID patterns and consistency
+
+**Report Generation:**
+- `generate_review_report` - Generate complete review report in Markdown or JSON
+- `export_review` - Export report to custom location
+
 **Prompts (Workflow Stages):**
 - `/initialize` - Stage 1: Create session and load checklist
 - `/document-discovery` - Stage 2: Discover and classify documents
 - `/evidence-extraction` - Stage 3: Extract evidence for all requirements
+- `/cross-validation` - Stage 4: Run cross-document validation checks
+- `/report-generation` - Stage 5: Generate complete review reports
 
 ### Example Session
 
@@ -308,12 +330,13 @@ uv run pytest tests/test_user_experience.py -v
 ```
 
 **Current Test Coverage:**
-- 42 total tests (100% passing)
+- 61 total tests (100% passing)
 - Phase 1 (Infrastructure): 23 tests
 - Phase 2 (Document Processing): 6 tests
 - Phase 3 (Evidence Extraction): 6 tests
+- Phase 4 (Validation & Reporting): 19 tests
 - Locking Mechanism: 4 tests
-- UX Improvements: 5 tests
+- UX Improvements: 3 tests
 
 ### Code Quality
 
@@ -336,16 +359,22 @@ regen-registry-review-mcp/
 │   ├── config/                 # Configuration
 │   ├── models/
 │   │   ├── session.py          # Session models
-│   │   ├── evidence.py         # Evidence models (NEW)
+│   │   ├── evidence.py         # Evidence models
+│   │   ├── validation.py       # Validation models (Phase 4)
+│   │   ├── report.py           # Report models (Phase 4)
 │   │   └── errors.py           # Error types
 │   ├── tools/
 │   │   ├── session_tools.py    # Session management
 │   │   ├── document_tools.py   # Document processing
-│   │   └── evidence_tools.py   # Evidence extraction (NEW)
+│   │   ├── evidence_tools.py   # Evidence extraction
+│   │   ├── validation_tools.py # Cross-document validation (Phase 4)
+│   │   └── report_tools.py     # Report generation (Phase 4)
 │   ├── prompts/
-│   │   ├── initialize.py       # Stage 1: Initialize (NEW)
+│   │   ├── initialize.py       # Stage 1: Initialize
 │   │   ├── document_discovery.py  # Stage 2: Discovery
-│   │   └── evidence_extraction.py # Stage 3: Extraction (NEW)
+│   │   ├── evidence_extraction.py # Stage 3: Extraction
+│   │   ├── cross_validation.py    # Stage 4: Validation (Phase 4)
+│   │   └── report_generation.py   # Stage 5: Reporting (Phase 4)
 │   └── utils/
 │       ├── state.py            # State management with locking
 │       └── cache.py            # Caching utilities
@@ -356,14 +385,18 @@ regen-registry-review-mcp/
 ├── tests/
 │   ├── test_infrastructure.py  # Phase 1 tests
 │   ├── test_document_processing.py  # Phase 2 tests
-│   ├── test_evidence_extraction.py  # Phase 3 tests (NEW)
+│   ├── test_evidence_extraction.py  # Phase 3 tests
+│   ├── test_validation.py      # Phase 4 validation tests
+│   ├── test_report_generation.py  # Phase 4 reporting tests
 │   ├── test_locking.py         # Locking mechanism tests
 │   └── test_user_experience.py # UX improvement tests
 ├── examples/22-23/             # Botany Farm test data
 │   └── */                      # Markdown versions from marker
 ├── docs/
 │   ├── PHASE_2_COMPLETION.md   # Phase 2 summary
-│   └── PHASE_3_COMPLETION.md   # Phase 3 summary (NEW)
+│   ├── PHASE_3_COMPLETION.md   # Phase 3 summary
+│   ├── PHASE_4_COMPLETION.md   # Phase 4 summary (NEW)
+│   └── PROMPT_DESIGN_PRINCIPLES.md  # MCP prompt design standards (NEW)
 ├── pyproject.toml
 ├── ROADMAP.md
 └── README.md
@@ -376,10 +409,10 @@ regen-registry-review-mcp/
 1. ✅ **Initialize** - Create session and load checklist
 2. ✅ **Document Discovery** - Scan and classify all documents
 3. ✅ **Evidence Extraction** - Map requirements to evidence with page citations
-4. 📋 **Cross-Validation** - Verify consistency across documents
-5. 📋 **Report Generation** - Generate structured review report
-6. 📋 **Human Review** - Present flagged items for decision
-7. 📋 **Complete** - Finalize and export report
+4. ✅ **Cross-Validation** - Verify consistency across documents (dates, land tenure, project IDs)
+5. ✅ **Report Generation** - Generate structured review report (Markdown + JSON)
+6. 📋 **Human Review** - Present flagged items for decision (Phase 5)
+7. 📋 **Complete** - Finalize and export report (Phase 5)
 
 ---
 
@@ -391,24 +424,28 @@ See [ROADMAP.md](ROADMAP.md) for detailed implementation plan.
 - ✅ Phase 1 (Foundation): Complete
 - ✅ Phase 2 (Document Processing): Complete
 - ✅ Phase 3 (Evidence Extraction): Complete
-- 🚧 Phase 4 (Validation & Reporting): Next
-- 📋 Phase 5 (Integration & Polish): Planned
+- ✅ Phase 4 (Validation & Reporting): Complete
+- 📋 Phase 5 (Integration & Polish): Next
 
-**Phase 3 Achievements:**
-- Implemented automated requirement mapping for all 23 checklist items
-- Added evidence snippet extraction with page and section citations
-- Built keyword-based search with smart phrase extraction
-- Created relevance scoring algorithm (coverage + density)
-- Implemented status classification (covered/partial/missing/flagged)
-- Added structured field extraction for dates and IDs
-- Achieved 85-90% mapping accuracy on real project data
-- Complete test coverage (42/42 tests passing)
+**Phase 4 Achievements:**
+- Implemented cross-document validation with three key checks:
+  - Date alignment validation (120-day rule with customizable threshold)
+  - Land tenure validation (fuzzy name matching with surname boost)
+  - Project ID validation (pattern matching and consistency checks)
+- Built comprehensive report generation in multiple formats:
+  - Markdown reports with complete findings and evidence
+  - JSON reports for programmatic access and integration
+- Added validation status indicators (pass/warning/fail) with flagged items
+- Implemented auto-selection with visible user feedback for all workflow prompts
+- Created systematic prompt design principles document to ensure consistency
+- Complete test coverage (61/61 tests passing - 100%)
 
 **Performance Metrics:**
 - Full evidence extraction: ~2.4 seconds for 23 requirements
-- Single requirement mapping: ~0.1 seconds
+- Cross-validation: <1 second for all checks
+- Report generation: ~0.5 seconds for both Markdown and JSON
 - Coverage on Botany Farm: 73.9% (11 covered, 12 partial, 0 missing)
-- Test execution: 5.87 seconds for full suite
+- Test execution: ~10 seconds for full suite (61 tests)
 
 ---
 
@@ -419,4 +456,4 @@ Copyright © 2025 Regen Network Development, Inc.
 ---
 
 **Last Updated:** November 12, 2025
-**Next Milestone:** Phase 4 - Cross-Document Validation & Report Generation
+**Next Milestone:** Phase 5 - Integration, Human Review Workflow & Polish
