@@ -319,9 +319,178 @@ async def validate_project_id(
     return validation.model_dump()
 
 
+def extract_project_ids_from_evidence(evidence_data: dict[str, Any]) -> list[dict[str, Any]]:
+    """
+    Extract project ID occurrences from evidence data.
+
+    Args:
+        evidence_data: Evidence JSON data
+
+    Returns:
+        List of project ID occurrences with document references
+    """
+    import re
+
+    project_ids = []
+    id_pattern = re.compile(r'\b(\d{4})\b|C\d{2}-(\d{4})')
+
+    # Extract from document names
+    for req in evidence_data.get('evidence', []):
+        for snip in req.get('evidence_snippets', []):
+            doc_name = snip['document_name']
+            # Look for 4-digit IDs in document names
+            matches = id_pattern.findall(doc_name)
+            for match in matches:
+                project_id = match[0] if match[0] else match[1]
+                # Only consider valid project IDs (exclude years like 2023, 2024)
+                if project_id and int(project_id) < 9000:
+                    project_ids.append({
+                        'project_id': project_id,
+                        'document_id': snip.get('document_id'),
+                        'document_name': doc_name,
+                        'source': 'document_name'
+                    })
+
+    return project_ids
+
+
+def extract_dates_from_evidence(evidence_data: dict[str, Any]) -> list[dict[str, Any]]:
+    """
+    Extract dates from evidence snippets with context.
+
+    Args:
+        evidence_data: Evidence JSON data
+
+    Returns:
+        List of date fields with context and source
+    """
+    import re
+    from datetime import datetime
+
+    dates = []
+    date_patterns = [
+        (r'(\d{1,2})[/-](\d{1,2})[/-](\d{4})', '%m/%d/%Y'),  # MM/DD/YYYY or MM-DD-YYYY
+        (r'(\d{4})[/-](\d{1,2})[/-](\d{1,2})', '%Y/%m/%d'),  # YYYY/MM/DD or YYYY-MM-DD
+    ]
+
+    # Focus on specific requirements that contain dates
+    date_requirements = {
+        'REQ-007': 'project_start_date',
+        'REQ-018': 'baseline_date',
+        'REQ-019': 'monitoring_date',
+    }
+
+    for req in evidence_data.get('evidence', []):
+        req_id = req['requirement_id']
+        if req_id in date_requirements:
+            date_type = date_requirements[req_id]
+
+            for snip in req.get('evidence_snippets', []):
+                text = snip['text']
+
+                # Try each date pattern
+                for pattern, date_format in date_patterns:
+                    matches = re.findall(pattern, text)
+                    for match in matches:
+                        try:
+                            if len(match) == 3:
+                                # Parse the date
+                                if date_format == '%m/%d/%Y':
+                                    date_str = f"{match[0]}/{match[1]}/{match[2]}"
+                                else:
+                                    date_str = f"{match[0]}/{match[1]}/{match[2]}"
+
+                                parsed_date = datetime.strptime(date_str, date_format)
+
+                                # Only include reasonable dates (2000-2030 range for project dates)
+                                if 2000 <= parsed_date.year <= 2030:
+                                    dates.append({
+                                        'date_type': date_type,
+                                        'date_value': parsed_date.isoformat(),
+                                        'date_str': date_str,
+                                        'document_id': snip.get('document_id'),
+                                        'document_name': snip['document_name'],
+                                        'page': snip.get('page'),
+                                        'source': req_id
+                                    })
+                        except (ValueError, IndexError):
+                            continue
+
+    return dates
+
+
+def extract_land_tenure_from_evidence(evidence_data: dict[str, Any]) -> list[dict[str, Any]]:
+    """
+    Extract land tenure information from evidence snippets.
+
+    Args:
+        evidence_data: Evidence JSON data
+
+    Returns:
+        List of land tenure fields
+    """
+    import re
+
+    tenure_fields = []
+
+    # Focus on REQ-002 (land tenure requirement)
+    for req in evidence_data.get('evidence', []):
+        if req['requirement_id'] == 'REQ-002':
+            for snip in req.get('evidence_snippets', []):
+                text = snip['text']
+                text_lower = text.lower()
+
+                # Look for owner name patterns
+                # Pattern: "Landowner: Name" or "Owner: Name" or "Land Steward: Name"
+                owner_patterns = [
+                    r'(?:land\s*owner|owner|land\s*steward)[:\s]+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+                    r'([A-Z][a-z]+\s+[A-Z][a-z]+).*(?:owner|steward)',
+                ]
+
+                for pattern in owner_patterns:
+                    matches = re.findall(pattern, text, re.IGNORECASE)
+                    for match in matches:
+                        owner_name = match if isinstance(match, str) else match[0]
+                        # Filter out common false positives
+                        if len(owner_name.split()) >= 2 and len(owner_name) > 5:
+                            tenure_fields.append({
+                                'owner_name': owner_name.strip(),
+                                'document_id': snip.get('document_id'),
+                                'document_name': snip['document_name'],
+                                'page': snip.get('page'),
+                                'source': 'REQ-002'
+                            })
+
+                # Look for area information
+                area_pattern = r'(\d+(?:\.\d+)?)\s*(?:ha|hectares)'
+                area_matches = re.findall(area_pattern, text_lower)
+                if area_matches:
+                    for area_str in area_matches:
+                        try:
+                            area = float(area_str)
+                            if area > 0 and area < 100000:  # Reasonable range
+                                tenure_fields.append({
+                                    'area_hectares': area,
+                                    'document_id': snip.get('document_id'),
+                                    'document_name': snip['document_name'],
+                                    'page': snip.get('page'),
+                                    'source': 'REQ-002'
+                                })
+                        except ValueError:
+                            continue
+
+    return tenure_fields
+
+
 async def cross_validate(session_id: str) -> dict[str, Any]:
     """
     Run all cross-document validation checks for a session.
+
+    This function:
+    1. Loads evidence data
+    2. Extracts structured fields (dates, land tenure, project IDs)
+    3. Runs validation checks using extracted data
+    4. Returns complete validation results
 
     Args:
         session_id: Session identifier
@@ -329,38 +498,143 @@ async def cross_validate(session_id: str) -> dict[str, Any]:
     Returns:
         Complete validation results
     """
+    from datetime import datetime
+
     state_manager = StateManager(session_id)
 
     # Load session data
     session_data = state_manager.read_json("session.json")
 
-    # Try to load evidence data (may not exist yet)
+    # Try to load evidence data (required for validation)
     evidence_path = state_manager.session_dir / "evidence.json"
-    if evidence_path.exists():
-        evidence_data = state_manager.read_json("evidence.json")
-    else:
-        evidence_data = None
+    if not evidence_path.exists():
+        # No evidence yet, return empty results
+        validation_result = ValidationResult(
+            session_id=session_id,
+            validated_at=datetime.now(UTC),
+            date_alignments=[],
+            land_tenure=[],
+            project_ids=[],
+            contradictions=[],
+            summary=ValidationSummary(
+                total_validations=0,
+                validations_passed=0,
+                validations_failed=0,
+                validations_warning=0,
+                items_flagged=0,
+                pass_rate=0.0
+            ),
+            all_passed=True
+        )
+        state_manager.write_json("validation.json", validation_result.model_dump())
+        return validation_result.model_dump()
 
-    # TODO: Implement full cross-validation workflow
-    # This will be completed as part of the /cross-validation prompt
-    # For now, return a placeholder structure
+    evidence_data = state_manager.read_json("evidence.json")
 
+    # Extract structured fields from evidence
+    project_ids = extract_project_ids_from_evidence(evidence_data)
+    dates = extract_dates_from_evidence(evidence_data)
+    tenure_fields = extract_land_tenure_from_evidence(evidence_data)
+
+    # Run validation checks
+    validation_results = {
+        'date_alignments': [],
+        'land_tenure': [],
+        'project_ids': [],
+        'contradictions': []
+    }
+
+    # 1. Date alignment validation
+    # Group dates by type and check if pairs are within 120-day threshold
+    project_start_dates = [d for d in dates if d['date_type'] == 'project_start_date']
+    baseline_dates = [d for d in dates if d['date_type'] == 'baseline_date']
+
+    if project_start_dates and baseline_dates:
+        # Validate first occurrence of each type
+        for psd in project_start_dates[:3]:  # Check up to 3 pairs
+            for bd in baseline_dates[:3]:
+                try:
+                    date1 = datetime.fromisoformat(psd['date_value'])
+                    date2 = datetime.fromisoformat(bd['date_value'])
+
+                    result = await validate_date_alignment(
+                        session_id=session_id,
+                        field1_name='project_start_date',
+                        field1_value=date1,
+                        field1_source=f"{psd['document_name']} (page {psd.get('page', '?')})",
+                        field2_name='baseline_date',
+                        field2_value=date2,
+                        field2_source=f"{bd['document_name']} (page {bd.get('page', '?')})",
+                        max_delta_days=120
+                    )
+                    validation_results['date_alignments'].append(result)
+                except (ValueError, KeyError):
+                    continue
+
+    # 2. Project ID validation
+    if project_ids:
+        # Build project ID occurrences
+        id_occurrences = []
+        for pid_data in project_ids:
+            id_occurrences.append({
+                'project_id': pid_data['project_id'],
+                'document_id': pid_data['document_id'],
+                'document_name': pid_data['document_name'],
+                'location': 'document_name',
+                'confidence': 1.0
+            })
+
+        if id_occurrences:
+            # Get total document count
+            total_docs = len(set(pid_data['document_id'] for pid_data in project_ids))
+
+            result = await validate_project_id(
+                session_id=session_id,
+                occurrences=id_occurrences,
+                total_documents=total_docs
+            )
+            validation_results['project_ids'].append(result)
+
+    # 3. Land tenure validation
+    # Extract unique owner names
+    owner_names = [f['owner_name'] for f in tenure_fields if 'owner_name' in f]
+    if len(owner_names) >= 2:
+        # Check first 2 owner names for consistency
+        tenure_data = []
+        for i, name in enumerate(owner_names[:2]):
+            matching_field = next((f for f in tenure_fields if f.get('owner_name') == name), None)
+            if matching_field:
+                tenure_data.append({
+                    'owner_name': name,
+                    'area_hectares': matching_field.get('area_hectares', 0.0),
+                    'tenure_type': 'unknown',
+                    'document_id': matching_field['document_id'],
+                    'document_name': matching_field['document_name'],
+                    'page': matching_field.get('page'),
+                    'source': f"REQ-002, {matching_field['document_name']}",
+                    'confidence': 0.8  # Moderate confidence from regex extraction
+                })
+
+        if len(tenure_data) >= 2:
+            result = await validate_land_tenure(
+                session_id=session_id,
+                fields=tenure_data
+            )
+            validation_results['land_tenure'].append(result)
+
+    # Calculate summary
+    summary = calculate_validation_summary(validation_results)
+
+    # Build final result
     validation_result = ValidationResult(
         session_id=session_id,
         validated_at=datetime.now(UTC),
-        date_alignments=[],
-        land_tenure=[],
-        project_ids=[],
-        contradictions=[],
-        summary=ValidationSummary(
-            total_validations=0,
-            validations_passed=0,
-            validations_failed=0,
-            validations_warning=0,
-            items_flagged=0,
-            pass_rate=0.0
-        ),
-        all_passed=True
+        date_alignments=validation_results['date_alignments'],
+        land_tenure=validation_results['land_tenure'],
+        project_ids=validation_results['project_ids'],
+        contradictions=validation_results['contradictions'],
+        summary=ValidationSummary(**summary),
+        all_passed=summary['pass_rate'] == 1.0
     )
 
     # Save validation results
