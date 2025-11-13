@@ -2,10 +2,12 @@
 
 import pytest
 import json
+import shutil
+import tempfile
 from pathlib import Path
 from datetime import datetime
 
-from registry_review_mcp.config.settings import settings
+from registry_review_mcp.config.settings import settings, Settings
 from registry_review_mcp.extractors.llm_extractors import (
     DateExtractor,
     LandTenureExtractor,
@@ -181,3 +183,119 @@ async def botany_farm_project_ids(botany_farm_markdown):
         "Botany_Farm_Project_Plan"
     )
     return results
+
+
+# =============================================================================
+# Original Test Fixtures (Required by existing tests)
+# =============================================================================
+
+
+@pytest.fixture
+def temp_data_dir(tmp_path):
+    """Create a temporary data directory for tests.
+
+    Args:
+        tmp_path: Pytest temporary directory fixture
+
+    Yields:
+        Path to temporary data directory
+    """
+    data_dir = tmp_path / "test_data"
+    data_dir.mkdir(parents=True)
+
+    # Create subdirectories
+    (data_dir / "checklists").mkdir()
+    (data_dir / "sessions").mkdir()
+    (data_dir / "cache").mkdir()
+
+    yield data_dir
+
+    # Cleanup
+    shutil.rmtree(data_dir, ignore_errors=True)
+
+
+@pytest.fixture
+def test_settings(temp_data_dir):
+    """Create test settings with temporary directories.
+
+    Args:
+        temp_data_dir: Temporary data directory fixture
+
+    Returns:
+        Settings instance for testing
+    """
+    return Settings(
+        data_dir=temp_data_dir,
+        checklists_dir=temp_data_dir / "checklists",
+        sessions_dir=temp_data_dir / "sessions",
+        cache_dir=temp_data_dir / "cache",
+        enable_caching=True,
+    )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def cleanup_cache_once():
+    """Clean cache once at the start of the test session.
+
+    This prevents test pollution from previous runs while avoiding
+    repeated cleanup operations.
+    """
+    from registry_review_mcp.utils.cache import Cache
+
+    # Clean the default cache directory
+    cache = Cache("test_cleanup")
+    cache.clear()
+
+    yield  # Run all tests
+
+    # Optional: Clean up after tests (commented out to preserve for inspection)
+    # cache.clear()
+
+
+@pytest.fixture
+def cache(test_settings):
+    """Create a cache instance for testing.
+
+    Args:
+        test_settings: Test settings fixture
+
+    Returns:
+        Cache instance
+    """
+    from registry_review_mcp.utils.cache import Cache
+
+    return Cache("test", cache_dir=test_settings.cache_dir)
+
+
+@pytest.fixture(autouse=True)
+def cleanup_sessions():
+    """Clean up sessions before and after each test.
+
+    This prevents test pollution from previous runs.
+    """
+    data_dir = Path(__file__).parent.parent / "data"
+    sessions_dir = data_dir / "sessions"
+
+    # Cleanup before test
+    if sessions_dir.exists():
+        for session_file in sessions_dir.glob("session-*"):
+            if session_file.is_dir():
+                shutil.rmtree(session_file, ignore_errors=True)
+
+    yield  # Run the test
+
+    # Cleanup after test
+    if sessions_dir.exists():
+        for session_file in sessions_dir.glob("session-*"):
+            if session_file.is_dir():
+                shutil.rmtree(session_file, ignore_errors=True)
+
+
+@pytest.fixture
+def example_documents_path():
+    """Get path to example documents.
+
+    Returns:
+        Absolute path to examples/22-23 directory
+    """
+    return (Path(__file__).parent.parent / "examples" / "22-23").absolute()
