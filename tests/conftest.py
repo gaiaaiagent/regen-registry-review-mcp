@@ -1,6 +1,7 @@
 """Pytest configuration and shared fixtures."""
 
 import pytest
+import pytest_asyncio
 import json
 import shutil
 import tempfile
@@ -131,7 +132,7 @@ def botany_farm_markdown():
     return markdown[:20000]
 
 
-@pytest.fixture(scope="session")
+@pytest_asyncio.fixture(scope="function")
 async def botany_farm_dates(botany_farm_markdown):
     """Extract dates from Botany Farm once and share across tests.
 
@@ -149,7 +150,7 @@ async def botany_farm_dates(botany_farm_markdown):
     return results
 
 
-@pytest.fixture(scope="session")
+@pytest_asyncio.fixture(scope="function")
 async def botany_farm_tenure(botany_farm_markdown):
     """Extract land tenure from Botany Farm once and share across tests.
 
@@ -167,7 +168,7 @@ async def botany_farm_tenure(botany_farm_markdown):
     return results
 
 
-@pytest.fixture(scope="session")
+@pytest_asyncio.fixture(scope="function")
 async def botany_farm_project_ids(botany_farm_markdown):
     """Extract project IDs from Botany Farm once and share across tests.
 
@@ -267,28 +268,116 @@ def cache(test_settings):
     return Cache("test", cache_dir=test_settings.cache_dir)
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="function")
 def cleanup_sessions():
-    """Clean up sessions before and after each test.
+    """Clean up TEST sessions before and after each test.
 
-    This prevents test pollution from previous runs.
+    CRITICAL: Only removes sessions that are DEFINITELY from tests:
+    - Sessions with names starting with "test-"
+    - Sessions pointing to /tmp/pytest directories (pytest temp dirs)
+    - Corrupted session files (likely failed tests)
+
+    PRESERVES:
+    - Sessions pointing to examples/ (user might be manually testing)
+    - Sessions pointing to real project directories outside the repo
+    - Any session that might be from actual MCP server usage
+
+    NOTE: Tests that use examples/ directory should use the separate
+    `cleanup_examples_sessions` fixture to clean up after themselves.
     """
     data_dir = Path(__file__).parent.parent / "data"
     sessions_dir = data_dir / "sessions"
 
+    def cleanup_test_sessions():
+        """Remove ONLY definitively test-created sessions."""
+        if not sessions_dir.exists():
+            return
+
+        for session_path in sessions_dir.iterdir():
+            if not session_path.is_dir():
+                continue
+
+            # Delete test-* sessions (explicitly test-prefixed)
+            if session_path.name.startswith("test-"):
+                shutil.rmtree(session_path, ignore_errors=True)
+                continue
+
+            # Check if session points to pytest temp directory
+            try:
+                session_file = session_path / "session.json"
+                if session_file.exists():
+                    with open(session_file) as f:
+                        session_data = json.load(f)
+                        docs_path_str = session_data.get("project_metadata", {}).get("documents_path", "")
+                        if docs_path_str:
+                            # ONLY delete if pointing to /tmp/pytest-*
+                            # (definitively a pytest temp directory)
+                            if "/tmp/pytest-" in docs_path_str or "/tmp/pytest_" in docs_path_str:
+                                shutil.rmtree(session_path, ignore_errors=True)
+                                continue
+            except Exception:
+                # If we can't read the session or it's corrupted, delete it
+                # (likely a failed test)
+                shutil.rmtree(session_path, ignore_errors=True)
+
     # Cleanup before test
-    if sessions_dir.exists():
-        for session_file in sessions_dir.glob("session-*"):
-            if session_file.is_dir():
-                shutil.rmtree(session_file, ignore_errors=True)
+    cleanup_test_sessions()
 
     yield  # Run the test
 
     # Cleanup after test
-    if sessions_dir.exists():
-        for session_file in sessions_dir.glob("session-*"):
-            if session_file.is_dir():
-                shutil.rmtree(session_file, ignore_errors=True)
+    cleanup_test_sessions()
+
+
+@pytest.fixture(scope="function")
+def cleanup_examples_sessions():
+    """Clean up sessions pointing to examples directory.
+
+    Use this fixture explicitly in tests that use the examples/ directory
+    to ensure they don't leave sessions behind.
+
+    This is separate from the autouse cleanup_sessions to preserve user
+    sessions that might be manually testing with examples.
+    """
+    data_dir = Path(__file__).parent.parent / "data"
+    sessions_dir = data_dir / "sessions"
+    examples_dir = (Path(__file__).parent.parent / "examples").resolve()
+
+    def cleanup_examples():
+        """Remove sessions pointing to examples directory."""
+        if not sessions_dir.exists():
+            return
+
+        for session_path in sessions_dir.iterdir():
+            if not session_path.is_dir():
+                continue
+
+            try:
+                session_file = session_path / "session.json"
+                if session_file.exists():
+                    with open(session_file) as f:
+                        session_data = json.load(f)
+                        docs_path_str = session_data.get("project_metadata", {}).get("documents_path", "")
+                        if docs_path_str:
+                            try:
+                                docs_path = Path(docs_path_str).resolve()
+                                docs_path.relative_to(examples_dir)
+                                # This session uses examples - delete it
+                                shutil.rmtree(session_path, ignore_errors=True)
+                            except (ValueError, OSError):
+                                # Not under examples or path doesn't exist
+                                pass
+            except Exception:
+                # Can't read session - skip it
+                pass
+
+    # Cleanup before test
+    cleanup_examples()
+
+    yield  # Run the test
+
+    # Cleanup after test
+    cleanup_examples()
 
 
 @pytest.fixture

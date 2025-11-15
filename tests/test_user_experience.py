@@ -2,7 +2,7 @@
 
 import pytest
 
-from registry_review_mcp.prompts.document_discovery import document_discovery_prompt
+from registry_review_mcp.prompts.B_document_discovery import document_discovery_prompt
 from registry_review_mcp.tools import session_tools
 from registry_review_mcp.server import start_review
 
@@ -11,7 +11,7 @@ class TestDocumentDiscoveryUX:
     """Test document discovery prompt user experience."""
 
     @pytest.mark.asyncio
-    async def test_no_session_provides_guidance(self, test_settings):
+    async def test_no_session_provides_guidance(self, test_settings, cleanup_examples_sessions):
         """Test that calling without session_id when no sessions exist provides helpful guidance."""
         # Call without session_id when no sessions exist
         result = await document_discovery_prompt(session_id=None)

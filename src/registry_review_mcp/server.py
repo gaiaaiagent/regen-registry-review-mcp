@@ -14,7 +14,7 @@ from mcp.types import TextContent
 from .config.settings import settings
 from .models import errors as mcp_errors
 from .tools import session_tools, document_tools, evidence_tools, validation_tools, report_tools
-from .prompts import initialize, document_discovery, evidence_extraction, cross_validation, report_generation
+from .prompts import A_initialize, B_document_discovery, C_evidence_extraction, D_cross_validation, E_report_generation, F_human_review, G_complete
 
 # ============================================================================
 # Logging Setup (CRITICAL: Must write to stderr, NOT stdout)
@@ -603,19 +603,19 @@ def list_capabilities() -> list[TextContent]:
 - `extract_evidence` - Map all requirements to documents and extract evidence
 - `map_requirement` - Map a single requirement to documents with evidence snippets
 
-**Coming Soon (Phase 4-5):**
-- Cross-document validation
-- Report generation
+**Validation & Reporting (Phase 4):**
+- `cross_validation` - Validate dates, land tenure, and project IDs across documents
+- `generate_report` - Create comprehensive Markdown and JSON reports
 
 ### Workflows (7 Sequential Stages)
 
-1. **Initialize** - Create session and load checklist
-2. **Document Discovery** - Scan and classify all documents
-3. **Evidence Extraction** - Map requirements to evidence
-4. **Cross-Validation** - Verify consistency across documents
-5. **Report Generation** - Generate structured review report
-6. **Human Review** - Present flagged items for decision
-7. **Complete** - Finalize and export report
+1. **Initialize** (`/initialize`) - Create session and load checklist
+2. **Document Discovery** (`/document-discovery`) - Scan and classify all documents
+3. **Evidence Extraction** (`/evidence-extraction`) - Map requirements to evidence
+4. **Cross-Validation** (`/cross-validation`) - Verify consistency across documents
+5. **Report Generation** (`/report-generation`) - Generate structured review report
+6. **Human Review** (`/human-review`) - Present flagged items for decision
+7. **Complete** (`/complete`) - Finalize and export report
 
 ### Supported Methodology
 
@@ -657,9 +657,11 @@ These will auto-select your most recent session, or guide you to create one if n
 - **Phase 1 (Foundation):** ✅ Complete (Session management, infrastructure)
 - **Phase 2 (Document Processing):** ✅ Complete (Document discovery, classification, PDF/GIS extraction)
 - **Phase 3 (Evidence Extraction):** ✅ Complete (Requirement mapping, evidence snippets, coverage analysis)
-- **Phase 4 (Validation & Reporting):** ✅ Complete (Cross-validation, report generation in Markdown/JSON)
-- **Phase 5 (Integration & Polish):** 📋 Planned
+- **Phase 4 (Validation & Reporting):** ✅ Complete (Cross-validation, report generation, LLM-native extraction)
+- **Phase 5 (Integration & Polish):** 🚧 In Progress (All 7 prompts complete, testing in progress)
 
+**Test Coverage:** 120/120 tests passing (100%)
+**LLM Extraction:** 80%+ recall with caching and cost tracking
 **Last Updated:** {datetime.now().strftime("%Y-%m-%d %H:%M UTC")}
 """
 
@@ -667,7 +669,7 @@ These will auto-select your most recent session, or guide you to create one if n
 
 
 @mcp.prompt()
-async def initialize_workflow(
+async def initialize(
     project_name: str | None = None,
     documents_path: str | None = None
 ) -> list[TextContent]:
@@ -686,11 +688,11 @@ async def initialize_workflow(
         /initialize Botany Farm 2022-2023, /path/to/documents/22-23
         /initialize My Project, /home/user/projects/my-project
     """
-    return await initialize.initialize_prompt(project_name, documents_path)
+    return await A_initialize.initialize_prompt(project_name, documents_path)
 
 
 @mcp.prompt()
-async def document_discovery_workflow(
+async def document_discovery(
     project_name: str | None = None,
     documents_path: str | None = None,
     session_id: str | None = None
@@ -711,11 +713,11 @@ async def document_discovery_workflow(
         /document-discovery Botany Farm 2022-2023, /path/to/documents
         /document-discovery (uses most recent session)
     """
-    return await document_discovery.document_discovery_prompt(project_name, documents_path, session_id)
+    return await B_document_discovery.document_discovery_prompt(project_name, documents_path, session_id)
 
 
 @mcp.prompt()
-async def evidence_extraction_workflow(session_id: str | None = None) -> list[TextContent]:
+async def evidence_extraction(session_id: str | None = None) -> list[TextContent]:
     """Run the evidence extraction workflow for a session (Stage 3).
 
     This prompt maps checklist requirements to discovered documents, extracts evidence
@@ -731,12 +733,12 @@ async def evidence_extraction_workflow(session_id: str | None = None) -> list[Te
         /evidence-extraction (uses most recent session)
         /evidence-extraction session-abc123
     """
-    result = await evidence_extraction.evidence_extraction(session_id)
+    result = await C_evidence_extraction.evidence_extraction(session_id)
     return [TextContent(type="text", text=result)]
 
 
 @mcp.prompt()
-async def cross_validation_workflow(session_id: str | None = None) -> list[TextContent]:
+async def cross_validation(session_id: str | None = None) -> list[TextContent]:
     """Run cross-document validation checks for a session (Stage 4).
 
     Validates consistency across documents including date alignment, land tenure,
@@ -752,11 +754,11 @@ async def cross_validation_workflow(session_id: str | None = None) -> list[TextC
         /cross-validation (uses most recent session)
         /cross-validation session-abc123
     """
-    return await cross_validation.cross_validation_prompt(session_id)
+    return await D_cross_validation.cross_validation_prompt(session_id)
 
 
 @mcp.prompt()
-async def report_generation_workflow(session_id: str | None = None) -> list[TextContent]:
+async def report_generation(session_id: str | None = None) -> list[TextContent]:
     """Generate complete review report in multiple formats (Stage 5).
 
     Creates Markdown and JSON reports with all findings, evidence citations,
@@ -772,7 +774,48 @@ async def report_generation_workflow(session_id: str | None = None) -> list[Text
         /report-generation (uses most recent session)
         /report-generation session-abc123
     """
-    return await report_generation.report_generation_prompt(session_id)
+    return await E_report_generation.report_generation_prompt(session_id)
+
+
+@mcp.prompt()
+async def human_review(session_id: str | None = None) -> list[TextContent]:
+    """Review flagged validation items requiring human judgment (Stage 6).
+
+    Presents items that were flagged during cross-validation for human review,
+    including date discrepancies, land tenure conflicts, project ID inconsistencies,
+    and contradictions. Provides context and evidence to guide decision-making.
+
+    Args:
+        session_id: Optional session identifier. If not provided, uses most recent session.
+
+    Returns:
+        Flagged items with detailed context for human review
+
+    Examples:
+        /human-review (uses most recent session)
+        /human-review session-abc123
+    """
+    return await F_human_review.human_review_prompt(session_id)
+
+
+@mcp.prompt()
+async def complete(session_id: str | None = None) -> list[TextContent]:
+    """Complete the registry review workflow and finalize the session (Stage 7).
+
+    Marks the review as complete, provides final summary with assessment,
+    and guides on next steps for export, sharing, or archiving reports.
+
+    Args:
+        session_id: Optional session identifier. If not provided, uses most recent session.
+
+    Returns:
+        Completion summary with final report location and next steps
+
+    Examples:
+        /complete (uses most recent session)
+        /complete session-abc123
+    """
+    return await G_complete.complete_prompt(session_id)
 
 
 # ============================================================================

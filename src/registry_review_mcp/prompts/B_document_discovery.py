@@ -157,6 +157,32 @@ Please verify:
 The system found {results['documents_found']} document(s) and is ready to extract evidence.
 """
 
+        # Format errors if any occurred
+        error_section = ""
+        if results.get("error_count", 0) > 0:
+            error_lines = []
+            for error in results.get("errors", []):
+                recovery = "\n".join([f"   - {step}" for step in error["recovery_steps"]])
+                error_lines.append(
+                    f"**File:** {error['filename']}\n"
+                    f"**Error:** {error['message']}\n"
+                    f"**Recovery Steps:**\n{recovery}"
+                )
+
+            error_section = f"""
+
+## ⚠️ Processing Errors
+
+{results['error_count']} file(s) could not be processed:
+
+{chr(10).join([f"{i}. {err}" for i, err in enumerate(error_lines, 1)])}
+
+---
+
+These errors won't prevent the review from continuing, but you may want to resolve them to ensure complete coverage.
+
+"""
+
         # Add auto-selection notice if applicable
         auto_notice = ""
         if auto_selected:
@@ -170,7 +196,7 @@ The system found {results['documents_found']} document(s) and is ready to extrac
 
 ## Summary
 
-Found **{results['documents_found']} document(s)**
+Found **{results['documents_found']} document(s)**{f" ({results['error_count']} error(s))" if results.get('error_count', 0) > 0 else ""}
 
 ### Classification Breakdown
 {summary_text}
@@ -178,7 +204,7 @@ Found **{results['documents_found']} document(s)**
 ## Discovered Documents
 
 {doc_list}
-
+{error_section}
 ---
 
 {next_steps}
