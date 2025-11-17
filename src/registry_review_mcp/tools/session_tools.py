@@ -50,6 +50,8 @@ async def create_session(
     Raises:
         ValueError: If documents_path does not exist or is invalid
     """
+    import json
+
     # Validate inputs via Pydantic
     project_metadata = ProjectMetadata(
         project_name=project_name,
@@ -65,14 +67,23 @@ async def create_session(
     session_id = generate_session_id()
     now = datetime.now(timezone.utc)
 
+    # Load checklist requirements count
+    checklist_path = settings.get_checklist_path(methodology)
+    requirements_count = 0
+    if checklist_path.exists():
+        with open(checklist_path, "r") as f:
+            checklist_data = json.load(f)
+        requirements_count = len(checklist_data.get("requirements", []))
+
+    # Create session with proper statistics and mark initialize stage complete
     session = Session(
         session_id=session_id,
         created_at=now,
         updated_at=now,
         status="initialized",
         project_metadata=project_metadata,
-        workflow_progress=WorkflowProgress(),
-        statistics=SessionStatistics(),
+        workflow_progress=WorkflowProgress(initialize="completed"),
+        statistics=SessionStatistics(requirements_total=requirements_count),
     )
 
     # Persist to disk
@@ -89,6 +100,7 @@ async def create_session(
         "created_at": now.isoformat(),
         "documents_path": project_metadata.documents_path,
         "methodology": methodology,
+        "requirements_total": requirements_count,
         "message": f"Session created successfully for project: {project_name}",
     }
 
@@ -173,6 +185,9 @@ async def list_sessions() -> list[dict[str, Any]]:
                         "created_at": session_data.get("created_at"),
                         "status": session_data.get("status"),
                         "methodology": session_data.get("project_metadata", {}).get("methodology"),
+                        "workflow_progress": session_data.get("workflow_progress", {}),
+                        "statistics": session_data.get("statistics", {}),
+                        "project_metadata": session_data.get("project_metadata", {}),
                     }
                 )
             except Exception:
@@ -214,4 +229,43 @@ async def delete_session(session_id: str) -> dict[str, Any]:
         "session_id": session_id,
         "status": "deleted",
         "message": f"Session {session_id} has been deleted",
+    }
+
+
+async def list_example_projects() -> dict[str, Any]:
+    """List example projects available in the examples directory.
+
+    Returns:
+        Dictionary with list of example projects and their metadata
+
+    Raises:
+        FileNotFoundError: If examples directory does not exist
+    """
+    from pathlib import Path
+
+    # Get examples directory relative to settings
+    examples_dir = settings.data_dir.parent / "examples"
+
+    if not examples_dir.exists():
+        return {
+            "projects_found": 0,
+            "projects": [],
+            "message": "No examples directory found",
+        }
+
+    projects = []
+    for item in sorted(examples_dir.iterdir()):
+        if item.is_dir() and not item.name.startswith('.'):
+            # Count files in the directory
+            file_count = sum(1 for f in item.rglob('*') if f.is_file())
+            projects.append({
+                "name": item.name,
+                "path": str(item.absolute()),
+                "file_count": file_count,
+            })
+
+    return {
+        "projects_found": len(projects),
+        "projects": projects,
+        "message": f"Found {len(projects)} example project(s)" if projects else "No example projects found",
     }

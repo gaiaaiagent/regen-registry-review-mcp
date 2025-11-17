@@ -5,7 +5,6 @@ from mcp.types import TextContent
 
 from ..config.settings import settings
 from ..tools import session_tools
-from ..utils.state import StateManager
 
 
 async def initialize_prompt(
@@ -25,38 +24,46 @@ async def initialize_prompt(
     """
     # Validate inputs
     if not project_name or not documents_path:
-        message = """# Registry Review Workflow - Stage 1: Initialize
-
-Welcome! Let's start a new registry review.
+        message = """# Registry Review Workflow - Initialize Session
 
 ## Usage
 
-Provide your project details:
+`/initialize Project Name, /absolute/path/to/documents`
 
-`/initialize Your Project Name, /absolute/path/to/documents`
+**Important:** 🔒 One directory = one session. If a session exists for this path, you'll be prompted to resume it.
 
-## Example
+## Examples
 
-For the Botany Farm example project:
+**For the Botany Farm example:**
+```
+/initialize Botany Farm 2022-2023, /home/ygg/Workspace/RegenAI/regen-registry-review-mcp/examples/22-23
+```
 
-`/initialize Botany Farm 2022-2023, /home/ygg/Workspace/RegenAI/regen-registry-review-mcp/examples/22-23`
+**Different name, same directory?** The existing session will be detected:
+```
+/initialize Botany 22, /home/ygg/.../examples/22-23
+→ Will find existing "Botany Farm 2022-2023" session
+```
 
 ## What This Does
 
-This prompt will:
-1. ✅ Create a new review session
-2. ✅ Load the checklist template
-3. ✅ Validate the document path
-4. ✅ Set up session state
+1. ✅ Checks if a session exists for this directory
+2. ✅ Creates new session (or prompts you to resume existing)
+3. ✅ Loads checklist template (23 requirements)
+4. ✅ Validates document path
 
-Then you can proceed to Stage 2: `/document-discovery`
+## Need Help?
+
+- **See available examples:** `list_example_projects`
+- **See your sessions:** `list_sessions`
+- **Continue existing session:** Just run `/document-discovery`
 """
         return [TextContent(type="text", text=message)]
 
     # Normalize documents path for comparison
     normalized_path = str(Path(documents_path).absolute())
 
-    # Check for duplicate sessions by scanning sessions directory
+    # Check for duplicate sessions by documents_path only (one directory = one session)
     duplicates = []
     if settings.sessions_dir.exists():
         for session_dir in settings.sessions_dir.iterdir():
@@ -67,12 +74,14 @@ Then you can proceed to Stage 2: `/document-discovery`
                     session_project = session_data.get("project_metadata", {})
                     session_path = str(Path(session_project.get("documents_path", "")).absolute())
 
-                    if (session_project.get("project_name") == project_name and
-                        session_path == normalized_path):
+                    # Match by documents_path only - one directory = one session
+                    if session_path == normalized_path:
                         duplicates.append({
                             "session_id": session_data.get("session_id"),
+                            "project_name": session_project.get("project_name"),
                             "created_at": session_data.get("created_at"),
-                            "status": session_data.get("status")
+                            "status": session_data.get("status"),
+                            "workflow_progress": session_data.get("workflow_progress", {})
                         })
                 except Exception:
                     # Skip corrupted sessions
@@ -81,25 +90,39 @@ Then you can proceed to Stage 2: `/document-discovery`
     # If duplicates found, show warning and options
     if duplicates:
         duplicate = duplicates[0]  # Show most recent
-        message = f"""# ⚠️ Existing Session Found
 
-A session already exists for this project:
+        # Check if user provided a different name
+        name_changed = duplicate['project_name'] != project_name
+        name_note = ""
+        if name_changed:
+            name_note = f"""
+**Note:** You provided the name "{project_name}" but this directory already has an active session named "{duplicate['project_name']}".
 
-**Session ID:** `{duplicate['session_id']}`
-**Project:** {project_name}
-**Documents:** {documents_path}
+🔒 **One Directory = One Session:** Each documents directory can only have one active session to avoid confusion.
+"""
+
+        # Get workflow progress
+        workflow = duplicate.get('workflow_progress', {})
+        completed = [stage for stage, status in workflow.items() if status == 'completed']
+        progress_summary = f"{len(completed)}/7 stages completed" if completed else "Not started"
+
+        message = f"""# ⚠️ Session Already Exists for This Directory
+
+{name_note}
+**Existing Session:** `{duplicate['session_id']}`
+**Project Name:** {duplicate['project_name']}
+**Documents Path:** {documents_path}
 **Created:** {duplicate.get('created_at', 'Unknown')}
-**Status:** {duplicate.get('status', 'Unknown')}
+**Progress:** {progress_summary}
+**Status:** {duplicate.get('status', 'active')}
 
 ---
 
-## Options
+## What To Do Next
 
-### 1. Resume Existing Session (Recommended)
+### ✅ Continue Existing Session (Recommended)
 
-Continue working on the existing session:
-
-Simply run the next workflow stage (the system auto-selects most recent session):
+Simply run the next workflow stage (auto-selects this session):
 
 `/document-discovery`
 
@@ -107,31 +130,24 @@ Or specify the session explicitly:
 
 `/document-discovery {duplicate['session_id']}`
 
-### 2. View Session Status
+### 📊 Check Session Status
 
-Check the current state of the session:
+View full session details:
 
 `load_session {duplicate['session_id']}`
 
-### 3. Delete and Start Fresh
+### 🗑️ Start Fresh
 
-If you want to start over, first delete the old session:
+Delete the existing session and create a new one:
 
-`delete_session {duplicate['session_id']}`
-
-Then run `/initialize` again.
-
-### 4. Create Duplicate Anyway (Not Recommended)
-
-If you really need multiple sessions for the same project, use the tool directly:
-
-`create_session {project_name}, {documents_path}, soil-carbon-v1.2.2, force=true`
-
-⚠️ Warning: Having multiple sessions for the same project can lead to confusion about which is the active review.
+```
+delete_session {duplicate['session_id']}
+/initialize {project_name}, {documents_path}
+```
 
 ---
 
-**Tip:** Most users want to resume the existing session. Just run `/document-discovery` to continue where you left off!
+**Tip:** Use `list_sessions` to see all your active sessions and their progress!
 """
         return [TextContent(type="text", text=message)]
 
@@ -144,12 +160,9 @@ If you really need multiple sessions for the same project, use the tool directly
         )
 
         session_id = result["session_id"]
+        requirements_count = result.get("requirements_total", 0)
 
-        # Mark initialize stage as completed
-        state_manager = StateManager(session_id)
-        session_data = state_manager.read_json("session.json")
-        session_data["workflow_progress"]["initialize"] = "completed"
-        state_manager.write_json("session.json", session_data)
+        # Note: initialize stage is already marked "completed" by create_session()
 
         # Format success message
         message = f"""# ✅ Registry Review Session Initialized
@@ -166,7 +179,7 @@ If you really need multiple sessions for the same project, use the tool directly
 
 Your review session is ready. The system has:
 - ✅ Created session state directory
-- ✅ Loaded checklist template (23 requirements)
+- ✅ Loaded checklist template ({requirements_count} requirements)
 - ✅ Validated document path
 - ✅ Initialized workflow tracking
 

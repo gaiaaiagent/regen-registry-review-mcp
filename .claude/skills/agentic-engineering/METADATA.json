@@ -1,0 +1,113 @@
+{
+  "name": "agentic-engineering",
+  "version": "1.1.0",
+  "created": "2025-11-12",
+  "last_updated": "2025-11-12",
+  "author": "RegenAI",
+  "license": "MIT",
+  "compatibility": {
+    "claude_code": ">=1.0.0",
+    "requires_skills_support": true
+  },
+  "documentation": {
+    "sources": {
+      "claude_docs": 12,
+      "mcp_docs": 6
+    },
+    "total_docs": 18,
+    "last_doc_update": "2025-11-11"
+  },
+  "files": {
+    "SKILL.md": {
+      "description": "Main skill definition and instructions",
+      "lines": 273,
+      "role": "core"
+    },
+    "README.md": {
+      "description": "Human-readable documentation",
+      "lines": 309,
+      "role": "documentation"
+    },
+    "QUICKSTART.md": {
+      "description": "2-minute quick start guide",
+      "lines": 150,
+      "role": "onboarding"
+    },
+    "EXAMPLES.md": {
+      "description": "Real-world examples and decision trees",
+      "lines": 450,
+      "role": "reference"
+    },
+    "DOCS_INDEX.md": {
+      "description": "Documentation quick reference",
+      "lines": 117,
+      "role": "navigation"
+    }
+  },
+  "triggers": [
+    "architecture decisions",
+    "skills vs MCP vs sub-agents",
+    "multi-agent orchestration",
+    "MCP server development",
+    "context optimization",
+    "agentic patterns",
+    "agent scaling",
+    "tool integration",
+    "when to use what pattern"
+  ],
+  "capabilities": [
+    "Architecture guidance",
+    "Implementation assistance",
+    "Decision frameworks",
+    "Best practices",
+    "Pitfall avoidance",
+    "Context optimization",
+    "Multi-agent orchestration",
+    "MCP development",
+    "Pattern selection"
+  ],
+  "performance": {
+    "context_efficient": true,
+    "progressive_disclosure": true,
+    "estimated_base_context": "1-2%"
+  },
+  "changelog": [
+    {
+      "version": "1.1.0",
+      "date": "2025-11-12",
+      "changes": [
+        "Added QUICKSTART.md for immediate value",
+        "Added EXAMPLES.md with comprehensive real-world examples",
+        "Added DOCS_INDEX.md for quick documentation navigation",
+        "Optimized SKILL.md (484 → 273 lines, 44% reduction)",
+        "Improved modularity and maintainability",
+        "Enhanced context efficiency"
+      ]
+    },
+    {
+      "version": "1.0.0",
+      "date": "2025-11-12",
+      "changes": [
+        "Initial release",
+        "Comprehensive skill definition",
+        "18 documentation files integrated",
+        "Core knowledge domains established",
+        "Decision frameworks included"
+      ]
+    }
+  ],
+  "dependencies": {
+    "required": [],
+    "optional": []
+  },
+  "tags": [
+    "agentic-engineering",
+    "architecture",
+    "mcp",
+    "skills",
+    "sub-agents",
+    "orchestration",
+    "context-engineering",
+    "best-practices"
+  ]
+}

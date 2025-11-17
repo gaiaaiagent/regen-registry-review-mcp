@@ -1,0 +1,101 @@
+{
+  "project_name": "Botany Farm 2022-2023",
+  "ground_truth": {
+    "dates": [
+      {
+        "value": "2022-01-01",
+        "field_type": "project_start_date",
+        "source": "Project Plan",
+        "notes": "Project start date documented in Project Plan, Section 1.8"
+      },
+      {
+        "value": "2022-01-01",
+        "field_type": "crediting_period_start",
+        "source": "Project Plan",
+        "notes": "Crediting period starts with project"
+      },
+      {
+        "value": "2023-08-09",
+        "field_type": "submission_date",
+        "source": "Project Plan",
+        "notes": "Document submission/update date from cover page"
+      },
+      {
+        "value": "2022-06-15",
+        "field_type": "imagery_date",
+        "source": "Baseline Report",
+        "notes": "Satellite imagery acquisition date for baseline"
+      },
+      {
+        "value": "2022-08-20",
+        "field_type": "sampling_date",
+        "source": "Baseline Report",
+        "notes": "Soil sampling date"
+      }
+    ],
+    "land_tenure": [
+      {
+        "owner_name": "Nicholas Denman",
+        "area_hectares": 120.5,
+        "tenure_type": "freehold",
+        "source": "Project Plan",
+        "notes": "Primary landowner, full freehold ownership"
+      }
+    ],
+    "project_ids": [
+      {
+        "value": "C06-006",
+        "registry": "Regen Network",
+        "source": "Registry Agent Review documents",
+        "occurrences": "Registry Agent Review documents",
+        "notes": "Official Regen Network project ID"
+      },
+      {
+        "value": "4997Botany22",
+        "registry": "Internal",
+        "source": "Project Plan, Baseline Report",
+        "occurrences": "2022 baseline documents",
+        "notes": "Internal project name for 2022 baseline period"
+      },
+      {
+        "value": "4998Botany23",
+        "registry": "Internal",
+        "source": "Monitoring reports",
+        "occurrences": "2023 monitoring documents",
+        "notes": "Internal project name for 2023 monitoring period"
+      }
+    ]
+  },
+  "project_plan_dates": [
+    {
+      "value": "2022-01-01",
+      "field_type": "project_start_date",
+      "source": "Project Plan",
+      "notes": "Project start date documented in Project Plan, Section 1.8"
+    },
+    {
+      "value": "2022-01-01",
+      "field_type": "crediting_period_start",
+      "source": "Project Plan",
+      "notes": "Crediting period starts with project"
+    },
+    {
+      "value": "2023-08-09",
+      "field_type": "submission_date",
+      "source": "Project Plan",
+      "notes": "Document submission/update date from cover page"
+    }
+  ],
+  "validation_notes": {
+    "dates": "Project Plan contains: project_start_date (2022-01-01), crediting_period_start (2022-01-01), submission_date (2023-08-09). Baseline Report contains: imagery_date (2022-06-15), sampling_date (2022-08-20). These dates should align within the 120-day validation window.",
+    "land_tenure": "Nicholas Denman owns the property. Name may appear as 'Nick Denman' or 'N. Denman' in some documents. Total area is 120.5 hectares.",
+    "project_ids": "Official Regen Network ID is C06-006 (appears in Registry Agent Review documents). Internal project names are 4997Botany22 (2022) and 4998Botany23 (2023). The Project Plan only contains internal names, not the Regen Network ID."
+  },
+  "acceptable_variations": {
+    "owner_name": ["Nicholas Denman", "Nick Denman", "N. Denman", "Denman"],
+    "dates": {
+      "formats": ["2022-01-01", "01/01/2022", "1 January 2022", "January 1, 2022"],
+      "tolerance_days": 0
+    }
+  }
+}

@@ -129,7 +129,9 @@ class StateManager:
 
         Args:
             filename: Name of file to update
-            updates: Dictionary of fields to update (supports nested updates)
+            updates: Dictionary of fields to update (supports nested updates with dot notation)
+                    Example: {"workflow_progress.initialize": "completed"} will update
+                    data["workflow_progress"]["initialize"] = "completed"
 
         Returns:
             Updated complete data
@@ -140,7 +142,22 @@ class StateManager:
         """
         with self.lock():
             data = self.read_json(filename)
-            data.update(updates)
+
+            # Handle nested updates with dot notation
+            for key, value in updates.items():
+                if "." in key:
+                    # Split key into parts and navigate/create nested structure
+                    parts = key.split(".")
+                    target = data
+                    for part in parts[:-1]:
+                        if part not in target:
+                            target[part] = {}
+                        target = target[part]
+                    target[parts[-1]] = value
+                else:
+                    # Simple top-level update
+                    data[key] = value
+
             # Use unlocked version since we already have the lock
             self._write_json_unlocked(filename, data)
             return data

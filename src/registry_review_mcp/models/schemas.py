@@ -121,6 +121,7 @@ class DocumentMetadata(BaseModel):
     modification_date: datetime | None = None
     file_size_bytes: int
     has_tables: bool = False
+    content_hash: str | None = None  # SHA256 hash for deduplication
 
 
 class Document(BaseModel):

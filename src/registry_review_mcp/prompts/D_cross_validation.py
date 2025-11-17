@@ -193,9 +193,18 @@ Then return here for cross-validation.
     report.append("  • JSON report for programmatic access")
     report.append("  • Summary statistics and items for human review")
 
-    # Update workflow progress
+    # Update workflow progress and statistics
     workflow["cross_validation"] = "completed"
-    state_manager.update_json("session.json", {"workflow_progress": workflow})
+
+    # Update statistics with validation results
+    stats = session.get("statistics", {})
+    stats["validations_passed"] = summary["validations_passed"]
+    stats["validations_failed"] = summary["validations_failed"]
+
+    state_manager.update_json("session.json", {
+        "workflow_progress": workflow,
+        "statistics": stats
+    })
 
     return [TextContent(type="text", text="\n".join(report))]
 

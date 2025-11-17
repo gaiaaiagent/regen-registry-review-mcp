@@ -253,6 +253,47 @@ class TestSessionTools:
         assert result["status"] == "deleted"
         assert not manager.exists()
 
+    @pytest.mark.asyncio
+    async def test_list_example_projects(self, test_settings):
+        """Test listing example projects from examples directory."""
+        result = await session_tools.list_example_projects()
+
+        # Verify structure
+        assert "projects_found" in result
+        assert "projects" in result
+        assert "message" in result
+        assert isinstance(result["projects"], list)
+
+        # If examples exist, verify format
+        if result["projects_found"] > 0:
+            project = result["projects"][0]
+            assert "name" in project
+            assert "path" in project
+            assert "file_count" in project
+            assert isinstance(project["file_count"], int)
+            assert Path(project["path"]).exists()
+
+    @pytest.mark.asyncio
+    async def test_list_example_projects_no_examples(self, test_settings, tmp_path, monkeypatch):
+        """Test list_example_projects when examples directory doesn't exist."""
+        # Import settings module to patch it
+        from registry_review_mcp.tools import session_tools as st_module
+
+        # Create temp data dir without examples
+        temp_data_dir = tmp_path / "data"
+        temp_data_dir.mkdir()
+
+        # Mock the settings object in session_tools module
+        mock_settings = test_settings
+        mock_settings.data_dir = temp_data_dir
+        monkeypatch.setattr(st_module, "settings", mock_settings)
+
+        result = await session_tools.list_example_projects()
+
+        assert result["projects_found"] == 0
+        assert result["projects"] == []
+        assert "No examples" in result["message"]
+
 
 class TestChecklist:
     """Test checklist loading."""

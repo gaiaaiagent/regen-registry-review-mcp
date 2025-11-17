@@ -193,32 +193,106 @@ Updated: {result.get('updated_at')}
 
 @mcp.tool()
 async def list_sessions() -> str:
-    """List all available review sessions.
-
-    Returns:
-        Formatted list of sessions with metadata
-    """
+    """List all review sessions with complete field details"""
     try:
         logger.info("Listing all sessions")
 
         sessions = await session_tools.list_sessions()
 
         if not sessions:
-            return "No sessions found.\n\nCreate a new session using the create_session tool."
+            return "No sessions found.\n\nCreate a new session with /initialize or the create_session tool."
 
         session_list = []
         for idx, session in enumerate(sessions, 1):
+            # Get all fields
+            session_id = session.get('session_id', 'Unknown')
+            project_name = session.get('project_name', 'Unknown')
+            status = session.get('status', 'unknown')
+            created_at = session.get('created_at', 'Unknown')
+            methodology = session.get('methodology', 'Unknown')
+
+            # Project metadata
+            project_meta = session.get('project_metadata', {})
+            project_id = project_meta.get('project_id') or 'None'
+            proponent = project_meta.get('proponent') or 'None'
+            crediting_period = project_meta.get('crediting_period') or 'None'
+            documents_path = project_meta.get('documents_path', 'Unknown')
+
+            # Workflow progress
+            workflow = session.get('workflow_progress', {})
+            workflow_items = []
+            for stage, stage_status in workflow.items():
+                workflow_items.append(f"    - {stage}: {stage_status}")
+            workflow_text = "\n".join(workflow_items) if workflow_items else "    (empty)"
+
+            # Statistics
+            stats = session.get('statistics', {})
+            stats_items = []
+            for key, value in stats.items():
+                stats_items.append(f"    - {key}: {value}")
+            stats_text = "\n".join(stats_items) if stats_items else "    (empty)"
+
             session_list.append(
-                f"{idx}. {session['session_id']}\n"
-                f"   Project: {session.get('project_name', 'Unknown')}\n"
-                f"   Created: {session.get('created_at', 'Unknown')}\n"
-                f"   Status: {session.get('status', 'Unknown')}"
+                f"{idx}. Session ID: {session_id}\n"
+                f"   Project Name: {project_name}\n"
+                f"   Status: {status}\n"
+                f"   Created At: {created_at}\n"
+                f"   Methodology: {methodology}\n"
+                f"\n"
+                f"   Project Metadata:\n"
+                f"    - project_id: {project_id}\n"
+                f"    - proponent: {proponent}\n"
+                f"    - crediting_period: {crediting_period}\n"
+                f"    - documents_path: {documents_path}\n"
+                f"\n"
+                f"   Workflow Progress:\n"
+                f"{workflow_text}\n"
+                f"\n"
+                f"   Statistics:\n"
+                f"{stats_text}"
             )
 
-        return f"✓ Found {len(sessions)} session(s)\n\n" + "\n\n".join(session_list)
+        header = f"✓ Found {len(sessions)} session(s)\n\n" + "=" * 80 + "\n\n"
+        separator = "\n\n" + "-" * 80 + "\n\n"
+        footer = "\n\n" + "=" * 80 + "\n\nUse /document-discovery (or any workflow prompt) to continue with the most recent session."
+
+        return header + separator.join(session_list) + footer
 
     except Exception as e:
         logger.error(f"Failed to list sessions: {e}", exc_info=True)
+        return f"✗ Error: {str(e)}"
+
+
+@mcp.tool()
+async def list_example_projects() -> str:
+    """List example projects available in the examples directory for testing/demo purposes"""
+    try:
+        logger.info("Listing example projects")
+
+        result = await session_tools.list_example_projects()
+
+        if result["projects_found"] == 0:
+            return f"✗ {result['message']}"
+
+        # Format projects for display
+        project_list = []
+        for project in result["projects"]:
+            project_list.append(
+                f"• **{project['name']}**\n"
+                f"  Path: {project['path']}\n"
+                f"  Files: {project['file_count']}"
+            )
+
+        return (
+            f"✓ {result['message']}\n\n"
+            + "\n\n".join(project_list)
+            + "\n\n---\n\n"
+            "To initialize an example project:\n"
+            "/initialize Project Name, /path/from/above"
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to list example projects: {e}", exc_info=True)
         return f"✗ Error: {str(e)}"
 
 
@@ -572,11 +646,7 @@ Mapped Documents ({len(result['mapped_documents'])}):
 
 @mcp.prompt()
 def list_capabilities() -> list[TextContent]:
-    """List all MCP server capabilities and workflows.
-
-    Returns:
-        Overview of tools, prompts, and workflows available
-    """
+    """List all MCP server capabilities, tools, and workflow prompts"""
     capabilities = f"""# Regen Registry Review MCP Server
 
 **Version:** 2.0.0
@@ -668,153 +738,75 @@ These will auto-select your most recent session, or guide you to create one if n
     return [TextContent(type="text", text=capabilities)]
 
 
-@mcp.prompt()
-async def initialize(
-    project_name: str | None = None,
-    documents_path: str | None = None
-) -> list[TextContent]:
-    """Initialize a new registry review session (Stage 1).
+@mcp.prompt(name="list-sessions")
+async def list_sessions_prompt() -> list[TextContent]:
+    """List all active review sessions with project names, progress, and workflow status"""
+    result = await list_sessions()
+    return [TextContent(type="text", text=result)]
 
-    Creates a new review session with project metadata and prepares for document discovery.
 
-    Args:
-        project_name: Name of the project being reviewed
-        documents_path: Absolute path to directory containing project documents
+@mcp.prompt(name="list-projects")
+async def list_projects_prompt() -> list[TextContent]:
+    """List available example projects in the examples directory for quick testing"""
+    result = await list_example_projects()
+    return [TextContent(type="text", text=result)]
 
-    Returns:
-        Session creation results with next step guidance
 
-    Examples:
-        /initialize Botany Farm 2022-2023, /path/to/documents/22-23
-        /initialize My Project, /home/user/projects/my-project
-    """
+@mcp.prompt(name="A-initialize")
+async def initialize(project: str) -> list[TextContent]:
+    """Initialize new review session - provide 'project name, /path/to/documents' (comma-separated)"""
+    parts = [p.strip() for p in project.split(",", 1)]
+    project_name = parts[0] if len(parts) > 0 else None
+    documents_path = parts[1] if len(parts) > 1 else None
     return await A_initialize.initialize_prompt(project_name, documents_path)
 
 
-@mcp.prompt()
-async def document_discovery(
-    project_name: str | None = None,
-    documents_path: str | None = None,
-    session_id: str | None = None
-) -> list[TextContent]:
-    """Run the document discovery workflow for a session (Stage 2).
-
-    Can create a new session or use an existing one.
-
-    Args:
-        project_name: Project name (creates session if provided with documents_path)
-        documents_path: Absolute path to documents (creates session if provided with project_name)
-        session_id: Optional session ID (overrides project_name/documents_path)
-
-    Returns:
-        Detailed document discovery results with next steps
-
-    Examples:
-        /document-discovery Botany Farm 2022-2023, /path/to/documents
-        /document-discovery (uses most recent session)
-    """
+@mcp.prompt(name="B-document-discovery")
+async def document_discovery(project: str = "") -> list[TextContent]:
+    """Discover and classify project documents - provide session ID or project name (optional, auto-selects latest)"""
+    session_id = project if project and not "," in project else None
+    project_name = None
+    documents_path = None
+    if "," in project:
+        parts = [p.strip() for p in project.split(",", 1)]
+        project_name = parts[0]
+        documents_path = parts[1] if len(parts) > 1 else None
     return await B_document_discovery.document_discovery_prompt(project_name, documents_path, session_id)
 
 
-@mcp.prompt()
-async def evidence_extraction(session_id: str | None = None) -> list[TextContent]:
-    """Run the evidence extraction workflow for a session (Stage 3).
-
-    This prompt maps checklist requirements to discovered documents, extracts evidence
-    snippets with page citations, and calculates coverage statistics.
-
-    Args:
-        session_id: Optional session identifier. If not provided, uses most recent session.
-
-    Returns:
-        Detailed evidence extraction results with coverage analysis
-
-    Examples:
-        /evidence-extraction (uses most recent session)
-        /evidence-extraction session-abc123
-    """
+@mcp.prompt(name="C-evidence-extraction")
+async def evidence_extraction(project: str = "") -> list[TextContent]:
+    """Extract evidence from documents and map to requirements - provide session ID (optional, auto-selects latest)"""
+    session_id = project if project else None
     result = await C_evidence_extraction.evidence_extraction(session_id)
     return [TextContent(type="text", text=result)]
 
 
-@mcp.prompt()
-async def cross_validation(session_id: str | None = None) -> list[TextContent]:
-    """Run cross-document validation checks for a session (Stage 4).
-
-    Validates consistency across documents including date alignment, land tenure,
-    and project ID consistency. Flags discrepancies for human review.
-
-    Args:
-        session_id: Optional session identifier. If not provided, uses most recent session.
-
-    Returns:
-        Validation results with summary statistics and flagged items
-
-    Examples:
-        /cross-validation (uses most recent session)
-        /cross-validation session-abc123
-    """
+@mcp.prompt(name="D-cross-validation")
+async def cross_validation(project: str = "") -> list[TextContent]:
+    """Validate consistency across documents (dates, land tenure, project IDs) - provide session ID (optional)"""
+    session_id = project if project else None
     return await D_cross_validation.cross_validation_prompt(session_id)
 
 
-@mcp.prompt()
-async def report_generation(session_id: str | None = None) -> list[TextContent]:
-    """Generate complete review report in multiple formats (Stage 5).
-
-    Creates Markdown and JSON reports with all findings, evidence citations,
-    validation results, and items requiring human review.
-
-    Args:
-        session_id: Optional session identifier. If not provided, uses most recent session.
-
-    Returns:
-        Report generation summary with paths to generated files
-
-    Examples:
-        /report-generation (uses most recent session)
-        /report-generation session-abc123
-    """
+@mcp.prompt(name="E-report-generation")
+async def report_generation(project: str = "") -> list[TextContent]:
+    """Generate complete review report in Markdown and JSON formats - provide session ID (optional)"""
+    session_id = project if project else None
     return await E_report_generation.report_generation_prompt(session_id)
 
 
-@mcp.prompt()
-async def human_review(session_id: str | None = None) -> list[TextContent]:
-    """Review flagged validation items requiring human judgment (Stage 6).
-
-    Presents items that were flagged during cross-validation for human review,
-    including date discrepancies, land tenure conflicts, project ID inconsistencies,
-    and contradictions. Provides context and evidence to guide decision-making.
-
-    Args:
-        session_id: Optional session identifier. If not provided, uses most recent session.
-
-    Returns:
-        Flagged items with detailed context for human review
-
-    Examples:
-        /human-review (uses most recent session)
-        /human-review session-abc123
-    """
+@mcp.prompt(name="F-human-review")
+async def human_review(project: str = "") -> list[TextContent]:
+    """Review flagged validation items requiring human judgment - provide session ID (optional)"""
+    session_id = project if project else None
     return await F_human_review.human_review_prompt(session_id)
 
 
-@mcp.prompt()
-async def complete(session_id: str | None = None) -> list[TextContent]:
-    """Complete the registry review workflow and finalize the session (Stage 7).
-
-    Marks the review as complete, provides final summary with assessment,
-    and guides on next steps for export, sharing, or archiving reports.
-
-    Args:
-        session_id: Optional session identifier. If not provided, uses most recent session.
-
-    Returns:
-        Completion summary with final report location and next steps
-
-    Examples:
-        /complete (uses most recent session)
-        /complete session-abc123
-    """
+@mcp.prompt(name="G-complete")
+async def complete(project: str = "") -> list[TextContent]:
+    """Complete and finalize the review session with final assessment - provide session ID (optional)"""
+    session_id = project if project else None
     return await G_complete.complete_prompt(session_id)
 
 

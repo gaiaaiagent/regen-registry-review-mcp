@@ -107,6 +107,7 @@ class ValidationSummary(BaseModel):
     validations_warning: int
     items_flagged: int
     pass_rate: float = Field(..., ge=0.0, le=1.0)
+    extraction_method: str = "regex"  # "llm", "regex", "llm_fallback", "regex_fallback"
 
 
 class ValidationResult(BaseModel):

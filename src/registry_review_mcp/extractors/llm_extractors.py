@@ -437,10 +437,14 @@ Instructions:
 5. Flag any inconsistencies (different IDs in same project)
 6. Assign confidence based on pattern clarity (1.0 = matches known registry, 0.8 = custom ID, 0.5 = ambiguous)
 
-Special Cases:
-- Reference numbers (e.g., REQ-007, DOC-001) are NOT project IDs - exclude these
-- Version numbers (e.g., v1.2.2) are NOT project IDs - exclude these
-- Dates (e.g., 2022-01-01) are NOT project IDs - exclude these
+Special Cases - DO NOT EXTRACT:
+- Reference numbers (e.g., REQ-007, DOC-001) are NOT project IDs
+- Version numbers (e.g., v1.2.2) are NOT project IDs
+- Dates (e.g., 2022-01-01) are NOT project IDs
+- Document filename prefixes (e.g., "4997Botany22" in "Documents Submitted: 4997Botany22_Project_Plan.pdf")
+- Standalone numbers without registry prefix (e.g., just "4997" or "4998")
+
+ONLY extract IDs that appear as "Project ID: [value]" or match known registry patterns (C##-####, VCS####, etc.).
 
 Return JSON array:
 [
@@ -554,8 +558,12 @@ class DateExtractor(BaseExtractor):
             json_str = extract_json_from_response(response_text)
             extracted_data = validate_and_parse_extraction_response(json_str, "date")
 
+            # Verify citations against source content (prevent hallucination)
+            from ..extractors.verification import verify_date_extraction
+            verified_data = verify_date_extraction(extracted_data, chunk)
+
             # Convert to ExtractedField objects
-            chunk_fields = [ExtractedField(**data) for data in extracted_data]
+            chunk_fields = [ExtractedField(**data) for data in verified_data]
 
             logger.info(f"Extracted {len(chunk_fields)} dates from {chunk_name}")
             return chunk_fields
@@ -944,9 +952,18 @@ class ProjectIDExtractor(BaseExtractor):
                 json_str = extract_json_from_response(response_text)
                 extracted_data = validate_and_parse_extraction_response(json_str, "project_id")
 
+                # Filter out invalid project IDs (standalone numbers, filename prefixes)
+                filtered_data = _filter_invalid_project_ids(extracted_data)
+
                 # Convert to ExtractedField objects
-                chunk_fields = [ExtractedField(**data) for data in extracted_data]
+                chunk_fields = [ExtractedField(**data) for data in filtered_data]
                 all_fields.extend(chunk_fields)
+
+                if len(extracted_data) > len(filtered_data):
+                    logger.info(
+                        f"Filtered {len(extracted_data) - len(filtered_data)} invalid project IDs "
+                        f"(standalone numbers or filename prefixes)"
+                    )
 
                 logger.info(f"Extracted {len(chunk_fields)} project IDs from {chunk_name}")
 
@@ -979,6 +996,69 @@ class ProjectIDExtractor(BaseExtractor):
 
 
 # Helper functions
+
+
+def _filter_invalid_project_ids(extracted_data: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    Filter out invalid project IDs that are actually document prefixes or standalone numbers.
+
+    Args:
+        extracted_data: List of extracted project ID dicts
+
+    Returns:
+        Filtered list with invalid IDs removed
+    """
+    import re
+
+    filtered = []
+
+    for item in extracted_data:
+        value = str(item.get("value", "")).strip()
+        raw_text = item.get("raw_text", "")
+
+        # Skip empty values
+        if not value:
+            continue
+
+        # Skip standalone numbers (4997, 4998, etc.)
+        if re.match(r"^\d+$", value):
+            logger.debug(f"Filtering standalone number: {value}")
+            continue
+
+        # Skip if it appears to be a document filename prefix
+        # Pattern: ####ProjectYY or ####Project (e.g., 4997Botany22)
+        if re.match(r"^\d{4}[A-Za-z]+\d{2}$", value):
+            logger.debug(f"Filtering document filename prefix: {value}")
+            continue
+
+        # Skip if raw_text suggests this is from a filename context
+        if raw_text and any(
+            indicator in raw_text.lower()
+            for indicator in [
+                "documents submitted:",
+                "document name:",
+                "filename:",
+                "_project_plan",
+                "_baseline_report",
+                "_monitoring_report",
+                ".pdf",
+                ".shp",
+            ]
+        ):
+            logger.debug(f"Filtering ID from filename context: {value}")
+            continue
+
+        # Keep if it matches a known registry pattern or appears as "Project ID:"
+        # Known patterns: C##-####, VCS####, GS####, CAR####, ACR####
+        known_pattern = re.match(r"^(C\d{2}-\d+|VCS-?\d+|GS-?\d+|CAR\d+|ACR\d+)$", value)
+        project_id_context = raw_text and "project id" in raw_text.lower()
+
+        if known_pattern or project_id_context:
+            filtered.append(item)
+        else:
+            logger.debug(f"Filtering ID without valid pattern or context: {value}")
+
+    return filtered
 
 
 def extract_json_from_response(response_text: str) -> str:

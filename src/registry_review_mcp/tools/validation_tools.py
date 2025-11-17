@@ -7,6 +7,7 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
 
+from ..config.settings import settings
 from ..models.validation import (
     DateField,
     DateAlignmentValidation,
@@ -531,10 +532,67 @@ async def cross_validate(session_id: str) -> dict[str, Any]:
 
     evidence_data = state_manager.read_json("evidence.json")
 
-    # Extract structured fields from evidence
-    project_ids = extract_project_ids_from_evidence(evidence_data)
-    dates = extract_dates_from_evidence(evidence_data)
-    tenure_fields = extract_land_tenure_from_evidence(evidence_data)
+    # Extract structured fields from evidence (LLM or regex)
+    extraction_method = "regex"
+    try:
+        if settings.llm_extraction_enabled and settings.anthropic_api_key:
+            import sys
+
+            from ..extractors.llm_extractors import extract_fields_with_llm
+
+            print("Using LLM-powered field extraction", file=sys.stderr)
+
+            # LLM extraction
+            raw_fields = await extract_fields_with_llm(session_id, evidence_data)
+
+            # Transform dates to validation format
+            dates = []
+            for field in raw_fields.get("dates", []):
+                if field.confidence >= settings.llm_confidence_threshold:
+                    dates.append({
+                        "date_type": field.field_type,
+                        "date_value": field.value,
+                        "date_str": field.value,
+                        "document_id": None,  # Will be populated if available
+                        "document_name": field.source.split(",")[0].strip(),
+                        "page": None,  # Extract from source if available
+                        "source": field.source,
+                        "confidence": field.confidence
+                    })
+
+            # Transform tenure fields to validation format
+            from ..extractors.llm_extractors import group_fields_by_document
+
+            # Filter by confidence and group by document
+            tenure_raw = [f for f in raw_fields.get("tenure", []) if f.confidence >= settings.llm_confidence_threshold]
+            tenure_fields = group_fields_by_document(tenure_raw)
+
+            # Transform project IDs to validation format
+            project_ids = []
+            for field in raw_fields.get("project_ids", []):
+                if field.confidence >= settings.llm_confidence_threshold:
+                    project_ids.append({
+                        "project_id": field.value,
+                        "document_id": field.source.split(",")[0].strip() if "," in field.source else None,
+                        "document_name": field.source.split(",")[0].strip(),
+                        "page": None,  # TODO: Extract from source
+                        "section": field.source,
+                        "confidence": field.confidence
+                    })
+
+            extraction_method = "llm"
+        else:
+            raise ValueError("LLM extraction not enabled")
+
+    except Exception as e:
+        import sys
+        print(f"LLM extraction failed: {e}. Using regex fallback.", file=sys.stderr)
+
+        # Regex extraction (fallback)
+        project_ids = extract_project_ids_from_evidence(evidence_data)
+        dates = extract_dates_from_evidence(evidence_data)
+        tenure_fields = extract_land_tenure_from_evidence(evidence_data)
+        extraction_method = "regex_fallback" if settings.llm_extraction_enabled else "regex"
 
     # Run validation checks
     validation_results = {
@@ -623,7 +681,7 @@ async def cross_validate(session_id: str) -> dict[str, Any]:
             validation_results['land_tenure'].append(result)
 
     # Calculate summary
-    summary = calculate_validation_summary(validation_results)
+    summary = calculate_validation_summary(validation_results, extraction_method)
 
     # Build final result
     validation_result = ValidationResult(
@@ -643,12 +701,15 @@ async def cross_validate(session_id: str) -> dict[str, Any]:
     return validation_result.model_dump()
 
 
-def calculate_validation_summary(validations: dict[str, list[dict]]) -> dict[str, Any]:
+def calculate_validation_summary(
+    validations: dict[str, list[dict]], extraction_method: str = "regex"
+) -> dict[str, Any]:
     """
     Calculate summary statistics from validation results.
 
     Args:
         validations: Dictionary of validation type to list of validation results
+        extraction_method: Method used for field extraction ("llm", "regex", etc.)
 
     Returns:
         Summary statistics dictionary
@@ -671,7 +732,8 @@ def calculate_validation_summary(validations: dict[str, list[dict]]) -> dict[str
         validations_failed=failed,
         validations_warning=warning,
         items_flagged=flagged,
-        pass_rate=pass_rate
+        pass_rate=pass_rate,
+        extraction_method=extraction_method
     )
 
     return summary.model_dump()

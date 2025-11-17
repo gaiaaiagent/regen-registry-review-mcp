@@ -364,15 +364,25 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
         checklist_data = json.load(f)
     requirements = checklist_data.get("requirements", [])
 
-    # Extract evidence for each requirement
+    total_requirements = len(requirements)
+    print(f"📋 Extracting evidence for {total_requirements} requirements", flush=True)
+
+    # Extract evidence for each requirement with progress
     all_evidence = []
-    for requirement in requirements:
+    for i, requirement in enumerate(requirements, 1):
         requirement_id = requirement["requirement_id"]
+
+        # Show progress every 5 requirements or on first/last
+        if i % 5 == 0 or i == 1 or i == total_requirements:
+            percentage = (i / total_requirements * 100)
+            print(f"  ⏳ Processing {i}/{total_requirements} ({percentage:.0f}%): {requirement_id}", flush=True)
+
         try:
             evidence = await map_requirement(session_id, requirement_id)
             all_evidence.append(RequirementEvidence(**evidence))
         except Exception as e:
             # Create a flagged entry for failed requirements
+            print(f"⚠️  Warning: Failed to extract {requirement_id}: {e}", flush=True)
             all_evidence.append(RequirementEvidence(
                 requirement_id=requirement_id,
                 requirement_text=requirement.get("requirement_text", ""),
@@ -391,6 +401,14 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
     flagged = sum(1 for e in all_evidence if e.status == "flagged")
 
     overall_coverage = (covered + (partial * 0.5)) / len(all_evidence) if all_evidence else 0.0
+
+    # Show completion summary
+    print(f"✅ Evidence extraction complete:", flush=True)
+    print(f"   • Covered: {covered} ({covered/total_requirements*100:.0f}%)", flush=True)
+    print(f"   • Partial: {partial} ({partial/total_requirements*100:.0f}%)", flush=True)
+    print(f"   • Missing: {missing} ({missing/total_requirements*100:.0f}%)", flush=True)
+    if flagged > 0:
+        print(f"   • Flagged: {flagged} (needs attention)", flush=True)
 
     result = EvidenceExtractionResult(
         session_id=session_id,

@@ -33,18 +33,34 @@ from ..utils.patterns import (
 from ..utils.state import StateManager
 
 
-def generate_document_id(filepath: str) -> str:
-    """Generate a unique document ID from filepath.
+def compute_file_hash(filepath: Path) -> str:
+    """Compute SHA256 hash of file content for deduplication.
 
     Args:
-        filepath: Path to document
+        filepath: Path to file
+
+    Returns:
+        SHA256 hash of file content
+    """
+    sha256_hash = hashlib.sha256()
+    with open(filepath, "rb") as f:
+        # Read in chunks to handle large files efficiently
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+    return sha256_hash.hexdigest()
+
+
+def generate_document_id(content_hash: str) -> str:
+    """Generate a unique document ID from content hash.
+
+    Args:
+        content_hash: SHA256 hash of file content
 
     Returns:
         Unique document ID (DOC-xxxxx)
     """
-    # Use hash of filepath for consistency
-    hash_obj = hashlib.md5(filepath.encode())
-    short_hash = hash_obj.hexdigest()[:8]
+    # Use first 8 chars of content hash for document ID
+    short_hash = content_hash[:8]
     return f"DOC-{short_hash}"
 
 
@@ -78,7 +94,9 @@ async def discover_documents(session_id: str) -> dict[str, Any]:
     # Supported extensions
     supported_extensions = {".pdf", ".shp", ".geojson", ".tif", ".tiff"}
 
-    # Recursive scan
+    # Recursive scan with progress
+    print(f"🔍 Scanning directory: {documents_path}", flush=True)
+
     for file_path in documents_path.rglob("*"):
         if not file_path.is_file():
             continue
@@ -93,20 +111,44 @@ async def discover_documents(session_id: str) -> dict[str, Any]:
 
         discovered_files.append(file_path)
 
-    # Process each file
+    file_count = len(discovered_files)
+    print(f"📄 Found {file_count} supported files to process", flush=True)
+
+    # Process each file with progress updates
     documents = []
-    for file_path in discovered_files:
+    errors = []
+    seen_hashes = {}  # Track content hashes for deduplication
+    duplicates_skipped = 0
+
+    for i, file_path in enumerate(discovered_files, 1):
+        # Show progress every 3 files or on last file
+        if i % 3 == 0 or i == file_count:
+            percentage = (i / file_count * 100)
+            print(f"  ⏳ Processing {i}/{file_count} ({percentage:.0f}%): {file_path.name}", flush=True)
+
         try:
-            # Generate document ID
-            doc_id = generate_document_id(str(file_path))
+            # Extract metadata (includes content hash computation)
+            metadata = await extract_document_metadata(file_path)
+
+            # Check for duplicate content
+            content_hash = metadata.content_hash
+            if content_hash in seen_hashes:
+                # Skip duplicate - already processed this file content
+                original_path = seen_hashes[content_hash]
+                duplicates_skipped += 1
+                print(f"  ⏭️  Skipping duplicate: {file_path.name} (same as {Path(original_path).name})", flush=True)
+                continue
+
+            # Track this hash
+            seen_hashes[content_hash] = str(file_path)
+
+            # Generate document ID from content hash
+            doc_id = generate_document_id(content_hash)
 
             # Classify document
             classification, confidence, method = await classify_document_by_filename(
                 str(file_path)
             )
-
-            # Extract metadata
-            metadata = await extract_document_metadata(file_path)
 
             # Create document record
             document = Document(
@@ -127,16 +169,69 @@ async def discover_documents(session_id: str) -> dict[str, Any]:
                 classification_summary.get(classification, 0) + 1
             )
 
+        except PermissionError as e:
+            error_msg = f"Cannot read {file_path.name}: Permission denied"
+            print(f"⚠️  {error_msg}", flush=True)
+            errors.append({
+                "filepath": str(file_path),
+                "filename": file_path.name,
+                "error_type": "permission_denied",
+                "message": error_msg,
+                "recovery_steps": [
+                    f"Check file permissions: chmod 644 {file_path}",
+                    f"Ensure you have read access to the file",
+                    "Contact system administrator if needed"
+                ]
+            })
         except Exception as e:
-            # Log but continue processing other files
-            print(f"Warning: Failed to process {file_path}: {e}", flush=True)
-            continue
+            error_type = type(e).__name__
+            error_msg = f"Failed to process {file_path.name}: {str(e)}"
+            print(f"⚠️  {error_msg}", flush=True)
 
-    # Save document index
+            # Provide specific recovery guidance based on error type
+            recovery_steps = []
+            if "PDF" in str(e) or "pdf" in str(e).lower():
+                recovery_steps = [
+                    "The PDF file may be corrupted or encrypted",
+                    f"Try opening {file_path.name} in a PDF viewer to verify it's valid",
+                    "Consider re-downloading or re-scanning the document"
+                ]
+            elif "shapefile" in str(e).lower() or ".shp" in str(file_path):
+                recovery_steps = [
+                    "Shapefile may be missing required components (.shp, .shx, .dbf)",
+                    f"Verify all shapefile components are present in {file_path.parent}",
+                    "Try re-exporting the shapefile from GIS software"
+                ]
+            else:
+                recovery_steps = [
+                    f"Verify the file is not corrupted: {file_path.name}",
+                    "Check file format is supported (.pdf, .shp, .geojson, .tif)",
+                    "Try re-processing the file or contact support"
+                ]
+
+            errors.append({
+                "filepath": str(file_path),
+                "filename": file_path.name,
+                "error_type": error_type,
+                "message": error_msg,
+                "recovery_steps": recovery_steps
+            })
+
+    # Show completion with error summary
+    print(f"✅ Discovery complete: {len(documents)} unique documents classified", flush=True)
+    if duplicates_skipped > 0:
+        print(f"  ⏭️  Skipped {duplicates_skipped} duplicate file(s)", flush=True)
+    if errors:
+        print(f"⚠️  {len(errors)} file(s) could not be processed (see errors below)", flush=True)
+
+    # Save document index with errors
     documents_data = {
         "documents": documents,
         "total_count": len(documents),
+        "duplicates_skipped": duplicates_skipped,
         "classification_summary": classification_summary,
+        "errors": errors,
+        "error_count": len(errors),
         "discovered_at": datetime.now(timezone.utc).isoformat(),
     }
     state_manager.write_json("documents.json", documents_data)
@@ -148,6 +243,7 @@ async def discover_documents(session_id: str) -> dict[str, Any]:
             "statistics": {
                 **session_data.get("statistics", {}),
                 "documents_found": len(documents),
+                "duplicates_skipped": duplicates_skipped,
             },
             "workflow_progress": {
                 **session_data.get("workflow_progress", {}),
@@ -159,6 +255,7 @@ async def discover_documents(session_id: str) -> dict[str, Any]:
     return {
         "session_id": session_id,
         "documents_found": len(documents),
+        "duplicates_skipped": duplicates_skipped,
         "classification_summary": classification_summary,
         "documents": documents,
     }
@@ -219,10 +316,14 @@ async def extract_document_metadata(file_path: Path) -> DocumentMetadata:
     """
     stat = file_path.stat()
 
+    # Compute content hash for deduplication
+    content_hash = compute_file_hash(file_path)
+
     metadata = DocumentMetadata(
         file_size_bytes=stat.st_size,
         creation_date=datetime.fromtimestamp(stat.st_ctime, tz=timezone.utc),
         modification_date=datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc),
+        content_hash=content_hash,
     )
 
     # PDF-specific metadata
