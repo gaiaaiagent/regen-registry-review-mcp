@@ -10,6 +10,18 @@ from mcp.types import TextContent
 from .config.settings import settings
 from .models import errors as mcp_errors
 from .tools import session_tools, document_tools, evidence_tools, validation_tools, report_tools, upload_tools
+from .utils.tool_helpers import (
+    with_error_handling,
+    format_success,
+    format_error,
+    format_list,
+    format_sessions_list,
+    format_session_created,
+    format_session_loaded,
+    format_documents_discovered,
+    format_evidence_extracted,
+    ResponseBuilder,
+)
 from .prompts import A_initialize, B_document_discovery, C_evidence_extraction, D_cross_validation, E_report_generation, F_human_review, G_complete
 
 # ============================================================================
@@ -37,6 +49,7 @@ logger.info("Initializing Registry Review MCP Server v2.0.0")
 
 
 @mcp.tool()
+@with_error_handling("create_session")
 async def create_session(
     project_name: str,
     documents_path: str,
@@ -46,82 +59,27 @@ async def create_session(
     crediting_period: str | None = None,
 ) -> str:
     """Create a new registry review session."""
-    try:
-        logger.info(f"Creating session for project: {project_name}")
-
-        result = await session_tools.create_session(
-            project_name=project_name,
-            documents_path=documents_path,
-            methodology=methodology,
-            project_id=project_id,
-            proponent=proponent,
-            crediting_period=crediting_period,
-        )
-
-        logger.info(f"Session created: {result['session_id']}")
-
-        return f"""✓ Session Created Successfully
-
-Session ID: {result['session_id']}
-Project: {result['project_name']}
-Methodology: {result['methodology']}
-Documents Path: {result['documents_path']}
-Created: {result['created_at']}
-
-Next Step: Run document discovery
-    - Use the /document-discovery prompt to scan and classify all project documents
-    - Or call the discover_documents tool directly with session_id: {result['session_id']}
-"""
-
-    except Exception as e:
-        logger.error(f"Failed to create session: {e}", exc_info=True)
-        return f"✗ Error: {str(e)}"
+    result = await session_tools.create_session(
+        project_name=project_name,
+        documents_path=documents_path,
+        methodology=methodology,
+        project_id=project_id,
+        proponent=proponent,
+        crediting_period=crediting_period,
+    )
+    return format_session_created(result)
 
 
 @mcp.tool()
+@with_error_handling("load_session")
 async def load_session(session_id: str) -> str:
     """Load an existing review session."""
-    try:
-        logger.info(f"Loading session: {session_id}")
-
-        session_data = await session_tools.load_session(session_id)
-
-        progress = session_data.get("workflow_progress", {})
-        progress_status = "\n".join(
-            f"  - {stage}: {status}" for stage, status in progress.items()
-        )
-
-        stats = session_data.get("statistics", {})
-
-        return f"""✓ Session Loaded
-
-Session ID: {session_id}
-Project: {session_data.get('project_metadata', {}).get('project_name')}
-Status: {session_data.get('status')}
-Created: {session_data.get('created_at')}
-Updated: {session_data.get('updated_at')}
-
-Workflow Progress:
-{progress_status}
-
-Statistics:
-  - Documents Found: {stats.get('documents_found', 0)}
-  - Requirements Total: {stats.get('requirements_total', 0)}
-  - Requirements Covered: {stats.get('requirements_covered', 0)}
-  - Requirements Partial: {stats.get('requirements_partial', 0)}
-  - Requirements Missing: {stats.get('requirements_missing', 0)}
-"""
-
-    except mcp_errors.SessionNotFoundError as e:
-        logger.warning(f"Session not found: {session_id}")
-        return f"✗ Session not found: {session_id}\n\nUse list_sessions to see available sessions."
-
-    except Exception as e:
-        logger.error(f"Failed to load session: {e}", exc_info=True)
-        return f"✗ Error: {str(e)}"
+    session_data = await session_tools.load_session(session_id)
+    return format_session_loaded(session_data)
 
 
 @mcp.tool()
+@with_error_handling("update_session_state")
 async def update_session_state(
     session_id: str,
     status: str | None = None,
@@ -129,103 +87,22 @@ async def update_session_state(
     workflow_status: str | None = None,
 ) -> str:
     """Update session state."""
-    try:
-        logger.info(f"Updating session: {session_id}")
+    updates: dict = {}
+    if status:
+        updates["status"] = status
+    if workflow_stage and workflow_status:
+        updates[f"workflow_progress.{workflow_stage}"] = workflow_status
 
-        updates: dict = {}
-
-        if status:
-            updates["status"] = status
-
-        if workflow_stage and workflow_status:
-            updates[f"workflow_progress.{workflow_stage}"] = workflow_status
-
-        result = await session_tools.update_session_state(session_id, updates)
-
-        return f"""✓ Session Updated
-
-Session ID: {session_id}
-Updated: {result.get('updated_at')}
-"""
-
-    except mcp_errors.SessionNotFoundError:
-        return f"✗ Session not found: {session_id}"
-
-    except Exception as e:
-        logger.error(f"Failed to update session: {e}", exc_info=True)
-        return f"✗ Error: {str(e)}"
+    result = await session_tools.update_session_state(session_id, updates)
+    return format_success("Session Updated", {"session_id": session_id, "updated": result.get('updated_at')})
 
 
 @mcp.tool()
+@with_error_handling("list_sessions")
 async def list_sessions() -> str:
     """List all review sessions with complete field details"""
-    try:
-        logger.info("Listing all sessions")
-
-        sessions = await session_tools.list_sessions()
-
-        if not sessions:
-            return "No sessions found.\n\nCreate a new session with /initialize or the create_session tool."
-
-        session_list = []
-        for idx, session in enumerate(sessions, 1):
-            # Get all fields
-            session_id = session.get('session_id', 'Unknown')
-            project_name = session.get('project_name', 'Unknown')
-            status = session.get('status', 'unknown')
-            created_at = session.get('created_at', 'Unknown')
-            methodology = session.get('methodology', 'Unknown')
-
-            # Project metadata
-            project_meta = session.get('project_metadata', {})
-            project_id = project_meta.get('project_id') or 'None'
-            proponent = project_meta.get('proponent') or 'None'
-            crediting_period = project_meta.get('crediting_period') or 'None'
-            documents_path = project_meta.get('documents_path', 'Unknown')
-
-            # Workflow progress
-            workflow = session.get('workflow_progress', {})
-            workflow_items = []
-            for stage, stage_status in workflow.items():
-                workflow_items.append(f"    - {stage}: {stage_status}")
-            workflow_text = "\n".join(workflow_items) if workflow_items else "    (empty)"
-
-            # Statistics
-            stats = session.get('statistics', {})
-            stats_items = []
-            for key, value in stats.items():
-                stats_items.append(f"    - {key}: {value}")
-            stats_text = "\n".join(stats_items) if stats_items else "    (empty)"
-
-            session_list.append(
-                f"{idx}. Session ID: {session_id}\n"
-                f"   Project Name: {project_name}\n"
-                f"   Status: {status}\n"
-                f"   Created At: {created_at}\n"
-                f"   Methodology: {methodology}\n"
-                f"\n"
-                f"   Project Metadata:\n"
-                f"    - project_id: {project_id}\n"
-                f"    - proponent: {proponent}\n"
-                f"    - crediting_period: {crediting_period}\n"
-                f"    - documents_path: {documents_path}\n"
-                f"\n"
-                f"   Workflow Progress:\n"
-                f"{workflow_text}\n"
-                f"\n"
-                f"   Statistics:\n"
-                f"{stats_text}"
-            )
-
-        header = f"✓ Found {len(sessions)} session(s)\n\n" + "=" * 80 + "\n\n"
-        separator = "\n\n" + "-" * 80 + "\n\n"
-        footer = "\n\n" + "=" * 80 + "\n\nUse /document-discovery (or any workflow prompt) to continue with the most recent session."
-
-        return header + separator.join(session_list) + footer
-
-    except Exception as e:
-        logger.error(f"Failed to list sessions: {e}", exc_info=True)
-        return f"✗ Error: {str(e)}"
+    sessions = await session_tools.list_sessions()
+    return format_sessions_list(sessions)
 
 
 @mcp.tool()
