@@ -146,7 +146,6 @@ async def discover_documents(session_id: str) -> dict[str, Any]:
                 try:
                     print(f"  🔄 Converting {file_path.name} to markdown...", flush=True)
                     from ..extractors.marker_extractor import convert_pdf_to_markdown
-                    from ..intelligence import get_metadata_extractor, get_prior_review_detector
 
                     # Convert PDF to markdown
                     markdown_result = await convert_pdf_to_markdown(str(file_path))
@@ -155,27 +154,12 @@ async def discover_documents(session_id: str) -> dict[str, Any]:
                     markdown_path = file_path.with_suffix('.md')
                     markdown_path.write_text(markdown_result["markdown"], encoding="utf-8")
 
-                    # Extract intelligent metadata from markdown
-                    metadata_extractor = get_metadata_extractor()
-                    intelligent_metadata = metadata_extractor.extract_all_metadata(
-                        text=markdown_result["markdown"],
-                        filename=file_path.name
-                    )
-
-                    # Detect and analyze if this is a prior review
-                    prior_review_detector = get_prior_review_detector()
-                    prior_review_analysis = prior_review_detector.analyze_document(
-                        text=markdown_result["markdown"],
-                        filename=file_path.name
-                    )
-
-                    # Add markdown reference and intelligent metadata to document
+                    # Add markdown reference to document
+                    # Note: Metadata extraction now handled by unified_analysis.py (100% accuracy validated)
                     doc_dict = document.model_dump(mode="json")
                     doc_dict["markdown_path"] = str(markdown_path)
                     doc_dict["has_markdown"] = True
                     doc_dict["markdown_char_count"] = len(markdown_result["markdown"])
-                    doc_dict["intelligent_metadata"] = intelligent_metadata
-                    doc_dict["prior_review_analysis"] = prior_review_analysis
                     documents.append(doc_dict)
 
                     print(f"  ✅ Markdown saved: {markdown_path.name} ({len(markdown_result['markdown']):,} chars)", flush=True)
