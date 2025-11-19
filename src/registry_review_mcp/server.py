@@ -1,8 +1,4 @@
-"""Registry Review MCP Server.
-
-Main entry point for the Model Context Protocol server providing automated
-registry review workflows for carbon credit project registration.
-"""
+"""Registry Review MCP Server - automated carbon credit project registry review workflows."""
 
 import logging
 import sys
@@ -13,7 +9,7 @@ from mcp.types import TextContent
 
 from .config.settings import settings
 from .models import errors as mcp_errors
-from .tools import session_tools, document_tools, evidence_tools, validation_tools, report_tools
+from .tools import session_tools, document_tools, evidence_tools, validation_tools, report_tools, upload_tools
 from .prompts import A_initialize, B_document_discovery, C_evidence_extraction, D_cross_validation, E_report_generation, F_human_review, G_complete
 
 # ============================================================================
@@ -49,19 +45,7 @@ async def create_session(
     proponent: str | None = None,
     crediting_period: str | None = None,
 ) -> str:
-    """Create a new registry review session.
-
-    Args:
-        project_name: Name of the project being reviewed
-        documents_path: Absolute path to directory containing project documents
-        methodology: Methodology identifier (default: soil-carbon-v1.2.2)
-        project_id: Project ID if known (e.g., C06-4997)
-        proponent: Name of project proponent
-        crediting_period: Crediting period description (e.g., "2022-2032")
-
-    Returns:
-        JSON string with session details and instructions for next steps
-    """
+    """Create a new registry review session."""
     try:
         logger.info(f"Creating session for project: {project_name}")
 
@@ -96,26 +80,17 @@ Next Step: Run document discovery
 
 @mcp.tool()
 async def load_session(session_id: str) -> str:
-    """Load an existing review session.
-
-    Args:
-        session_id: Unique session identifier
-
-    Returns:
-        JSON string with complete session data
-    """
+    """Load an existing review session."""
     try:
         logger.info(f"Loading session: {session_id}")
 
         session_data = await session_tools.load_session(session_id)
 
-        # Format workflow progress
         progress = session_data.get("workflow_progress", {})
         progress_status = "\n".join(
             f"  - {stage}: {status}" for stage, status in progress.items()
         )
 
-        # Format statistics
         stats = session_data.get("statistics", {})
 
         return f"""✓ Session Loaded
@@ -153,17 +128,7 @@ async def update_session_state(
     workflow_stage: str | None = None,
     workflow_status: str | None = None,
 ) -> str:
-    """Update session state.
-
-    Args:
-        session_id: Unique session identifier
-        status: Overall session status
-        workflow_stage: Workflow stage to update (e.g., "document_discovery")
-        workflow_status: Status for the workflow stage (pending/in_progress/completed)
-
-    Returns:
-        Confirmation message
-    """
+    """Update session state."""
     try:
         logger.info(f"Updating session: {session_id}")
 
@@ -274,7 +239,6 @@ async def list_example_projects() -> str:
         if result["projects_found"] == 0:
             return f"✗ {result['message']}"
 
-        # Format projects for display
         project_list = []
         for project in result["projects"]:
             project_list.append(
@@ -320,7 +284,6 @@ async def start_review(
     try:
         logger.info(f"Starting review for project: {project_name}")
 
-        # Create session
         session_result = await session_tools.create_session(
             project_name=project_name,
             documents_path=documents_path,
@@ -331,10 +294,8 @@ async def start_review(
         session_id = session_result["session_id"]
         logger.info(f"Session created: {session_id}")
 
-        # Discover documents
         discovery_result = await document_tools.discover_documents(session_id)
 
-        # Format summary
         summary_lines = []
         for doc_type, count in sorted(discovery_result["classification_summary"].items()):
             summary_lines.append(f"  - {doc_type}: {count}")
@@ -392,6 +353,376 @@ async def delete_session(session_id: str) -> str:
 
 
 # ============================================================================
+# File Upload Tools
+# ============================================================================
+
+
+@mcp.tool()
+async def create_session_from_uploads(
+    project_name: str,
+    files: list[dict],
+    methodology: str = "soil-carbon-v1.2.2",
+    project_id: str | None = None,
+    proponent: str | None = None,
+    crediting_period: str | None = None,
+    deduplicate: bool = True,
+    force_new_session: bool = False,
+) -> str:
+    """Create a new registry review session from uploaded file content.
+
+    Accepts file content in two flexible formats:
+    1. Base64 format: {"filename": "doc.pdf", "content_base64": "JVBERi0..."}
+    2. Path format: {"filename": "doc.pdf", "path": "/absolute/path/to/file.pdf"}
+
+    Ideal for web applications, chat interfaces, and APIs where files are
+    uploaded dynamically or stored on the server filesystem.
+
+    Args:
+        project_name: Name of the project being reviewed
+        files: List of file objects. Each file must have:
+            - filename OR name (required): Name of the file (e.g., "ProjectPlan.pdf")
+            - content_base64 OR path (required): Either base64-encoded content or absolute file path
+            - mime_type (optional): MIME type (e.g., "application/pdf")
+        methodology: Methodology identifier (default: soil-carbon-v1.2.2)
+        project_id: Project ID if known (e.g., C06-4997)
+        proponent: Name of project proponent
+        crediting_period: Crediting period description (e.g., "2022-2032")
+        deduplicate: Automatically remove duplicate files by filename and content hash (default: True)
+        force_new_session: Force creation of new session even if existing session detected (default: False)
+
+    Returns:
+        Success message with session details and document discovery results.
+        If existing session detected, returns that session's information.
+
+    Examples:
+        # Base64 format
+        files = [{"filename": "plan.pdf", "content_base64": "JVBERi0xLjQK..."}]
+
+        # Path format (e.g., from ElizaOS uploads)
+        files = [{"name": "plan.pdf", "path": "/media/uploads/agents/abc/plan.pdf"}]
+
+        create_session_from_uploads("My Project", files)
+    """
+    try:
+        logger.info(f"Creating session from uploads: {project_name}")
+
+        result = await upload_tools.create_session_from_uploads(
+            project_name=project_name,
+            files=files,
+            methodology=methodology,
+            project_id=project_id,
+            proponent=proponent,
+            crediting_period=crediting_period,
+            deduplicate=deduplicate,
+            force_new_session=force_new_session,
+        )
+
+        if result.get("existing_session_detected"):
+            logger.info(f"Existing session detected: {result['session_id']}")
+
+            progress = result.get("workflow_progress", {})
+            progress_text = []
+            for stage, status in progress.items():
+                icon = "✓" if status == "completed" else "⏳" if status == "in_progress" else "○"
+                progress_text.append(f"  {icon} {stage}: {status}")
+            progress_summary = "\n".join(progress_text) if progress_text else "  (No progress recorded)"
+
+            return f"""ℹ️ Existing Session Found
+
+Session ID: {result['session_id']}
+Project: {result['project_name']}
+Created: {result.get('session_created', 'Unknown')}
+
+{result.get('message', 'Returning existing session.')}
+
+Workflow Progress:
+{progress_summary}
+
+To create a new session anyway, set force_new_session=True.
+"""
+
+        logger.info(f"Session created from uploads: {result['session_id']}")
+
+        files_list = "\n".join(f"  - {f}" for f in result["files_saved"])
+
+        doc_types = []
+        for doc_type, count in sorted(result["documents_by_type"].items()):
+            doc_types.append(f"  - {doc_type}: {count}")
+        doc_types_text = "\n".join(doc_types) if doc_types else "  (none classified yet)"
+
+        dedup_info = result.get("deduplication", {})
+        dedup_text = ""
+        if dedup_info.get("enabled") and dedup_info.get("total_duplicates_removed", 0) > 0:
+            dedup_text = f"\nDeduplication:\n"
+            dedup_text += f"  Files uploaded: {result.get('files_uploaded', len(result['files_saved']))}\n"
+            dedup_text += f"  Files saved: {len(result['files_saved'])}\n"
+            dedup_text += f"  Duplicates removed: {dedup_info['total_duplicates_removed']}\n"
+
+            if dedup_info.get("duplicate_filenames_skipped"):
+                dedup_text += f"  - Duplicate filenames: {', '.join(dedup_info['duplicate_filenames_skipped'])}\n"
+
+            if dedup_info.get("duplicate_content_detected"):
+                content_dupes = [f"{k} (same as {v})" for k, v in dedup_info['duplicate_content_detected'].items()]
+                dedup_text += f"  - Duplicate content: {', '.join(content_dupes)}\n"
+
+        return f"""✓ Session Created from Uploads
+
+Session ID: {result['session_id']}
+Project: {project_name}
+Methodology: {methodology}
+Temp Directory: {result['temp_directory']}
+
+Files Uploaded ({len(result['files_saved'])}):
+{files_list}
+{dedup_text}
+Document Discovery Complete:
+  Found: {result['documents_found']} document(s)
+  Classified: {result['documents_classified']}
+
+Classification Summary:
+{doc_types_text}
+
+Next Steps:
+  - Run extract_evidence("{result['session_id']}") to map requirements to documents
+  - Or use /evidence-extraction prompt for guided workflow
+"""
+
+    except ValueError as e:
+        logger.warning(f"Validation error in create_session_from_uploads: {e}")
+        return f"✗ Validation Error: {str(e)}"
+
+    except Exception as e:
+        logger.error(f"Failed to create session from uploads: {e}", exc_info=True)
+        return f"✗ Error: {str(e)}"
+
+
+@mcp.tool()
+async def upload_additional_files(
+    session_id: str,
+    files: list[dict],
+) -> str:
+    """Add additional files to an existing session.
+
+    Accepts file content in two flexible formats:
+    1. Base64 format: {"filename": "doc.pdf", "content_base64": "JVBERi0..."}
+    2. Path format: {"filename": "doc.pdf", "path": "/absolute/path/to/file.pdf"}
+
+    Adds files to an existing session's document directory and re-runs document discovery.
+    Useful for iterative document submission.
+
+    Args:
+        session_id: Existing session identifier
+        files: List of file objects. Each file must have:
+            - filename OR name (required): Name of the file
+            - content_base64 OR path (required): Either base64-encoded content or absolute file path
+            - mime_type (optional): MIME type
+
+    Returns:
+        Success message with updated document discovery results
+
+    Examples:
+        # Base64 format
+        upload_additional_files("session-abc123",
+            [{"filename": "Baseline.pdf", "content_base64": "JVBERi0..."}])
+
+        # Path format
+        upload_additional_files("session-abc123",
+            [{"name": "Baseline.pdf", "path": "/media/uploads/agents/abc/baseline.pdf"}])
+    """
+    try:
+        logger.info(f"Uploading additional files to session: {session_id}")
+
+        result = await upload_tools.upload_additional_files(
+            session_id=session_id,
+            files=files,
+        )
+
+        logger.info(f"Added {len(result['files_added'])} files to session {session_id}")
+
+        files_list = "\n".join(f"  - {f}" for f in result["files_added"])
+
+        doc_types = []
+        for doc_type, count in sorted(result["documents_by_type"].items()):
+            doc_types.append(f"  - {doc_type}: {count}")
+        doc_types_text = "\n".join(doc_types) if doc_types else "  (none classified)"
+
+        return f"""✓ Files Added to Session
+
+Session ID: {session_id}
+
+Files Added ({len(result['files_added'])}):
+{files_list}
+
+Updated Document Discovery:
+  Total Found: {result['documents_found']} document(s)
+  Classified: {result['documents_classified']}
+
+Classification Summary:
+{doc_types_text}
+
+Next Steps:
+  - Review the updated document list
+  - Run extract_evidence("{session_id}") to re-extract evidence with new files
+"""
+
+    except mcp_errors.SessionNotFoundError:
+        logger.warning(f"Session not found: {session_id}")
+        return f"✗ Session not found: {session_id}\n\nUse list_sessions to see available sessions."
+
+    except ValueError as e:
+        logger.warning(f"Validation error in upload_additional_files: {e}")
+        return f"✗ Validation Error: {str(e)}"
+
+    except Exception as e:
+        logger.error(f"Failed to upload additional files: {e}", exc_info=True)
+        return f"✗ Error: {str(e)}"
+
+
+@mcp.tool()
+async def start_review_from_uploads(
+    project_name: str,
+    files: list[dict],
+    methodology: str = "soil-carbon-v1.2.2",
+    project_id: str | None = None,
+    proponent: str | None = None,
+    crediting_period: str | None = None,
+    auto_extract: bool = True,
+    deduplicate: bool = True,
+    force_new_session: bool = False,
+) -> str:
+    """One-step tool to create session, upload files, and optionally extract evidence.
+
+    This is the recommended tool for new integrations - it combines session creation,
+    document discovery, and evidence extraction into a single streamlined operation.
+
+    Accepts file content in two flexible formats:
+    1. Base64 format: {"filename": "doc.pdf", "content_base64": "JVBERi0..."}
+    2. Path format: {"filename": "doc.pdf", "path": "/absolute/path/to/file.pdf"}
+
+    Args:
+        project_name: Name of the project being reviewed
+        files: List of file objects. Each file must have:
+            - filename OR name (required): Name of the file
+            - content_base64 OR path (required): Either base64-encoded content or absolute file path
+            - mime_type (optional): MIME type
+        methodology: Methodology identifier (default: soil-carbon-v1.2.2)
+        project_id: Project ID if known (e.g., C06-4997)
+        proponent: Name of project proponent
+        crediting_period: Crediting period description (e.g., "2022-2032")
+        auto_extract: Automatically run evidence extraction (default: True)
+        deduplicate: Automatically remove duplicate files by filename and content hash (default: True)
+        force_new_session: Force creation of new session even if existing session detected (default: False)
+
+    Returns:
+        Combined results from session creation and evidence extraction.
+        If existing session detected, returns that session's information.
+
+    Examples:
+        # Base64 format
+        start_review_from_uploads("Botany Farm 2022", [
+            {"filename": "ProjectPlan.pdf", "content_base64": "JVBERi0..."},
+            {"filename": "Baseline.pdf", "content_base64": "JVBERi0..."}
+        ])
+
+        # Path format (e.g., from ElizaOS)
+        start_review_from_uploads("Botany Farm 2022", [
+            {"name": "ProjectPlan.pdf", "path": "/media/uploads/agents/abc/plan.pdf"},
+            {"name": "Baseline.pdf", "path": "/media/uploads/agents/abc/baseline.pdf"}
+        ])
+    """
+    try:
+        logger.info(f"Starting review from uploads: {project_name}")
+
+        result = await upload_tools.start_review_from_uploads(
+            project_name=project_name,
+            files=files,
+            methodology=methodology,
+            project_id=project_id,
+            proponent=proponent,
+            crediting_period=crediting_period,
+            auto_extract=auto_extract,
+            deduplicate=deduplicate,
+            force_new_session=force_new_session,
+        )
+
+        session_result = result["session_creation"]
+        session_id = session_result["session_id"]
+
+        logger.info(f"Review started from uploads: {session_id}")
+
+        files_list = "\n".join(f"  - {f}" for f in session_result["files_saved"])
+
+        doc_types = []
+        for doc_type, count in sorted(session_result["documents_by_type"].items()):
+            doc_types.append(f"  - {doc_type}: {count}")
+        doc_types_text = "\n".join(doc_types) if doc_types else "  (none classified)"
+
+        dedup_info = session_result.get("deduplication", {})
+        dedup_text = ""
+        if dedup_info.get("enabled") and dedup_info.get("total_duplicates_removed", 0) > 0:
+            dedup_text = f"\nDeduplication:\n"
+            dedup_text += f"  Files uploaded: {session_result.get('files_uploaded', len(session_result['files_saved']))}\n"
+            dedup_text += f"  Files saved: {len(session_result['files_saved'])}\n"
+            dedup_text += f"  Duplicates removed: {dedup_info['total_duplicates_removed']}\n"
+
+            if dedup_info.get("duplicate_filenames_skipped"):
+                dedup_text += f"  - Duplicate filenames: {', '.join(dedup_info['duplicate_filenames_skipped'])}\n"
+
+            if dedup_info.get("duplicate_content_detected"):
+                content_dupes = [f"{k} (same as {v})" for k, v in dedup_info['duplicate_content_detected'].items()]
+                dedup_text += f"  - Duplicate content: {', '.join(content_dupes)}\n"
+
+        output = f"""✓ Review Started from Uploads
+
+Session ID: {session_id}
+Project: {project_name}
+Methodology: {methodology}
+
+Files Uploaded ({len(session_result['files_saved'])}):
+{files_list}
+{dedup_text}
+Documents Found: {session_result['documents_found']}
+Classification Summary:
+{doc_types_text}
+"""
+
+        if "evidence_extraction" in result:
+            evidence = result["evidence_extraction"]
+
+            if evidence.get("success") is False:
+                output += f"""
+⚠️  Evidence Extraction Failed:
+{evidence.get('message', 'Unknown error')}
+
+You can run extract_evidence("{session_id}") manually to retry.
+"""
+            else:
+                output += f"""
+Evidence Extraction Complete:
+  Total Requirements: {evidence.get('requirements_total', 0)}
+  ✅ Covered: {evidence.get('requirements_covered', 0)} ({evidence.get('requirements_covered', 0) / max(evidence.get('requirements_total', 1), 1) * 100:.1f}%)
+  ⚠️  Partial: {evidence.get('requirements_partial', 0)} ({evidence.get('requirements_partial', 0) / max(evidence.get('requirements_total', 1), 1) * 100:.1f}%)
+  ❌ Missing: {evidence.get('requirements_missing', 0)} ({evidence.get('requirements_missing', 0) / max(evidence.get('requirements_total', 1), 1) * 100:.1f}%)
+  Overall Coverage: {evidence.get('overall_coverage', 0) * 100:.1f}%
+
+Next Steps:
+  - Review evidence details with map_requirement("{session_id}", "REQ-###")
+  - Run /cross-validation prompt to verify consistency across documents
+  - Generate final report with /report-generation prompt
+"""
+
+        return output
+
+    except ValueError as e:
+        logger.warning(f"Validation error in start_review_from_uploads: {e}")
+        return f"✗ Validation Error: {str(e)}"
+
+    except Exception as e:
+        logger.error(f"Failed to start review from uploads: {e}", exc_info=True)
+        return f"✗ Error: {str(e)}"
+
+
+# ============================================================================
 # Document Processing Tools
 # ============================================================================
 
@@ -411,7 +742,6 @@ async def discover_documents(session_id: str) -> str:
 
         results = await document_tools.discover_documents(session_id)
 
-        # Format summary
         summary_lines = []
         for doc_type, count in sorted(results["classification_summary"].items()):
             summary_lines.append(f"  - {doc_type}: {count}")
@@ -463,7 +793,6 @@ async def extract_pdf_text(
             filepath, page_range, extract_tables
         )
 
-        # Format response
         pages_text = f"Pages {start_page}-{end_page}" if page_range else "All pages"
         tables_info = f", {len(results.get('tables', []))} tables found" if extract_tables else ""
 
@@ -476,7 +805,6 @@ Characters Extracted: {len(results['full_text'])}{tables_info}
 
 """
 
-        # Include first 2000 characters of text
         preview = results['full_text'][:2000]
         if len(results['full_text']) > 2000:
             preview += f"\n\n... ({len(results['full_text']) - 2000} more characters)"
@@ -545,7 +873,6 @@ async def extract_evidence(session_id: str) -> str:
 
         results = await evidence_tools.extract_all_evidence(session_id)
 
-        # Format summary
         return f"""✓ Evidence Extraction Complete
 
 Session: {session_id}
@@ -587,7 +914,6 @@ async def map_requirement(session_id: str, requirement_id: str) -> str:
 
         result = await evidence_tools.map_requirement(session_id, requirement_id)
 
-        # Format response
         status_emoji = {
             "covered": "✅",
             "partial": "⚠️",

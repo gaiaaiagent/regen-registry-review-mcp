@@ -13,6 +13,37 @@
       "env": {
         "REGISTRY_REVIEW_LOG_LEVEL": "INFO"
       }
+    },
+    "regen-koi": {
+      "command": "node",
+      "args": ["/home/ygg/Workspace/sandbox/regen-koi-mcp/dist/index.js"],
+      "env": {
+        "KOI_API_ENDPOINT": "https://regen.gaiaai.xyz/api/koi",
+        "JENA_ENDPOINT": "https://regen.gaiaai.xyz/api/koi/fuseki/koi/sparql"
+      }
+    },
+    "regen-network": {
+      "command": "/home/ygg/.local/bin/uv",
+      "args": [
+        "run",
+        "--directory",
+        "/home/ygg/Workspace/sandbox/regen-python-mcp",
+        "python",
+        "main.py"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/ygg/Workspace/sandbox/regen-python-mcp/src",
+        "REGEN_MCP_LOG_LEVEL": "INFO"
+      }
+    },
+    "regen": {
+      "command": "node",
+      "args": [
+        "/home/ygg/Workspace/cognitive-ecosystem/09-resources/52-regen-mcp/mcp/server/dist/index.js"
+      ],
+      "env": {
+        "NODE_ENV": "production"
+      }
     }
   }
 }

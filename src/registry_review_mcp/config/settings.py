@@ -65,6 +65,10 @@ class Settings(BaseSettings):
     llm_max_images_per_call: int = Field(default=20, ge=1)  # Max images per API call (cost consideration)
     llm_warn_image_threshold: int = Field(default=10, ge=1)  # Warn when exceeding this many images
 
+    # LLM-Native Architecture (Codebase Simplification)
+    use_llm_native_extraction: bool = Field(default=False)  # Use unified LLM analysis
+    llm_native_max_tokens: int = Field(default=16000, ge=4000, le=16000)  # Longer output for complete analysis
+
     # Cost Management
     max_api_calls_per_session: int = Field(default=50, ge=1)
     api_call_timeout_seconds: int = Field(default=30, ge=5, le=120)

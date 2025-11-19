@@ -2,6 +2,7 @@
 
 from mcp.types import TextContent
 
+from ..config.settings import settings
 from ..tools import validation_tools, session_tools
 from ..utils.state import StateManager
 from ..models.errors import SessionNotFoundError
@@ -101,9 +102,14 @@ Then return here for cross-validation.
     state_manager = StateManager(session_id)
     evidence_data = state_manager.read_json("evidence.json")
 
-    # Run cross-validation (currently placeholder, will be expanded)
-    print("Running cross-document validation checks...")
-    validation_results = await validation_tools.cross_validate(session_id)
+    # Run cross-validation (use LLM-native if enabled)
+    if settings.use_llm_native_extraction:
+        print("🤖 Using LLM-native unified validation...")
+        from ..tools import analyze_llm
+        validation_results = await analyze_llm.cross_validate_llm(session_id)
+    else:
+        print("Running cross-document validation checks...")
+        validation_results = await validation_tools.cross_validate(session_id)
 
     # TODO: In future, extract actual validation fields from evidence
     # For now, validation checks return placeholder data

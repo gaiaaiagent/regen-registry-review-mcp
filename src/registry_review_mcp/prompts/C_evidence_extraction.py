@@ -1,5 +1,6 @@
 """Evidence extraction workflow prompt."""
 
+from ..config.settings import settings
 from ..tools import session_tools, evidence_tools
 from ..models.errors import SessionNotFoundError
 
@@ -78,11 +79,16 @@ await discover_documents("{session_id}")
     print(f"Methodology: {methodology}")
     print(f"{'='*80}\n")
 
-    # Run evidence extraction
-    print("Extracting evidence for all requirements...")
-    print("This may take a few moments...\n")
-
-    results = await evidence_tools.extract_all_evidence(session_id)
+    # Run evidence extraction (use LLM-native if enabled)
+    if settings.use_llm_native_extraction:
+        print("🤖 Using LLM-native unified analysis...")
+        print("This may take a few moments...\n")
+        from ..tools import analyze_llm
+        results = await analyze_llm.extract_all_evidence_llm(session_id)
+    else:
+        print("Extracting evidence for all requirements...")
+        print("This may take a few moments...\n")
+        results = await evidence_tools.extract_all_evidence(session_id)
 
     # Format results
     report = []

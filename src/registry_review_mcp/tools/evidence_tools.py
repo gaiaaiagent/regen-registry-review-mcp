@@ -26,12 +26,6 @@ STOP_WORDS = {
 
 def extract_keywords(requirement: dict[str, Any]) -> list[str]:
     """Extract search keywords from a requirement.
-
-    Args:
-        requirement: Requirement dictionary with text and accepted_evidence
-
-    Returns:
-        List of keywords for searching
     """
     # Combine requirement text and accepted evidence
     text = requirement.get("requirement_text", "")
@@ -67,15 +61,14 @@ def extract_keywords(requirement: dict[str, Any]) -> list[str]:
 
 async def get_markdown_content(document: dict[str, Any], session_id: str) -> str | None:
     """Get markdown content for a document.
-
-    Args:
-        document: Document dictionary from documents.json
-        session_id: Session identifier
-
-    Returns:
-        Markdown content or None if not found
     """
-    # Try to find markdown version
+    # First: Check if document has markdown_path from discovery
+    if document.get("has_markdown") and document.get("markdown_path"):
+        md_path = Path(document["markdown_path"])
+        if md_path.exists():
+            return md_path.read_text(encoding="utf-8")
+
+    # Fallback 1: Try to find markdown version manually
     pdf_path = Path(document["filepath"])
     parent_dir = pdf_path.parent
     stem = pdf_path.stem
@@ -86,7 +79,7 @@ async def get_markdown_content(document: dict[str, Any], session_id: str) -> str
     if md_path.exists():
         return md_path.read_text(encoding="utf-8")
 
-    # Fallback: check for .md next to .pdf
+    # Fallback 2: check for .md next to .pdf
     md_path_alt = pdf_path.with_suffix(".md")
     if md_path_alt.exists():
         return md_path_alt.read_text(encoding="utf-8")
@@ -100,14 +93,6 @@ async def calculate_relevance_score(
     session_id: str
 ) -> float:
     """Calculate relevance score for a document based on keyword matches.
-
-    Args:
-        document: Document dictionary
-        keywords: List of keywords to search for
-        session_id: Session identifier
-
-    Returns:
-        Relevance score between 0.0 and 1.0
     """
     content = await get_markdown_content(document, session_id)
     if not content:
@@ -135,12 +120,6 @@ async def calculate_relevance_score(
 
 def extract_page_number(text_before: str) -> int | None:
     """Extract page number from page markers in markdown.
-
-    Args:
-        text_before: Text before the match position
-
-    Returns:
-        Page number (1-indexed) or None
     """
     # Look for page markers like ![](_page_3_Picture_0.jpeg)
     page_markers = re.findall(r'!\[\]\(_page_(\d+)_', text_before)
@@ -153,13 +132,6 @@ def extract_page_number(text_before: str) -> int | None:
 
 def extract_section_header(text_before: str, max_distance: int = 500) -> str | None:
     """Extract the most recent section header before a match.
-
-    Args:
-        text_before: Text before the match position
-        max_distance: Maximum characters to look back
-
-    Returns:
-        Section header or None
     """
     # Limit lookback
     lookback = text_before[-max_distance:] if len(text_before) > max_distance else text_before
@@ -180,16 +152,6 @@ async def extract_evidence_snippets(
     context_words: int = 100
 ) -> list[EvidenceSnippet]:
     """Extract evidence snippets from a document.
-
-    Args:
-        document: Document dictionary
-        keywords: Keywords to search for
-        session_id: Session identifier
-        max_snippets: Maximum number of snippets to return
-        context_words: Number of words of context around matches
-
-    Returns:
-        List of evidence snippets
     """
     content = await get_markdown_content(document, session_id)
     if not content:
@@ -252,13 +214,6 @@ async def map_requirement(
     requirement_id: str
 ) -> dict[str, Any]:
     """Map a single requirement to documents and extract evidence.
-
-    Args:
-        session_id: Session identifier
-        requirement_id: Requirement ID (e.g., "REQ-002")
-
-    Returns:
-        RequirementEvidence as dictionary
     """
     state_manager = StateManager(session_id)
 
@@ -348,12 +303,6 @@ async def map_requirement(
 
 async def extract_all_evidence(session_id: str) -> dict[str, Any]:
     """Extract evidence for all requirements.
-
-    Args:
-        session_id: Session identifier
-
-    Returns:
-        EvidenceExtractionResult as dictionary
     """
     state_manager = StateManager(session_id)
 
@@ -441,14 +390,6 @@ async def extract_structured_field(
     field_patterns: list[str]
 ) -> dict[str, Any] | None:
     """Extract a specific structured field from documents.
-
-    Args:
-        session_id: Session identifier
-        field_name: Name of the field to extract
-        field_patterns: List of regex patterns to try
-
-    Returns:
-        StructuredField as dictionary or None
     """
     state_manager = StateManager(session_id)
     docs_data = state_manager.read_json("documents.json")

@@ -5,6 +5,8 @@ READ TRANSCRIPTS:
 @docs/transcripts/2025-10-21-project-registration-review-process.md                             │
 @docs/transcripts/2025-11-07-regen-network-community-call.md                                    │
 @docs/transcripts/2025-11-11-transcript-synthesis.md        
+@docs/transcripts/2025-11-18-registry-agent-development-meeting.md        
+
 
 READ SPECS:
 @docs/specs/2025-09-09-high-level-spec-for-registry-ai-agents.md                          │

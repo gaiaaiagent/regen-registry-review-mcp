@@ -35,12 +35,6 @@ from ..utils.state import StateManager
 
 def compute_file_hash(filepath: Path) -> str:
     """Compute SHA256 hash of file content for deduplication.
-
-    Args:
-        filepath: Path to file
-
-    Returns:
-        SHA256 hash of file content
     """
     sha256_hash = hashlib.sha256()
     with open(filepath, "rb") as f:
@@ -52,12 +46,6 @@ def compute_file_hash(filepath: Path) -> str:
 
 def generate_document_id(content_hash: str) -> str:
     """Generate a unique document ID from content hash.
-
-    Args:
-        content_hash: SHA256 hash of file content
-
-    Returns:
-        Unique document ID (DOC-xxxxx)
     """
     # Use first 8 chars of content hash for document ID
     short_hash = content_hash[:8]
@@ -66,15 +54,6 @@ def generate_document_id(content_hash: str) -> str:
 
 async def discover_documents(session_id: str) -> dict[str, Any]:
     """Discover and index all documents in the session's project directory.
-
-    Args:
-        session_id: Unique session identifier
-
-    Returns:
-        Dictionary with discovery results and document index
-
-    Raises:
-        SessionNotFoundError: If session doesn't exist
     """
     # Load session
     state_manager = StateManager(session_id)
@@ -162,7 +141,56 @@ async def discover_documents(session_id: str) -> dict[str, Any]:
                 indexed_at=datetime.now(timezone.utc),
             )
 
-            documents.append(document.model_dump(mode="json"))
+            # NEW: Convert PDF to markdown for better extraction quality
+            if is_pdf_file(file_path.name):
+                try:
+                    print(f"  🔄 Converting {file_path.name} to markdown...", flush=True)
+                    from ..extractors.marker_extractor import convert_pdf_to_markdown
+                    from ..intelligence import get_metadata_extractor, get_prior_review_detector
+
+                    # Convert PDF to markdown
+                    markdown_result = await convert_pdf_to_markdown(str(file_path))
+
+                    # Store markdown alongside PDF
+                    markdown_path = file_path.with_suffix('.md')
+                    markdown_path.write_text(markdown_result["markdown"], encoding="utf-8")
+
+                    # Extract intelligent metadata from markdown
+                    metadata_extractor = get_metadata_extractor()
+                    intelligent_metadata = metadata_extractor.extract_all_metadata(
+                        text=markdown_result["markdown"],
+                        filename=file_path.name
+                    )
+
+                    # Detect and analyze if this is a prior review
+                    prior_review_detector = get_prior_review_detector()
+                    prior_review_analysis = prior_review_detector.analyze_document(
+                        text=markdown_result["markdown"],
+                        filename=file_path.name
+                    )
+
+                    # Add markdown reference and intelligent metadata to document
+                    doc_dict = document.model_dump(mode="json")
+                    doc_dict["markdown_path"] = str(markdown_path)
+                    doc_dict["has_markdown"] = True
+                    doc_dict["markdown_char_count"] = len(markdown_result["markdown"])
+                    doc_dict["intelligent_metadata"] = intelligent_metadata
+                    doc_dict["prior_review_analysis"] = prior_review_analysis
+                    documents.append(doc_dict)
+
+                    print(f"  ✅ Markdown saved: {markdown_path.name} ({len(markdown_result['markdown']):,} chars)", flush=True)
+
+                except Exception as e:
+                    # If markdown conversion fails, still add document without markdown
+                    print(f"  ⚠️  Markdown conversion failed for {file_path.name}: {str(e)}", flush=True)
+                    doc_dict = document.model_dump(mode="json")
+                    doc_dict["markdown_path"] = None
+                    doc_dict["has_markdown"] = False
+                    doc_dict["markdown_error"] = str(e)
+                    documents.append(doc_dict)
+            else:
+                # Non-PDF files don't need markdown conversion
+                documents.append(document.model_dump(mode="json"))
 
             # Update classification summary
             classification_summary[classification] = (
@@ -263,12 +291,6 @@ async def discover_documents(session_id: str) -> dict[str, Any]:
 
 async def classify_document_by_filename(filepath: str) -> tuple[str, float, str]:
     """Classify document based on filename patterns.
-
-    Args:
-        filepath: Path to document
-
-    Returns:
-        Tuple of (classification, confidence, method)
     """
     filename = Path(filepath).name.lower()
 
@@ -307,12 +329,6 @@ async def classify_document_by_filename(filepath: str) -> tuple[str, float, str]
 
 async def extract_document_metadata(file_path: Path) -> DocumentMetadata:
     """Extract metadata from a document file.
-
-    Args:
-        file_path: Path to document
-
-    Returns:
-        DocumentMetadata object
     """
     stat = file_path.stat()
 
@@ -348,100 +364,38 @@ async def extract_pdf_text(
     page_range: tuple[int, int] | None = None,
     extract_tables: bool = False,
 ) -> dict[str, Any]:
-    """Extract text content from a PDF file with caching.
-
-    Args:
-        filepath: Path to PDF file
-        page_range: Optional tuple of (start_page, end_page) (1-indexed)
-        extract_tables: Whether to extract tables
-
-    Returns:
-        Dictionary with extracted text, pages, and metadata
-
-    Raises:
-        DocumentExtractionError: If extraction fails
+    """Extract text content from a PDF file using marker for high-quality conversion.
     """
-    # Check cache
-    cache_key = f"{filepath}:{page_range}:{extract_tables}"
-    cached = pdf_cache.get(cache_key)
-    if cached is not None:
-        return cached
+    # Import marker extractor
+    from ..extractors.marker_extractor import (
+        convert_pdf_to_markdown,
+        extract_tables_from_markdown,
+    )
 
-    try:
-        file_path = Path(filepath)
-        if not file_path.exists():
-            raise DocumentExtractionError(
-                f"PDF file not found: {filepath}",
-                details={"filepath": filepath},
-            )
+    # Use marker for conversion
+    result = await convert_pdf_to_markdown(filepath, page_range)
 
-        result = {
-            "filepath": filepath,
-            "pages": [],
-            "full_text": "",
-            "tables": [] if extract_tables else None,
-            "page_count": 0,
-            "extracted_at": datetime.now(timezone.utc).isoformat(),
-        }
+    # Extract tables from markdown if requested
+    tables = None
+    if extract_tables:
+        tables = extract_tables_from_markdown(result["markdown"])
 
-        with pdfplumber.open(file_path) as pdf:
-            result["page_count"] = len(pdf.pages)
-
-            # Determine page range
-            start_page = (page_range[0] - 1) if page_range else 0
-            end_page = page_range[1] if page_range else len(pdf.pages)
-            end_page = min(end_page, len(pdf.pages))
-
-            # Extract from each page
-            for page_num in range(start_page, end_page):
-                page = pdf.pages[page_num]
-                text = page.extract_text() or ""
-
-                page_data = {
-                    "page_number": page_num + 1,  # 1-indexed
-                    "text": text,
-                    "char_count": len(text),
-                }
-
-                # Extract tables if requested
-                if extract_tables:
-                    tables = page.extract_tables()
-                    if tables:
-                        page_data["tables"] = tables
-                        result["tables"].extend(
-                            {
-                                "page": page_num + 1,
-                                "table_data": table,
-                            }
-                            for table in tables
-                        )
-
-                result["pages"].append(page_data)
-                result["full_text"] += f"\n\n--- Page {page_num + 1} ---\n\n{text}"
-
-        # Cache the result
-        pdf_cache.set(cache_key, result)
-
-        return result
-
-    except Exception as e:
-        raise DocumentExtractionError(
-            f"Failed to extract PDF text: {str(e)}",
-            details={"filepath": filepath, "error": str(e)},
-        )
+    # Format result with backward compatibility
+    return {
+        "filepath": filepath,
+        "markdown": result["markdown"],  # NEW: Full markdown
+        "full_text": result["markdown"],  # Backward compat (same as markdown)
+        "tables": tables,
+        "images": result["images"],
+        "page_count": result["page_count"],
+        "extracted_at": result["extracted_at"],
+        "extraction_method": "marker",
+        "metadata": result.get("metadata", {}),
+    }
 
 
 async def extract_gis_metadata(filepath: str) -> dict[str, Any]:
     """Extract metadata from a GIS shapefile.
-
-    Args:
-        filepath: Path to shapefile (.shp) or GeoJSON
-
-    Returns:
-        Dictionary with GIS metadata
-
-    Raises:
-        DocumentExtractionError: If extraction fails
     """
     # Check cache
     cache_key = filepath
@@ -494,13 +448,6 @@ async def extract_gis_metadata(filepath: str) -> dict[str, Any]:
 
 async def get_document_by_id(session_id: str, document_id: str) -> dict[str, Any] | None:
     """Get a specific document from the session.
-
-    Args:
-        session_id: Unique session identifier
-        document_id: Document identifier
-
-    Returns:
-        Document data or None if not found
     """
     state_manager = StateManager(session_id)
     if not state_manager.exists("documents.json"):

@@ -17,9 +17,6 @@ from ..utils.state import StateManager
 
 def generate_session_id() -> str:
     """Generate a unique session ID.
-
-    Returns:
-        UUID-based session identifier
     """
     return f"session-{uuid.uuid4().hex[:12]}"
 
@@ -34,21 +31,6 @@ async def create_session(
     submission_date: datetime | None = None,
 ) -> dict[str, Any]:
     """Create a new registry review session.
-
-    Args:
-        project_name: Name of the project being reviewed
-        documents_path: Absolute path to directory containing project documents
-        methodology: Methodology identifier (default: soil-carbon-v1.2.2)
-        project_id: Project ID if known (e.g., C06-4997)
-        proponent: Name of project proponent
-        crediting_period: Crediting period description
-        submission_date: Date of submission
-
-    Returns:
-        Dictionary with session_id and creation metadata
-
-    Raises:
-        ValueError: If documents_path does not exist or is invalid
     """
     import json
 
@@ -107,15 +89,6 @@ async def create_session(
 
 async def load_session(session_id: str) -> dict[str, Any]:
     """Load an existing session.
-
-    Args:
-        session_id: Unique session identifier
-
-    Returns:
-        Complete session data
-
-    Raises:
-        SessionNotFoundError: If session does not exist
     """
     state_manager = StateManager(session_id)
 
@@ -134,16 +107,6 @@ async def update_session_state(
     updates: dict[str, Any],
 ) -> dict[str, Any]:
     """Update session state with partial changes.
-
-    Args:
-        session_id: Unique session identifier
-        updates: Dictionary of fields to update (supports nested updates)
-
-    Returns:
-        Updated session data
-
-    Raises:
-        SessionNotFoundError: If session does not exist
     """
     state_manager = StateManager(session_id)
 
@@ -164,9 +127,6 @@ async def update_session_state(
 
 async def list_sessions() -> list[dict[str, Any]]:
     """List all available sessions.
-
-    Returns:
-        List of session summaries with metadata
     """
     sessions = []
 
@@ -202,15 +162,6 @@ async def list_sessions() -> list[dict[str, Any]]:
 
 async def delete_session(session_id: str) -> dict[str, Any]:
     """Delete a session and all its data.
-
-    Args:
-        session_id: Unique session identifier
-
-    Returns:
-        Confirmation message
-
-    Raises:
-        SessionNotFoundError: If session does not exist
     """
     import shutil
 
@@ -234,12 +185,6 @@ async def delete_session(session_id: str) -> dict[str, Any]:
 
 async def list_example_projects() -> dict[str, Any]:
     """List example projects available in the examples directory.
-
-    Returns:
-        Dictionary with list of example projects and their metadata
-
-    Raises:
-        FileNotFoundError: If examples directory does not exist
     """
     from pathlib import Path
 

@@ -113,6 +113,9 @@ The prompts guide you through the entire review process automatically!
 
 - Python >=3.10
 - [UV](https://github.com/astral-sh/uv) package manager
+- **4GB RAM minimum** (8GB recommended)
+- **3GB disk space** for ML models (marker PDF conversion)
+- **GPU optional** but recommended for faster PDF conversion
 
 ### Setup
 
@@ -120,8 +123,11 @@ The prompts guide you through the entire review process automatically!
 # Clone repository
 cd regen-registry-review-mcp
 
-# Install dependencies
+# Standard installation (CPU-based PDF conversion)
 uv sync
+
+# OR: Install with GPU support (recommended for large document sets)
+uv sync --extra gpu
 
 # Create configuration file
 cp .env.example .env
@@ -132,6 +138,15 @@ cp .env.example .env
 # Verify installation
 uv run python -m registry_review_mcp.server
 ```
+
+**First PDF Conversion:**
+On first use, marker will download ML models (~1GB, one-time). This takes 30-60 seconds. Subsequent conversions are fast (models are cached).
+
+**System Requirements:**
+- **CPU Mode**: 10-30 seconds per PDF page (default)
+- **GPU Mode**: 2-5 seconds per PDF page (with CUDA GPU)
+- **Storage**: ~3GB for marker models + document storage
+- **Memory**: 4GB minimum, 8GB recommended for large PDFs
 
 ---
 

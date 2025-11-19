@@ -17,10 +17,16 @@ dependencies = [
     "pydantic-settings>=2.12.0",
     "anthropic>=0.40.0",
     "rapidfuzz>=3.14.3",
+    "marker-pdf>=0.2.17",
 ]
 
 [project.scripts]
 registry-review-mcp = "registry_review_mcp.server:main"
+
+[project.optional-dependencies]
+gpu = [
+    "torch>=2.0.0",
+]
 
 [dependency-groups]
 dev = [
