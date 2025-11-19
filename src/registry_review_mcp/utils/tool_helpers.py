@@ -371,3 +371,168 @@ class ResponseBuilder:
     def build(self) -> str:
         """Build and return the formatted response."""
         return "\n".join(self.lines)
+
+
+def format_review_started(session_result: dict[str, Any], discovery_result: dict[str, Any]) -> str:
+    """Format start_review response combining session creation and document discovery.
+
+    Specialized formatter for start_review tool.
+    """
+    summary_lines = []
+    for doc_type, count in sorted(discovery_result["classification_summary"].items()):
+        summary_lines.append(f"  - {doc_type}: {count}")
+
+    summary = "\n".join(summary_lines) if summary_lines else "  (none found)"
+
+    return (
+        ResponseBuilder()
+        .success("Review Started Successfully")
+        .add_data("session_id", session_result["session_id"])
+        .add_data("project", session_result["project_name"])
+        .add_data("methodology", session_result["methodology"])
+        .add_data("documents_path", session_result["documents_path"])
+        .add_data("created", session_result["created_at"])
+        .add_section("Document Discovery Complete", {
+            "documents_found": discovery_result["documents_found"]
+        })
+        .build()
+        + f"\n\nClassification Summary:\n{summary}\n\n"
+        + "Next Steps:\n"
+        + "  - Review the document classifications\n"
+        + "  - Use the /document-discovery prompt for detailed results\n"
+        + "  - Or proceed to evidence extraction (Phase 3)"
+    )
+
+
+def format_upload_result(result: dict[str, Any]) -> str:
+    """Format file upload response with session and discovery details.
+
+    Specialized formatter for create_session_from_uploads and start_review_from_uploads.
+    """
+    builder = ResponseBuilder().success(result.get("message", "Files Uploaded Successfully"))
+
+    # Session details
+    if "session_id" in result:
+        builder.add_data("session_id", result["session_id"])
+    if "project_name" in result:
+        builder.add_data("project", result["project_name"])
+
+    # File statistics
+    if "files_received" in result:
+        builder.add_section("Files", {
+            "received": result["files_received"],
+            "saved": result.get("files_saved", result["files_received"]),
+        })
+
+    # Document discovery (if present)
+    if "documents_found" in result:
+        builder.add_section("Document Discovery", {
+            "documents_found": result["documents_found"],
+        })
+
+        # Classification summary
+        if "classification_summary" in result:
+            summary_lines = []
+            for doc_type, count in sorted(result["classification_summary"].items()):
+                summary_lines.append(f"  - {doc_type}: {count}")
+            if summary_lines:
+                builder.lines.append("Classification Summary:")
+                builder.lines.extend(summary_lines)
+                builder.lines.append("")
+
+    # Next steps
+    if result.get("documents_found"):
+        builder.add_next_step("Run evidence extraction to analyze document contents")
+    elif "session_id" in result:
+        builder.add_next_step(f"Run document discovery with session_id: {result['session_id']}")
+
+    return builder.build()
+
+
+def format_pdf_extraction(result: dict[str, Any]) -> str:
+    """Format PDF text extraction response.
+
+    Specialized formatter for extract_pdf_text tool.
+    """
+    lines = ["✓ PDF Text Extracted", ""]
+
+    lines.append(f"Filepath: {result.get('filepath', 'Unknown')}")
+    lines.append(f"Page Count: {result.get('page_count', 0)}")
+    lines.append(f"Extraction Method: {result.get('extraction_method', 'marker')}")
+    lines.append(f"Character Count: {len(result.get('markdown', ''))}")
+    lines.append("")
+
+    if result.get('tables'):
+        lines.append(f"Tables Found: {len(result['tables'])}")
+        lines.append("")
+
+    if result.get('images'):
+        lines.append(f"Images Found: {len(result['images'])}")
+        lines.append("")
+
+    # Show full content
+    content = result.get('markdown', result.get('full_text', ''))
+    if content:
+        lines.append("Full Content:")
+        lines.append(content)
+
+    return "\n".join(lines)
+
+
+def format_gis_metadata(result: dict[str, Any]) -> str:
+    """Format GIS metadata extraction response.
+
+    Specialized formatter for extract_gis_metadata tool.
+    """
+    return (
+        ResponseBuilder()
+        .success("GIS Metadata Extracted")
+        .add_data("filepath", result.get("filepath", "Unknown"))
+        .add_data("driver", result.get("driver", "Unknown"))
+        .add_data("crs", result.get("crs", "Unknown"))
+        .add_data("feature_count", result.get("feature_count", 0))
+        .add_data("geometry_type", result.get("geometry_type", "Unknown"))
+        .add_section("Bounds", {
+            "bounds": str(result.get("bounds", "Unknown"))
+        })
+        .build()
+    )
+
+
+def format_requirement_mapping(result: dict[str, Any]) -> str:
+    """Format requirement mapping response with full evidence details.
+
+    Specialized formatter for map_requirement tool.
+    """
+    status_emoji = {
+        "covered": "✅",
+        "partial": "⚠️",
+        "missing": "❌",
+        "flagged": "🚩"
+    }
+
+    emoji = status_emoji.get(result['status'], "❓")
+
+    lines = ["✓ Requirement Mapping Complete", ""]
+    lines.append(f"{emoji} {result['requirement_id']}: {result['requirement_text']}")
+    lines.append("")
+    lines.append(f"Status: {result['status'].upper()}")
+    lines.append(f"Confidence: {result['confidence']:.2f}")
+    lines.append(f"Category: {result['category']}")
+    lines.append("")
+    lines.append(f"Mapped Documents ({len(result['mapped_documents'])}):")
+
+    for doc in result['mapped_documents']:
+        lines.append(f"  - {doc['document_name']} (relevance: {doc['relevance_score']:.2f})")
+
+    lines.append("")
+    lines.append(f"Evidence Snippets ({len(result['evidence_snippets'])}):")
+
+    for idx, snippet in enumerate(result['evidence_snippets'], 1):
+        page_info = f" (page {snippet['page']})" if snippet.get('page') else ""
+        section_info = f" - {snippet['section']}" if snippet.get('section') else ""
+        lines.append(f"\n{idx}. {snippet['document_name']}{page_info}{section_info}")
+        lines.append(f"   {snippet['text']}")  # Full text, no truncation
+        lines.append(f"   Confidence: {snippet['confidence']:.2f}")
+
+    return "\n".join(lines)

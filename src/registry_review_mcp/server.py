@@ -20,6 +20,11 @@ from .utils.tool_helpers import (
     format_session_loaded,
     format_documents_discovered,
     format_evidence_extracted,
+    format_review_started,
+    format_upload_result,
+    format_pdf_extraction,
+    format_gis_metadata,
+    format_requirement_mapping,
     ResponseBuilder,
 )
 from .prompts import A_initialize, B_document_discovery, C_evidence_extraction, D_cross_validation, E_report_generation, F_human_review, G_complete
@@ -106,38 +111,31 @@ async def list_sessions() -> str:
 
 
 @mcp.tool()
+@with_error_handling("list_example_projects")
 async def list_example_projects() -> str:
     """List example projects available in the examples directory for testing/demo purposes"""
-    try:
-        logger.info("Listing example projects")
+    result = await session_tools.list_example_projects()
 
-        result = await session_tools.list_example_projects()
+    if result["projects_found"] == 0:
+        return format_error(Exception(result['message']))
 
-        if result["projects_found"] == 0:
-            return f"✗ {result['message']}"
+    projects = [
+        {
+            "name": p['name'],
+            "path": p['path'],
+            "file_count": p['file_count']
+        }
+        for p in result["projects"]
+    ]
 
-        project_list = []
-        for project in result["projects"]:
-            project_list.append(
-                f"• **{project['name']}**\n"
-                f"  Path: {project['path']}\n"
-                f"  Files: {project['file_count']}"
-            )
-
-        return (
-            f"✓ {result['message']}\n\n"
-            + "\n\n".join(project_list)
-            + "\n\n---\n\n"
-            "To initialize an example project:\n"
-            "/initialize Project Name, /path/from/above"
-        )
-
-    except Exception as e:
-        logger.error(f"Failed to list example projects: {e}", exc_info=True)
-        return f"✗ Error: {str(e)}"
+    return (
+        format_list(projects, result['message'])
+        + "\n\nTo initialize an example project:\n/initialize Project Name, /path/from/above"
+    )
 
 
 @mcp.tool()
+@with_error_handling("start_review")
 async def start_review(
     project_name: str,
     documents_path: str,
@@ -158,53 +156,20 @@ async def start_review(
     Returns:
         Combined session creation and document discovery results
     """
-    try:
-        logger.info(f"Starting review for project: {project_name}")
+    session_result = await session_tools.create_session(
+        project_name=project_name,
+        documents_path=documents_path,
+        methodology=methodology,
+        project_id=project_id,
+    )
 
-        session_result = await session_tools.create_session(
-            project_name=project_name,
-            documents_path=documents_path,
-            methodology=methodology,
-            project_id=project_id,
-        )
+    discovery_result = await document_tools.discover_documents(session_result["session_id"])
 
-        session_id = session_result["session_id"]
-        logger.info(f"Session created: {session_id}")
-
-        discovery_result = await document_tools.discover_documents(session_id)
-
-        summary_lines = []
-        for doc_type, count in sorted(discovery_result["classification_summary"].items()):
-            summary_lines.append(f"  - {doc_type}: {count}")
-
-        summary = "\n".join(summary_lines) if summary_lines else "  (none found)"
-
-        return f"""✓ Review Started Successfully
-
-Session ID: {session_id}
-Project: {project_name}
-Methodology: {methodology}
-Documents Path: {documents_path}
-Created: {session_result['created_at']}
-
-Document Discovery Complete:
-  Found {discovery_result['documents_found']} document(s)
-
-Classification Summary:
-{summary}
-
-Next Steps:
-  - Review the document classifications
-  - Use the /document-discovery prompt for detailed results
-  - Or proceed to evidence extraction (Phase 3)
-"""
-
-    except Exception as e:
-        logger.error(f"Failed to start review: {e}", exc_info=True)
-        return f"✗ Error: {str(e)}"
+    return format_review_started(session_result, discovery_result)
 
 
 @mcp.tool()
+@with_error_handling("delete_session")
 async def delete_session(session_id: str) -> str:
     """Delete a review session and all its data.
 
@@ -214,19 +179,8 @@ async def delete_session(session_id: str) -> str:
     Returns:
         Confirmation message
     """
-    try:
-        logger.info(f"Deleting session: {session_id}")
-
-        result = await session_tools.delete_session(session_id)
-
-        return f"✓ {result['message']}"
-
-    except mcp_errors.SessionNotFoundError:
-        return f"✗ Session not found: {session_id}"
-
-    except Exception as e:
-        logger.error(f"Failed to delete session: {e}", exc_info=True)
-        return f"✗ Error: {str(e)}"
+    result = await session_tools.delete_session(session_id)
+    return format_success(result["message"])
 
 
 # ============================================================================
@@ -235,6 +189,7 @@ async def delete_session(session_id: str) -> str:
 
 
 @mcp.tool()
+@with_error_handling("create_session_from_uploads")
 async def create_session_from_uploads(
     project_name: str,
     files: list[dict],
@@ -280,31 +235,27 @@ async def create_session_from_uploads(
 
         create_session_from_uploads("My Project", files)
     """
-    try:
-        logger.info(f"Creating session from uploads: {project_name}")
+    result = await upload_tools.create_session_from_uploads(
+        project_name=project_name,
+        files=files,
+        methodology=methodology,
+        project_id=project_id,
+        proponent=proponent,
+        crediting_period=crediting_period,
+        deduplicate=deduplicate,
+        force_new_session=force_new_session,
+    )
 
-        result = await upload_tools.create_session_from_uploads(
-            project_name=project_name,
-            files=files,
-            methodology=methodology,
-            project_id=project_id,
-            proponent=proponent,
-            crediting_period=crediting_period,
-            deduplicate=deduplicate,
-            force_new_session=force_new_session,
-        )
+    # Handle existing session case with special formatting
+    if result.get("existing_session_detected"):
+        progress = result.get("workflow_progress", {})
+        progress_text = []
+        for stage, status in progress.items():
+            icon = "✓" if status == "completed" else "⏳" if status == "in_progress" else "○"
+            progress_text.append(f"  {icon} {stage}: {status}")
+        progress_summary = "\n".join(progress_text) if progress_text else "  (No progress recorded)"
 
-        if result.get("existing_session_detected"):
-            logger.info(f"Existing session detected: {result['session_id']}")
-
-            progress = result.get("workflow_progress", {})
-            progress_text = []
-            for stage, status in progress.items():
-                icon = "✓" if status == "completed" else "⏳" if status == "in_progress" else "○"
-                progress_text.append(f"  {icon} {stage}: {status}")
-            progress_summary = "\n".join(progress_text) if progress_text else "  (No progress recorded)"
-
-            return f"""ℹ️ Existing Session Found
+        return f"""ℹ️ Existing Session Found
 
 Session ID: {result['session_id']}
 Project: {result['project_name']}
@@ -318,62 +269,11 @@ Workflow Progress:
 To create a new session anyway, set force_new_session=True.
 """
 
-        logger.info(f"Session created from uploads: {result['session_id']}")
-
-        files_list = "\n".join(f"  - {f}" for f in result["files_saved"])
-
-        doc_types = []
-        for doc_type, count in sorted(result["documents_by_type"].items()):
-            doc_types.append(f"  - {doc_type}: {count}")
-        doc_types_text = "\n".join(doc_types) if doc_types else "  (none classified yet)"
-
-        dedup_info = result.get("deduplication", {})
-        dedup_text = ""
-        if dedup_info.get("enabled") and dedup_info.get("total_duplicates_removed", 0) > 0:
-            dedup_text = f"\nDeduplication:\n"
-            dedup_text += f"  Files uploaded: {result.get('files_uploaded', len(result['files_saved']))}\n"
-            dedup_text += f"  Files saved: {len(result['files_saved'])}\n"
-            dedup_text += f"  Duplicates removed: {dedup_info['total_duplicates_removed']}\n"
-
-            if dedup_info.get("duplicate_filenames_skipped"):
-                dedup_text += f"  - Duplicate filenames: {', '.join(dedup_info['duplicate_filenames_skipped'])}\n"
-
-            if dedup_info.get("duplicate_content_detected"):
-                content_dupes = [f"{k} (same as {v})" for k, v in dedup_info['duplicate_content_detected'].items()]
-                dedup_text += f"  - Duplicate content: {', '.join(content_dupes)}\n"
-
-        return f"""✓ Session Created from Uploads
-
-Session ID: {result['session_id']}
-Project: {project_name}
-Methodology: {methodology}
-Temp Directory: {result['temp_directory']}
-
-Files Uploaded ({len(result['files_saved'])}):
-{files_list}
-{dedup_text}
-Document Discovery Complete:
-  Found: {result['documents_found']} document(s)
-  Classified: {result['documents_classified']}
-
-Classification Summary:
-{doc_types_text}
-
-Next Steps:
-  - Run extract_evidence("{result['session_id']}") to map requirements to documents
-  - Or use /evidence-extraction prompt for guided workflow
-"""
-
-    except ValueError as e:
-        logger.warning(f"Validation error in create_session_from_uploads: {e}")
-        return f"✗ Validation Error: {str(e)}"
-
-    except Exception as e:
-        logger.error(f"Failed to create session from uploads: {e}", exc_info=True)
-        return f"✗ Error: {str(e)}"
+    return format_upload_result(result)
 
 
 @mcp.tool()
+@with_error_handling("upload_additional_files")
 async def upload_additional_files(
     session_id: str,
     files: list[dict],
@@ -406,56 +306,16 @@ async def upload_additional_files(
         upload_additional_files("session-abc123",
             [{"name": "Baseline.pdf", "path": "/media/uploads/agents/abc/baseline.pdf"}])
     """
-    try:
-        logger.info(f"Uploading additional files to session: {session_id}")
+    result = await upload_tools.upload_additional_files(
+        session_id=session_id,
+        files=files,
+    )
 
-        result = await upload_tools.upload_additional_files(
-            session_id=session_id,
-            files=files,
-        )
-
-        logger.info(f"Added {len(result['files_added'])} files to session {session_id}")
-
-        files_list = "\n".join(f"  - {f}" for f in result["files_added"])
-
-        doc_types = []
-        for doc_type, count in sorted(result["documents_by_type"].items()):
-            doc_types.append(f"  - {doc_type}: {count}")
-        doc_types_text = "\n".join(doc_types) if doc_types else "  (none classified)"
-
-        return f"""✓ Files Added to Session
-
-Session ID: {session_id}
-
-Files Added ({len(result['files_added'])}):
-{files_list}
-
-Updated Document Discovery:
-  Total Found: {result['documents_found']} document(s)
-  Classified: {result['documents_classified']}
-
-Classification Summary:
-{doc_types_text}
-
-Next Steps:
-  - Review the updated document list
-  - Run extract_evidence("{session_id}") to re-extract evidence with new files
-"""
-
-    except mcp_errors.SessionNotFoundError:
-        logger.warning(f"Session not found: {session_id}")
-        return f"✗ Session not found: {session_id}\n\nUse list_sessions to see available sessions."
-
-    except ValueError as e:
-        logger.warning(f"Validation error in upload_additional_files: {e}")
-        return f"✗ Validation Error: {str(e)}"
-
-    except Exception as e:
-        logger.error(f"Failed to upload additional files: {e}", exc_info=True)
-        return f"✗ Error: {str(e)}"
+    return format_upload_result(result)
 
 
 @mcp.tool()
+@with_error_handling("start_review_from_uploads")
 async def start_review_from_uploads(
     project_name: str,
     files: list[dict],
@@ -507,96 +367,37 @@ async def start_review_from_uploads(
             {"name": "Baseline.pdf", "path": "/media/uploads/agents/abc/baseline.pdf"}
         ])
     """
-    try:
-        logger.info(f"Starting review from uploads: {project_name}")
+    result = await upload_tools.start_review_from_uploads(
+        project_name=project_name,
+        files=files,
+        methodology=methodology,
+        project_id=project_id,
+        proponent=proponent,
+        crediting_period=crediting_period,
+        auto_extract=auto_extract,
+        deduplicate=deduplicate,
+        force_new_session=force_new_session,
+    )
 
-        result = await upload_tools.start_review_from_uploads(
-            project_name=project_name,
-            files=files,
-            methodology=methodology,
-            project_id=project_id,
-            proponent=proponent,
-            crediting_period=crediting_period,
-            auto_extract=auto_extract,
-            deduplicate=deduplicate,
-            force_new_session=force_new_session,
-        )
+    # Build response from session creation part
+    session_result = result["session_creation"]
+    output = format_upload_result(session_result)
 
-        session_result = result["session_creation"]
-        session_id = session_result["session_id"]
+    # Add evidence extraction results if present
+    if "evidence_extraction" in result:
+        evidence = result["evidence_extraction"]
 
-        logger.info(f"Review started from uploads: {session_id}")
+        if evidence.get("success") is False:
+            output += f"\n\n⚠️  Evidence Extraction Failed:\n{evidence.get('message', 'Unknown error')}\n\nYou can run extract_evidence(\"{session_result['session_id']}\") manually to retry."
+        else:
+            output += f"\n\nEvidence Extraction Complete:\n"
+            output += f"  Total Requirements: {evidence.get('requirements_total', 0)}\n"
+            output += f"  ✅ Covered: {evidence.get('requirements_covered', 0)}\n"
+            output += f"  ⚠️  Partial: {evidence.get('requirements_partial', 0)}\n"
+            output += f"  ❌ Missing: {evidence.get('requirements_missing', 0)}\n"
+            output += f"  Overall Coverage: {evidence.get('overall_coverage', 0) * 100:.1f}%"
 
-        files_list = "\n".join(f"  - {f}" for f in session_result["files_saved"])
-
-        doc_types = []
-        for doc_type, count in sorted(session_result["documents_by_type"].items()):
-            doc_types.append(f"  - {doc_type}: {count}")
-        doc_types_text = "\n".join(doc_types) if doc_types else "  (none classified)"
-
-        dedup_info = session_result.get("deduplication", {})
-        dedup_text = ""
-        if dedup_info.get("enabled") and dedup_info.get("total_duplicates_removed", 0) > 0:
-            dedup_text = f"\nDeduplication:\n"
-            dedup_text += f"  Files uploaded: {session_result.get('files_uploaded', len(session_result['files_saved']))}\n"
-            dedup_text += f"  Files saved: {len(session_result['files_saved'])}\n"
-            dedup_text += f"  Duplicates removed: {dedup_info['total_duplicates_removed']}\n"
-
-            if dedup_info.get("duplicate_filenames_skipped"):
-                dedup_text += f"  - Duplicate filenames: {', '.join(dedup_info['duplicate_filenames_skipped'])}\n"
-
-            if dedup_info.get("duplicate_content_detected"):
-                content_dupes = [f"{k} (same as {v})" for k, v in dedup_info['duplicate_content_detected'].items()]
-                dedup_text += f"  - Duplicate content: {', '.join(content_dupes)}\n"
-
-        output = f"""✓ Review Started from Uploads
-
-Session ID: {session_id}
-Project: {project_name}
-Methodology: {methodology}
-
-Files Uploaded ({len(session_result['files_saved'])}):
-{files_list}
-{dedup_text}
-Documents Found: {session_result['documents_found']}
-Classification Summary:
-{doc_types_text}
-"""
-
-        if "evidence_extraction" in result:
-            evidence = result["evidence_extraction"]
-
-            if evidence.get("success") is False:
-                output += f"""
-⚠️  Evidence Extraction Failed:
-{evidence.get('message', 'Unknown error')}
-
-You can run extract_evidence("{session_id}") manually to retry.
-"""
-            else:
-                output += f"""
-Evidence Extraction Complete:
-  Total Requirements: {evidence.get('requirements_total', 0)}
-  ✅ Covered: {evidence.get('requirements_covered', 0)} ({evidence.get('requirements_covered', 0) / max(evidence.get('requirements_total', 1), 1) * 100:.1f}%)
-  ⚠️  Partial: {evidence.get('requirements_partial', 0)} ({evidence.get('requirements_partial', 0) / max(evidence.get('requirements_total', 1), 1) * 100:.1f}%)
-  ❌ Missing: {evidence.get('requirements_missing', 0)} ({evidence.get('requirements_missing', 0) / max(evidence.get('requirements_total', 1), 1) * 100:.1f}%)
-  Overall Coverage: {evidence.get('overall_coverage', 0) * 100:.1f}%
-
-Next Steps:
-  - Review evidence details with map_requirement("{session_id}", "REQ-###")
-  - Run /cross-validation prompt to verify consistency across documents
-  - Generate final report with /report-generation prompt
-"""
-
-        return output
-
-    except ValueError as e:
-        logger.warning(f"Validation error in start_review_from_uploads: {e}")
-        return f"✗ Validation Error: {str(e)}"
-
-    except Exception as e:
-        logger.error(f"Failed to start review from uploads: {e}", exc_info=True)
-        return f"✗ Error: {str(e)}"
+    return output
 
 
 # ============================================================================
@@ -605,6 +406,7 @@ Next Steps:
 
 
 @mcp.tool()
+@with_error_handling("discover_documents")
 async def discover_documents(session_id: str) -> str:
     """Discover and classify all documents in the project directory.
 
@@ -614,37 +416,12 @@ async def discover_documents(session_id: str) -> str:
     Returns:
         Summary of discovered documents with classifications
     """
-    try:
-        logger.info(f"Discovering documents for session: {session_id}")
-
-        results = await document_tools.discover_documents(session_id)
-
-        summary_lines = []
-        for doc_type, count in sorted(results["classification_summary"].items()):
-            summary_lines.append(f"  - {doc_type}: {count}")
-
-        summary = "\n".join(summary_lines) if summary_lines else "  (none found)"
-
-        return f"""✓ Document Discovery Complete
-
-Session: {session_id}
-Documents Found: {results['documents_found']}
-
-Classification Summary:
-{summary}
-
-Use the /document-discovery prompt for detailed results and next steps.
-"""
-
-    except mcp_errors.SessionNotFoundError:
-        return f"✗ Session not found: {session_id}"
-
-    except Exception as e:
-        logger.error(f"Failed to discover documents: {e}", exc_info=True)
-        return f"✗ Error: {str(e)}"
+    results = await document_tools.discover_documents(session_id)
+    return format_documents_discovered(results)
 
 
 @mcp.tool()
+@with_error_handling("extract_pdf_text")
 async def extract_pdf_text(
     filepath: str,
     start_page: int | None = None,
@@ -662,40 +439,16 @@ async def extract_pdf_text(
     Returns:
         Extracted text content with metadata
     """
-    try:
-        logger.info(f"Extracting PDF text: {filepath}")
+    page_range = (start_page, end_page) if start_page and end_page else None
+    results = await document_tools.extract_pdf_text(
+        filepath, page_range, extract_tables
+    )
 
-        page_range = (start_page, end_page) if start_page and end_page else None
-        results = await document_tools.extract_pdf_text(
-            filepath, page_range, extract_tables
-        )
-
-        pages_text = f"Pages {start_page}-{end_page}" if page_range else "All pages"
-        tables_info = f", {len(results.get('tables', []))} tables found" if extract_tables else ""
-
-        response = f"""✓ PDF Text Extraction Complete
-
-File: {filepath}
-Pages: {pages_text}
-Total Pages: {results['page_count']}
-Characters Extracted: {len(results['full_text'])}{tables_info}
-
-"""
-
-        preview = results['full_text'][:2000]
-        if len(results['full_text']) > 2000:
-            preview += f"\n\n... ({len(results['full_text']) - 2000} more characters)"
-
-        response += f"Text Preview:\n{preview}"
-
-        return response
-
-    except Exception as e:
-        logger.error(f"Failed to extract PDF text: {e}", exc_info=True)
-        return f"✗ Error: {str(e)}"
+    return format_pdf_extraction(results)
 
 
 @mcp.tool()
+@with_error_handling("extract_gis_metadata")
 async def extract_gis_metadata(filepath: str) -> str:
     """Extract metadata from a GIS shapefile or GeoJSON.
 
@@ -705,26 +458,8 @@ async def extract_gis_metadata(filepath: str) -> str:
     Returns:
         GIS metadata including CRS, bounds, feature count
     """
-    try:
-        logger.info(f"Extracting GIS metadata: {filepath}")
-
-        results = await document_tools.extract_gis_metadata(filepath)
-
-        return f"""✓ GIS Metadata Extraction Complete
-
-File: {filepath}
-Driver: {results.get('driver', 'Unknown')}
-CRS: {results.get('crs', 'Unknown')}
-Geometry Type: {results.get('geometry_type', 'Unknown')}
-Feature Count: {results.get('feature_count', 0)}
-Bounds: {results.get('bounds', 'Unknown')}
-
-Schema: {results.get('schema', 'Not available')}
-"""
-
-    except Exception as e:
-        logger.error(f"Failed to extract GIS metadata: {e}", exc_info=True)
-        return f"✗ Error: {str(e)}"
+    results = await document_tools.extract_gis_metadata(filepath)
+    return format_gis_metadata(results)
 
 
 # ============================================================================
@@ -733,6 +468,7 @@ Schema: {results.get('schema', 'Not available')}
 
 
 @mcp.tool()
+@with_error_handling("extract_evidence")
 async def extract_evidence(session_id: str) -> str:
     """Extract evidence for all requirements from discovered documents.
 
@@ -745,37 +481,12 @@ async def extract_evidence(session_id: str) -> str:
     Returns:
         Summary of evidence extraction results with coverage statistics
     """
-    try:
-        logger.info(f"Extracting evidence for session: {session_id}")
-
-        results = await evidence_tools.extract_all_evidence(session_id)
-
-        return f"""✓ Evidence Extraction Complete
-
-Session: {session_id}
-
-Coverage Summary:
-  Total Requirements: {results['requirements_total']}
-  ✅ Covered: {results['requirements_covered']} ({results['requirements_covered']/results['requirements_total']*100:.1f}%)
-  ⚠️  Partial: {results['requirements_partial']} ({results['requirements_partial']/results['requirements_total']*100:.1f}%)
-  ❌ Missing: {results['requirements_missing']} ({results['requirements_missing']/results['requirements_total']*100:.1f}%)
-  Overall Coverage: {results['overall_coverage']*100:.1f}%
-
-Results saved to: evidence.json
-Session updated with coverage statistics
-
-Use the /evidence-extraction prompt for detailed results and next steps.
-"""
-
-    except mcp_errors.SessionNotFoundError:
-        return f"✗ Session not found: {session_id}"
-
-    except Exception as e:
-        logger.error(f"Failed to extract evidence: {e}", exc_info=True)
-        return f"✗ Error: {str(e)}"
+    results = await evidence_tools.extract_all_evidence(session_id)
+    return format_evidence_extracted(results)
 
 
 @mcp.tool()
+@with_error_handling("map_requirement")
 async def map_requirement(session_id: str, requirement_id: str) -> str:
     """Map a single requirement to documents and extract evidence.
 
@@ -786,60 +497,8 @@ async def map_requirement(session_id: str, requirement_id: str) -> str:
     Returns:
         Evidence details for the specific requirement
     """
-    try:
-        logger.info(f"Mapping requirement {requirement_id} for session: {session_id}")
-
-        result = await evidence_tools.map_requirement(session_id, requirement_id)
-
-        status_emoji = {
-            "covered": "✅",
-            "partial": "⚠️",
-            "missing": "❌",
-            "flagged": "🚩"
-        }
-
-        emoji = status_emoji.get(result['status'], "❓")
-
-        response = f"""✓ Requirement Mapping Complete
-
-{emoji} {result['requirement_id']}: {result['requirement_text']}
-
-Status: {result['status'].upper()}
-Confidence: {result['confidence']:.2f}
-Category: {result['category']}
-
-Mapped Documents ({len(result['mapped_documents'])}):
-"""
-
-        for doc in result['mapped_documents'][:5]:
-            response += f"  - {doc['document_name']} (relevance: {doc['relevance_score']:.2f})\n"
-
-        if len(result['mapped_documents']) > 5:
-            response += f"  ... and {len(result['mapped_documents']) - 5} more\n"
-
-        response += f"\nEvidence Snippets ({len(result['evidence_snippets'])}):\n"
-
-        for idx, snippet in enumerate(result['evidence_snippets'][:3], 1):
-            page_info = f" (page {snippet['page']})" if snippet.get('page') else ""
-            section_info = f" - {snippet['section']}" if snippet.get('section') else ""
-            response += f"\n{idx}. {snippet['document_name']}{page_info}{section_info}\n"
-            response += f"   {snippet['text'][:150]}...\n"
-            response += f"   Confidence: {snippet['confidence']:.2f}\n"
-
-        if len(result['evidence_snippets']) > 3:
-            response += f"\n... and {len(result['evidence_snippets']) - 3} more snippets\n"
-
-        return response
-
-    except mcp_errors.SessionNotFoundError:
-        return f"✗ Session not found: {session_id}"
-
-    except ValueError as e:
-        return f"✗ {str(e)}"
-
-    except Exception as e:
-        logger.error(f"Failed to map requirement: {e}", exc_info=True)
-        return f"✗ Error: {str(e)}"
+    result = await evidence_tools.map_requirement(session_id, requirement_id)
+    return format_requirement_mapping(result)
 
 
 # ============================================================================
