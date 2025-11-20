@@ -210,3 +210,6 @@ __marimo__/
 # Registry Review MCP - Data directories
 data/sessions/
 data/cache/
+
+# Development assets (23MB - exclude from production)
+examples/
