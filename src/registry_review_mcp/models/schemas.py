@@ -7,7 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator
+from .base import BaseModel, ConfidenceScore
 
 
 # ============================================================================
@@ -131,7 +132,7 @@ class Document(BaseModel):
     filename: str
     filepath: str
     classification: str
-    confidence: float = Field(ge=0.0, le=1.0)
+    confidence: ConfidenceScore
     classification_method: str  # "filename", "content", "manual"
     metadata: DocumentMetadata
     indexed_at: datetime
@@ -150,7 +151,7 @@ class EvidenceSnippet(BaseModel):
     document_id: str
     page: int | None = None
     section: str | None = None
-    confidence: float = Field(ge=0.0, le=1.0)
+    confidence: ConfidenceScore
     extraction_method: str  # "keyword", "semantic", "structured"
 
 
@@ -161,7 +162,7 @@ class RequirementFinding(BaseModel):
     mapped_documents: list[str]  # document_ids
     evidence_snippets: list[EvidenceSnippet]
     status: Literal["covered", "partial", "missing", "needs_review"]
-    confidence: float = Field(ge=0.0, le=1.0)
+    confidence: ConfidenceScore
     ai_comments: str | None = None
     human_comments: str | None = None
 
