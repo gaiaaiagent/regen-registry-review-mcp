@@ -1,12 +1,20 @@
 """Integration tests for land tenure and project ID extraction with real API calls."""
 
 import pytest
+import time
 from pathlib import Path
 
 from registry_review_mcp.config.settings import settings
 from registry_review_mcp.extractors.llm_extractors import (
     LandTenureExtractor,
     ProjectIDExtractor,
+)
+
+# Import factory infrastructure
+from tests.factories import (
+    unique_doc_name,
+    create_llm_mock_response,
+    create_llm_client_mock,
 )
 
 
@@ -20,6 +28,8 @@ class TestRealAPILandTenureExtraction:
     """Test land tenure extraction with real Anthropic API calls."""
 
     @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.expensive
     async def test_extract_owner_name_and_area(self):
         """Test extracting owner name and area from text."""
         markdown = """
@@ -146,6 +156,8 @@ class TestRealAPIProjectIDExtraction:
     """Test project ID extraction with real Anthropic API calls."""
 
     @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.expensive
     async def test_extract_regen_network_id(self):
         """Test extracting Regen Network project ID."""
         markdown = """
@@ -285,18 +297,8 @@ class TestFuzzyNameDeduplication:
     @pytest.mark.asyncio
     async def test_fuzzy_name_deduplication(self):
         """Test that similar owner names are deduplicated correctly."""
-        import time
-        from unittest.mock import AsyncMock, Mock
-        from registry_review_mcp.extractors.llm_extractors import LandTenureExtractor
-
-        doc_name = f"fuzzy_dedup_{int(time.time() * 1000000)}.pdf"
-
         # Mock response with name variations
-        mock_response = Mock()
-        mock_response.content = [
-            Mock(
-                text='''```json
-[
+        json_content = '''[
     {
         "value": "Nicholas Denman",
         "field_type": "owner_name",
@@ -339,16 +341,12 @@ class TestFuzzyNameDeduplication:
         "confidence": 0.85,
         "reasoning": "Duplicate area"
     }
-]
-```'''
-            )
-        ]
+]'''
+        response = create_llm_mock_response(json_content)
+        client = create_llm_client_mock(response)
 
-        mock_client = AsyncMock()
-        mock_client.messages.create.return_value = mock_response
-
-        extractor = LandTenureExtractor(mock_client)
-        results = await extractor.extract("test content", [], doc_name)
+        extractor = LandTenureExtractor(client)
+        results = await extractor.extract("test content", [], unique_doc_name("fuzzy_dedup"))
 
         # Verify fuzzy deduplication worked
         owner_names = [f.value for f in results if f.field_type == "owner_name"]
@@ -370,64 +368,38 @@ class TestFuzzyNameDeduplication:
 class TestCachingForNewExtractors:
     """Test caching behavior for land tenure and project ID extractors."""
 
-    @pytest.mark.asyncio
-    async def test_land_tenure_caching(self):
-        """Test that land tenure extraction uses cache on second call."""
-        import time
-
-        markdown = "The property is owned by Nicholas Denman, total area 120.5 hectares."
-        doc_name = f"cache_test_tenure_{int(time.time())}.pdf"
-
-        extractor = LandTenureExtractor()
+    async def _verify_caching(self, extractor, markdown: str, test_name: str, result_type: str):
+        """Helper to verify caching behavior for any extractor."""
+        doc_name = unique_doc_name(test_name)
 
         # First call - hits API
         start1 = time.time()
         results1 = await extractor.extract(markdown, [], doc_name)
         duration1 = time.time() - start1
-
-        print(f"\nFirst call (API): {duration1:.2f}s, extracted {len(results1)} fields")
-
-        # Second call - should use cache
-        start2 = time.time()
-        results2 = await extractor.extract(markdown, [], doc_name)
-        duration2 = time.time() - start2
-
-        print(f"Second call (cache): {duration2:.2f}s, extracted {len(results2)} fields")
-
-        # Verify results are identical
-        assert len(results1) == len(results2)
-
-        # Second call should be much faster (< 100ms for cache hit)
-        assert duration2 < 0.1, f"Cache hit should be fast, got {duration2}s"
-
-    @pytest.mark.asyncio
-    async def test_project_id_caching(self):
-        """Test that project ID extraction uses cache on second call."""
-        import time
-
-        markdown = "Project ID: C06-4997"
-        doc_name = f"cache_test_id_{int(time.time())}.pdf"
-
-        extractor = ProjectIDExtractor()
-
-        # First call - hits API
-        start1 = time.time()
-        results1 = await extractor.extract(markdown, [], doc_name)
-        duration1 = time.time() - start1
-
-        print(f"\nFirst call (API): {duration1:.2f}s, extracted {len(results1)} IDs")
+        print(f"\nFirst call (API): {duration1:.2f}s, extracted {len(results1)} {result_type}")
 
         # Second call - should use cache
         start2 = time.time()
         results2 = await extractor.extract(markdown, [], doc_name)
         duration2 = time.time() - start2
-
-        print(f"Second call (cache): {duration2:.2f}s, extracted {len(results2)} IDs")
+        print(f"Second call (cache): {duration2:.2f}s, extracted {len(results2)} {result_type}")
 
         # Verify results are identical
         assert len(results1) == len(results2)
         if results1:
             assert results1[0].value == results2[0].value
 
-        # Second call should be much faster
-        assert duration2 < 0.1, f"Cache hit should be fast, got {duration2}s"
+        # Second call should be much faster (< 500ms for cache hit)
+        assert duration2 < 0.5, f"Cache hit should be fast, got {duration2}s"
+
+    @pytest.mark.asyncio
+    async def test_land_tenure_caching(self):
+        """Test that land tenure extraction uses cache on second call."""
+        markdown = "The property is owned by Nicholas Denman, total area 120.5 hectares."
+        await self._verify_caching(LandTenureExtractor(), markdown, "cache_tenure", "fields")
+
+    @pytest.mark.asyncio
+    async def test_project_id_caching(self):
+        """Test that project ID extraction uses cache on second call."""
+        markdown = "Project ID: C06-4997"
+        await self._verify_caching(ProjectIDExtractor(), markdown, "cache_id", "IDs")

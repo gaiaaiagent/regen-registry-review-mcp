@@ -23,6 +23,8 @@ class TestCostTracking:
     """Test cost tracking integration."""
 
     @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.expensive
     async def test_cost_tracker_records_api_calls(self):
         """Test that cost tracker records API calls from extractors."""
         import time

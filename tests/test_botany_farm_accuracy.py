@@ -31,7 +31,8 @@ class TestBotanyFarmAccuracy:
     """Validate extraction accuracy against Botany Farm ground truth."""
 
     @pytest.mark.asyncio
-    @pytest.mark.slow
+    @pytest.mark.accuracy
+    @pytest.mark.expensive
     async def test_date_extraction_accuracy(self, botany_farm_dates):
         """Test date extraction accuracy against ground truth.
 
@@ -103,7 +104,8 @@ class TestBotanyFarmAccuracy:
         assert recall >= 0.80, f"Recall too low: {recall:.2%} (expected >= 80%)"
 
     @pytest.mark.asyncio
-    @pytest.mark.slow
+    @pytest.mark.accuracy
+    @pytest.mark.expensive
     async def test_land_tenure_accuracy(self, botany_farm_tenure):
         """Test land tenure extraction accuracy against ground truth.
 
@@ -151,7 +153,8 @@ class TestBotanyFarmAccuracy:
                 print(f"❌ Area: INCORRECT (got {area_value}, expected {expected_area})")
 
     @pytest.mark.asyncio
-    @pytest.mark.slow
+    @pytest.mark.accuracy
+    @pytest.mark.expensive
     async def test_project_id_accuracy(self, botany_farm_project_ids):
         """Test project ID extraction accuracy against ground truth.
 
@@ -219,7 +222,8 @@ class TestBotanyFarmAccuracy:
             print(f"✅ No false positives (REQ-, DOC-, v*)")
 
     @pytest.mark.asyncio
-    @pytest.mark.slow
+    @pytest.mark.accuracy
+    @pytest.mark.expensive
     async def test_full_accuracy_report(self):
         """Generate comprehensive accuracy report for all extractors."""
         project_plan_path = Path("examples/22-23/4997Botany22_Public_Project_Plan/4997Botany22_Public_Project_Plan.md")

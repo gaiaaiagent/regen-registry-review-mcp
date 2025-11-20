@@ -9,6 +9,7 @@ from typing import Literal
 
 from pydantic import Field, field_validator
 from .base import BaseModel, ConfidenceScore
+from .evidence import EvidenceSnippet
 
 
 # ============================================================================
@@ -138,103 +139,5 @@ class Document(BaseModel):
     indexed_at: datetime
 
 
-# ============================================================================
-# Evidence & Finding Models
-# ============================================================================
 
 
-class EvidenceSnippet(BaseModel):
-    """A snippet of text extracted as evidence."""
-
-    snippet_id: str
-    text: str = Field(max_length=500)  # ~2-3 sentences
-    document_id: str
-    page: int | None = None
-    section: str | None = None
-    confidence: ConfidenceScore
-    extraction_method: str  # "keyword", "semantic", "structured"
-
-
-class RequirementFinding(BaseModel):
-    """Evidence and assessment for a single requirement."""
-
-    requirement_id: str
-    mapped_documents: list[str]  # document_ids
-    evidence_snippets: list[EvidenceSnippet]
-    status: Literal["covered", "partial", "missing", "needs_review"]
-    confidence: ConfidenceScore
-    ai_comments: str | None = None
-    human_comments: str | None = None
-
-
-# ============================================================================
-# Validation Models
-# ============================================================================
-
-
-class DateValidation(BaseModel):
-    """Result of date alignment validation."""
-
-    validation_type: Literal["date_alignment"] = "date_alignment"
-    date1_field: str
-    date1_value: str
-    date1_source: str  # "DOC-001, Page 5"
-    date2_field: str
-    date2_value: str
-    date2_source: str
-    delta_days: int
-    max_allowed: int
-    status: Literal["pass", "fail", "warning"]
-    message: str
-
-
-class LandTenureValidation(BaseModel):
-    """Result of land tenure validation."""
-
-    validation_type: Literal["land_tenure"] = "land_tenure"
-    field: str  # "owner_name", "area_hectares", etc.
-    values_found: list[dict]  # [{"value": "Nick Denman", "source": "DOC-001"}]
-    status: Literal["pass", "fail", "warning"]
-    message: str
-    fuzzy_match_threshold: float = 0.8
-
-
-class ProjectIDValidation(BaseModel):
-    """Result of project ID consistency validation."""
-
-    validation_type: Literal["project_id"] = "project_id"
-    project_id: str
-    occurrences: list[dict]  # [{"document_id": "DOC-001", "page": 3}]
-    min_required: int = 3
-    status: Literal["pass", "fail", "warning"]
-    message: str
-
-
-# ============================================================================
-# Report Models
-# ============================================================================
-
-
-class ReportMetadata(BaseModel):
-    """Metadata for a generated report."""
-
-    report_id: str
-    session_id: str
-    generated_at: datetime
-    format: Literal["markdown", "json", "pdf"]
-    report_path: str
-
-
-class ReviewSummary(BaseModel):
-    """High-level summary of review findings."""
-
-    project_name: str
-    project_id: str | None
-    methodology: str
-    reviewed_at: datetime
-    total_requirements: int
-    covered: int
-    partial: int
-    missing: int
-    needs_human_review: list[str]  # requirement_ids
-    overall_status: Literal["approved", "needs_revision", "not_approved"]
