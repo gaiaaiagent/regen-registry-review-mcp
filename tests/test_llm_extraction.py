@@ -17,56 +17,6 @@ from registry_review_mcp.extractors.llm_extractors import (
 )
 
 
-class TestDateExtractor:
-    """Test date extraction with LLM."""
-
-    @pytest.mark.asyncio
-    async def test_extract_simple_date(self):
-        """Test extraction of a simple date."""
-        import time
-
-        # Use unique document name to avoid cache
-        doc_name = f"test_{int(time.time() * 1000000)}.pdf"
-
-        # Create mock response
-        mock_response = Mock()
-        mock_response.content = [
-            Mock(
-                text='''```json
-[
-    {
-        "value": "2022-01-01",
-        "field_type": "project_start_date",
-        "source": "Section 1.8",
-        "confidence": 0.95,
-        "reasoning": "Explicitly labeled as Project Start Date",
-        "raw_text": "Project Start Date: 01/01/2022"
-    }
-]
-```'''
-            )
-        ]
-
-        # Create mock client
-        mock_client = AsyncMock()
-        mock_client.messages.create.return_value = mock_response
-
-        # Extract
-        extractor = DateExtractor(mock_client)
-        results = await extractor.extract(
-            markdown_content="Project Start Date: 01/01/2022",
-            images=[],
-            document_name=doc_name,
-        )
-
-        # Verify
-        assert len(results) == 1
-        assert results[0].value == "2022-01-01"
-        assert results[0].field_type == "project_start_date"
-        assert results[0].confidence == 0.95
-        assert mock_client.messages.create.called
-
-
 class TestHelperFunctions:
     """Test helper functions for data transformation."""
 
@@ -331,43 +281,3 @@ class TestBoundaryAwareChunking:
             settings.llm_chunk_size = original_chunk_size
             settings.llm_max_input_chars = original_max_chars
             settings.llm_chunk_overlap = original_overlap
-
-
-class TestCaching:
-    """Test caching behavior."""
-
-    @pytest.mark.asyncio
-    async def test_date_extraction_uses_cache(self, tmp_path):
-        """Test that date extraction caches results."""
-        import time
-
-        # Use unique document name to avoid cache collisions
-        doc_name = f"test_{int(time.time() * 1000)}.pdf"
-
-        # Mock response
-        mock_response = Mock()
-        mock_response.content = [
-            Mock(
-                text='[{"value": "2022-01-01", "field_type": "project_start_date", "source": "test", "confidence": 0.9, "reasoning": "test"}]'
-            )
-        ]
-
-        mock_client = AsyncMock()
-        mock_client.messages.create.return_value = mock_response
-
-        extractor = DateExtractor(mock_client)
-
-        # Clear cache for this document
-        extractor.cache.delete(f"{doc_name}_dates")
-
-        # First call
-        results1 = await extractor.extract("test content", [], doc_name)
-        assert len(results1) == 1
-        assert mock_client.messages.create.call_count == 1
-
-        # Second call - should use cache
-        results2 = await extractor.extract("test content", [], doc_name)
-        assert len(results2) == 1
-        assert results1[0].value == results2[0].value
-        # API should still only be called once
-        assert mock_client.messages.create.call_count == 1

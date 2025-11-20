@@ -132,9 +132,14 @@ def botany_farm_markdown():
     return markdown[:20000]
 
 
-@pytest_asyncio.fixture(scope="function")
+@pytest_asyncio.fixture(scope="session")
 async def botany_farm_dates(botany_farm_markdown):
-    """Extract dates from Botany Farm once and share across tests.
+    """Extract dates from Botany Farm ONCE for entire test session.
+
+    Session scope is safe because:
+    - Data is read-only (tests only read/filter, never mutate)
+    - Eliminates expensive duplicate API calls (~$0.03 each)
+    - Result is deterministic (same input → same output)
 
     Requires API key and LLM extraction to be enabled.
     """
@@ -150,9 +155,14 @@ async def botany_farm_dates(botany_farm_markdown):
     return results
 
 
-@pytest_asyncio.fixture(scope="function")
+@pytest_asyncio.fixture(scope="session")
 async def botany_farm_tenure(botany_farm_markdown):
-    """Extract land tenure from Botany Farm once and share across tests.
+    """Extract land tenure from Botany Farm ONCE for entire test session.
+
+    Session scope is safe because:
+    - Data is read-only (tests only read/filter, never mutate)
+    - Eliminates expensive duplicate API calls (~$0.03 each)
+    - Result is deterministic
 
     Requires API key and LLM extraction to be enabled.
     """
@@ -168,9 +178,14 @@ async def botany_farm_tenure(botany_farm_markdown):
     return results
 
 
-@pytest_asyncio.fixture(scope="function")
+@pytest_asyncio.fixture(scope="session")
 async def botany_farm_project_ids(botany_farm_markdown):
-    """Extract project IDs from Botany Farm once and share across tests.
+    """Extract project IDs from Botany Farm ONCE for entire test session.
+
+    Session scope is safe because:
+    - Data is read-only (tests only read/filter, never mutate)
+    - Eliminates expensive duplicate API calls (~$0.03 each)
+    - Result is deterministic
 
     Requires API key and LLM extraction to be enabled.
     """
@@ -269,8 +284,11 @@ def cache(test_settings):
 
 
 @pytest.fixture(autouse=True, scope="function")
-def cleanup_sessions():
+def cleanup_sessions(tmp_path_factory, worker_id):
     """Clean up TEST sessions before and after each test.
+
+    Worker-isolated for parallel execution: each xdist worker gets its own
+    sessions directory to prevent race conditions.
 
     CRITICAL: Only removes sessions that are DEFINITELY from tests:
     - Sessions with names starting with "test-"
@@ -285,8 +303,22 @@ def cleanup_sessions():
     NOTE: Tests that use examples/ directory should use the separate
     `cleanup_examples_sessions` fixture to clean up after themselves.
     """
-    data_dir = Path(__file__).parent.parent / "data"
-    sessions_dir = data_dir / "sessions"
+    # Worker isolation: each xdist worker uses its own sessions directory
+    if worker_id == "master":
+        # Not running with xdist (single process)
+        data_dir = Path(__file__).parent.parent / "data"
+        sessions_dir = data_dir / "sessions"
+    else:
+        # Running with xdist: use worker-specific directory
+        root_tmp_dir = tmp_path_factory.getbasetemp().parent
+        worker_tmp = root_tmp_dir / worker_id
+        worker_tmp.mkdir(exist_ok=True)
+        sessions_dir = worker_tmp / "sessions"
+        sessions_dir.mkdir(exist_ok=True)
+
+        # Update settings to use worker-specific directory
+        from registry_review_mcp.config.settings import settings
+        settings.sessions_dir = sessions_dir
 
     def cleanup_test_sessions():
         """Remove ONLY definitively test-created sessions."""
@@ -380,9 +412,14 @@ def cleanup_examples_sessions():
     cleanup_examples()
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def example_documents_path():
-    """Get path to example documents.
+    """Get path to example documents (session-scoped for efficiency).
+
+    Session scope is safe because:
+    - Returns immutable Path object
+    - Path resolution is deterministic
+    - Used by 18 tests across 5 files
 
     Returns:
         Absolute path to examples/22-23 directory

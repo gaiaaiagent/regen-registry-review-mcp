@@ -66,6 +66,10 @@ class TestSanitizeProjectName:
 class TestCreateSessionFromUploads:
     """Test create_session_from_uploads business logic."""
 
+    @pytest.fixture(autouse=True)
+    def _cleanup(self, cleanup_sessions):
+        pass
+
     @pytest.mark.asyncio
     async def test_create_session_success(self, test_settings, sample_pdf_base64):
         """Test successful session creation from uploads."""
@@ -97,8 +101,8 @@ class TestCreateSessionFromUploads:
         # Cleanup
         try:
             await session_tools.delete_session(result["session_id"])
-        except:
-            pass
+        except Exception:
+            pass  # Ignore cleanup errors
 
     @pytest.mark.asyncio
     async def test_create_session_multiple_files(
@@ -123,8 +127,8 @@ class TestCreateSessionFromUploads:
         # Cleanup
         try:
             await session_tools.delete_session(result["session_id"])
-        except:
-            pass
+        except Exception:
+            pass  # Ignore cleanup errors
 
     @pytest.mark.asyncio
     async def test_create_session_missing_project_name(self, test_settings):
@@ -203,12 +207,16 @@ class TestCreateSessionFromUploads:
         # Cleanup
         try:
             await session_tools.delete_session(result["session_id"])
-        except:
-            pass
+        except Exception:
+            pass  # Ignore cleanup errors
 
 
 class TestUploadAdditionalFiles:
     """Test upload_additional_files business logic."""
+
+    @pytest.fixture(autouse=True)
+    def _cleanup(self, cleanup_sessions):
+        pass
 
     @pytest.mark.asyncio
     async def test_upload_additional_files_success(self, test_settings, sample_pdf_base64, sample_pdf2_base64):
@@ -326,6 +334,10 @@ class TestUploadAdditionalFiles:
 class TestStartReviewFromUploads:
     """Test start_review_from_uploads business logic."""
 
+    @pytest.fixture(autouse=True)
+    def _cleanup(self, cleanup_sessions):
+        pass
+
     @pytest.mark.asyncio
     async def test_start_review_full_workflow(self, test_settings, sample_pdf_base64, sample_pdf2_base64):
         """Test complete review workflow with auto-extraction."""
@@ -354,8 +366,8 @@ class TestStartReviewFromUploads:
         # Cleanup
         try:
             await session_tools.delete_session(session_result["session_id"])
-        except:
-            pass
+        except Exception:
+            pass  # Ignore cleanup errors
 
     @pytest.mark.asyncio
     async def test_start_review_no_auto_extract(self, test_settings, sample_pdf_base64):
@@ -372,8 +384,8 @@ class TestStartReviewFromUploads:
         # Cleanup
         try:
             await session_tools.delete_session(result["session_creation"]["session_id"])
-        except:
-            pass
+        except Exception:
+            pass  # Ignore cleanup errors
 
     @pytest.mark.asyncio
     async def test_start_review_with_metadata(self, test_settings, sample_pdf_base64):
@@ -400,8 +412,8 @@ class TestStartReviewFromUploads:
         # Cleanup
         try:
             await session_tools.delete_session(session_result["session_id"])
-        except:
-            pass
+        except Exception:
+            pass  # Ignore cleanup errors
 
     @pytest.mark.asyncio
     async def test_start_review_invalid_inputs(self, test_settings):
@@ -421,6 +433,10 @@ class TestStartReviewFromUploads:
 
 class TestDeduplication:
     """Test file deduplication functionality."""
+
+    @pytest.fixture(autouse=True)
+    def _cleanup(self, cleanup_sessions):
+        pass
 
     def test_deduplicate_by_filename_basic(self):
         """Test filename deduplication."""
@@ -518,8 +534,8 @@ class TestDeduplication:
         # Cleanup
         try:
             await session_tools.delete_session(result["session_id"])
-        except:
-            pass
+        except Exception:
+            pass  # Ignore cleanup errors
 
     @pytest.mark.asyncio
     async def test_create_session_deduplication_disabled(self, test_settings, sample_pdf_base64):
@@ -541,8 +557,8 @@ class TestDeduplication:
         # Cleanup
         try:
             await session_tools.delete_session(result["session_id"])
-        except:
-            pass
+        except Exception:
+            pass  # Ignore cleanup errors
 
     @pytest.mark.asyncio
     async def test_create_session_all_same_content(self, test_settings, sample_pdf_base64):
@@ -566,8 +582,8 @@ class TestDeduplication:
         # Cleanup
         try:
             await session_tools.delete_session(result["session_id"])
-        except:
-            pass
+        except Exception:
+            pass  # Ignore cleanup errors
 
     @pytest.mark.asyncio
     async def test_start_review_with_deduplication(
@@ -594,13 +610,17 @@ class TestDeduplication:
         # Cleanup
         try:
             await session_tools.delete_session(session_result["session_id"])
-        except:
-            pass
+        except Exception:
+            pass  # Ignore cleanup errors
 
 
 
 class TestSessionDetection:
     """Test automatic session detection (Phase 2)."""
+
+    @pytest.fixture(autouse=True)
+    def _cleanup(self, cleanup_sessions):
+        pass
 
     @pytest.mark.asyncio
     async def test_detect_existing_session_basic(self, test_settings, sample_pdf_base64):
@@ -660,6 +680,10 @@ class TestSessionDetection:
 
 class TestPathBasedUploads:
     """Test path-based file upload functionality (Phase 3)."""
+
+    @pytest.fixture(autouse=True)
+    def _cleanup(self, cleanup_sessions):
+        pass
 
     @pytest.fixture
     def temp_pdf_file(self, tmp_path, sample_pdf_base64):
@@ -945,6 +969,10 @@ class TestPathBasedUploads:
 
 class TestPathResolution:
     """Test ElizaOS path resolution functionality."""
+
+    @pytest.fixture(autouse=True)
+    def _cleanup(self, cleanup_sessions):
+        pass
 
     def test_resolve_absolute_path_exists(self, tmp_path, sample_pdf_base64):
         """Test that absolute paths that exist are used as-is."""
