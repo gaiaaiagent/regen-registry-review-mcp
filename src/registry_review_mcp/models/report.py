@@ -1,7 +1,8 @@
 """Report generation data models."""
 
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import Field
+from .base import BaseModel, ConfidenceScore
 
 
 class ReportMetadata(BaseModel):
@@ -24,7 +25,7 @@ class RequirementFinding(BaseModel):
     requirement_text: str
     category: str
     status: str  # "covered", "partial", "missing", "flagged"
-    confidence: float = Field(..., ge=0.0, le=1.0)
+    confidence: ConfidenceScore
     documents_referenced: int
     snippets_found: int
     evidence_summary: str  # Brief summary of evidence found

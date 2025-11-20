@@ -30,7 +30,7 @@ from ..utils.patterns import (
     is_image_file,
     match_any,
 )
-from ..utils.state import StateManager
+from ..utils.state import StateManager, get_session_or_raise
 
 
 def compute_file_hash(filepath: Path) -> str:
@@ -56,12 +56,7 @@ async def discover_documents(session_id: str) -> dict[str, Any]:
     """Discover and index all documents in the session's project directory.
     """
     # Load session
-    state_manager = StateManager(session_id)
-    if not state_manager.exists():
-        raise SessionNotFoundError(
-            f"Session not found: {session_id}",
-            details={"session_id": session_id},
-        )
+    state_manager = get_session_or_raise(session_id)
 
     session_data = state_manager.read_json("session.json")
     documents_path = Path(session_data["project_metadata"]["documents_path"])
@@ -141,40 +136,9 @@ async def discover_documents(session_id: str) -> dict[str, Any]:
                 indexed_at=datetime.now(timezone.utc),
             )
 
-            # NEW: Convert PDF to markdown for better extraction quality
-            if is_pdf_file(file_path.name):
-                try:
-                    print(f"  🔄 Converting {file_path.name} to markdown...", flush=True)
-                    from ..extractors.marker_extractor import convert_pdf_to_markdown
-
-                    # Convert PDF to markdown
-                    markdown_result = await convert_pdf_to_markdown(str(file_path))
-
-                    # Store markdown alongside PDF
-                    markdown_path = file_path.with_suffix('.md')
-                    markdown_path.write_text(markdown_result["markdown"], encoding="utf-8")
-
-                    # Add markdown reference to document
-                    # Note: Metadata extraction now handled by unified_analysis.py (100% accuracy validated)
-                    doc_dict = document.model_dump(mode="json")
-                    doc_dict["markdown_path"] = str(markdown_path)
-                    doc_dict["has_markdown"] = True
-                    doc_dict["markdown_char_count"] = len(markdown_result["markdown"])
-                    documents.append(doc_dict)
-
-                    print(f"  ✅ Markdown saved: {markdown_path.name} ({len(markdown_result['markdown']):,} chars)", flush=True)
-
-                except Exception as e:
-                    # If markdown conversion fails, still add document without markdown
-                    print(f"  ⚠️  Markdown conversion failed for {file_path.name}: {str(e)}", flush=True)
-                    doc_dict = document.model_dump(mode="json")
-                    doc_dict["markdown_path"] = None
-                    doc_dict["has_markdown"] = False
-                    doc_dict["markdown_error"] = str(e)
-                    documents.append(doc_dict)
-            else:
-                # Non-PDF files don't need markdown conversion
-                documents.append(document.model_dump(mode="json"))
+            # Document discovery: Just catalog metadata, don't extract content
+            # Markdown conversion happens lazily during evidence extraction (Stage 5)
+            documents.append(document.model_dump(mode="json"))
 
             # Update classification summary
             classification_summary[classification] = (

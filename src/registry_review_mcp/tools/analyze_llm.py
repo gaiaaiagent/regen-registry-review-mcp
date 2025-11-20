@@ -22,7 +22,7 @@ from ..prompts.unified_analysis import (
     analyze_with_llm,
     UnifiedAnalysisResult
 )
-from ..utils.state import StateManager
+from ..utils.state import StateManager, get_session_or_raise
 
 logger = logging.getLogger(__name__)
 

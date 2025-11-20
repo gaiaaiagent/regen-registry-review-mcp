@@ -163,7 +163,7 @@ Then run this workflow again.
     return sessions[0]["session_id"], True, None
 
 
-def validate_session_exists(session_id: str, workflow_name: str) -> list[TextContent] | None:
+async def validate_session_exists(session_id: str, workflow_name: str) -> list[TextContent] | None:
     """Validate that a session exists and return error if not.
 
     Args:
@@ -176,8 +176,7 @@ def validate_session_exists(session_id: str, workflow_name: str) -> list[TextCon
     state_manager = StateManager(session_id)
     if not state_manager.exists():
         # Session doesn't exist - show available sessions
-        import asyncio
-        sessions = asyncio.run(session_tools.list_sessions())
+        sessions = await session_tools.list_sessions()
         session_list = format_session_list(sessions)
 
         return format_error(

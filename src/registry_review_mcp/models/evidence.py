@@ -3,21 +3,24 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+from .base import BaseModel, ConfidenceScore
 
 
 class EvidenceSnippet(BaseModel):
     """A snippet of text that serves as evidence for a requirement."""
 
-    text: str = Field(..., description="The extracted text snippet")
+    text: str = Field(..., description="The extracted text snippet", max_length=5000)
     document_id: str = Field(..., description="ID of the source document")
     document_name: str = Field(..., description="Name of the source document")
     page: int | None = Field(None, description="Page number (1-indexed)")
     section: str | None = Field(None, description="Section header")
-    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score")
+    confidence: ConfidenceScore
     keywords_matched: list[str] = Field(
         default_factory=list, description="Keywords that matched in this snippet"
     )
+    snippet_id: str | None = Field(None, description="Unique snippet identifier")
+    extraction_method: str | None = Field(None, description="Method: keyword, semantic, or structured")
 
 
 class MappedDocument(BaseModel):
@@ -43,9 +46,7 @@ class RequirementEvidence(BaseModel):
     status: str = Field(
         ..., description="Status: covered, partial, missing, or flagged"
     )
-    confidence: float = Field(
-        ..., ge=0.0, le=1.0, description="Overall confidence score"
-    )
+    confidence: ConfidenceScore
     mapped_documents: list[MappedDocument] = Field(
         default_factory=list, description="Documents containing evidence"
     )
@@ -93,5 +94,5 @@ class StructuredField(BaseModel):
     field_value: Any = Field(..., description="Extracted value")
     source_document: str = Field(..., description="Source document ID")
     page: int | None = Field(None, description="Page number")
-    confidence: float = Field(..., ge=0.0, le=1.0, description="Extraction confidence")
+    confidence: ConfidenceScore
     extraction_method: str = Field(..., description="Method used to extract (regex, table, etc.)")

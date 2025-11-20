@@ -12,7 +12,7 @@ Benefit: DRY principle, consistent timestamp handling, type safety
 
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Annotated
 from pydantic import BaseModel as PydanticBaseModel, Field, ConfigDict
 
 
@@ -173,3 +173,6 @@ class StatusTrackedModel(IdentifiedModel):
 # Type aliases for common patterns
 ModelID = str  # UUID string
 Timestamp = datetime  # ISO 8601 datetime
+
+# Annotated types for common field constraints
+ConfidenceScore = Annotated[float, Field(ge=0.0, le=1.0, description="Confidence score between 0 and 1")]

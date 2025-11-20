@@ -5,6 +5,8 @@ from mcp.types import TextContent
 
 from ..config.settings import settings
 from ..tools import session_tools
+from ..utils.state import StateManager
+from .helpers import text_content, format_error
 
 
 async def initialize_prompt(
@@ -58,7 +60,7 @@ async def initialize_prompt(
 - **See your sessions:** `list_sessions`
 - **Continue existing session:** Just run `/document-discovery`
 """
-        return [TextContent(type="text", text=message)]
+        return text_content(message)
 
     # Normalize documents path for comparison
     normalized_path = str(Path(documents_path).absolute())
@@ -149,7 +151,7 @@ delete_session {duplicate['session_id']}
 
 **Tip:** Use `list_sessions` to see all your active sessions and their progress!
 """
-        return [TextContent(type="text", text=message)]
+        return text_content(message)
 
     # Create session
     try:
@@ -200,28 +202,18 @@ This will automatically:
 The prompt will auto-select your session - no need to provide the session ID!
 """
 
-        return [TextContent(type="text", text=message)]
+        return text_content(message)
 
     except FileNotFoundError:
-        message = f"""# ❌ Error: Document Path Not Found
-
-The path you provided does not exist:
-`{documents_path}`
-
-Please check:
-- The path is correct
-- The path is absolute (not relative)
-- You have permission to access the directory
-
-Try again with a valid path.
-"""
-        return [TextContent(type="text", text=message)]
+        return format_error(
+            "Document Path Not Found",
+            f"The path you provided does not exist:\n`{documents_path}`",
+            "Please check:\n- The path is correct\n- The path is absolute (not relative)\n- You have permission to access the directory\n\nTry again with a valid path."
+        )
 
     except Exception as e:
-        message = f"""# ❌ Error Creating Session
-
-An error occurred: {str(e)}
-
-Please check your inputs and try again.
-"""
-        return [TextContent(type="text", text=message)]
+        return format_error(
+            "Error Creating Session",
+            f"An error occurred: {str(e)}",
+            "Please check your inputs and try again."
+        )

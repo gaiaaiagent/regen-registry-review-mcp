@@ -41,15 +41,16 @@ class ProjectMetadata(BaseModel):
 
 
 class WorkflowProgress(BaseModel):
-    """Tracks progress through the 7-stage workflow."""
+    """Tracks progress through the 8-stage workflow."""
 
     initialize: Literal["pending", "in_progress", "completed"] = "pending"
     document_discovery: Literal["pending", "in_progress", "completed"] = "pending"
+    requirement_mapping: Literal["pending", "in_progress", "completed"] = "pending"
     evidence_extraction: Literal["pending", "in_progress", "completed"] = "pending"
     cross_validation: Literal["pending", "in_progress", "completed"] = "pending"
     report_generation: Literal["pending", "in_progress", "completed"] = "pending"
     human_review: Literal["pending", "in_progress", "completed"] = "pending"
-    complete: Literal["pending", "in_progress", "completed"] = "pending"
+    completion: Literal["pending", "in_progress", "completed"] = "pending"
 
 
 class SessionStatistics(BaseModel):
@@ -137,6 +138,36 @@ class Document(BaseModel):
     classification_method: str  # "filename", "content", "manual"
     metadata: DocumentMetadata
     indexed_at: datetime
+
+
+# ============================================================================
+# Requirement Mapping Models
+# ============================================================================
+
+
+class RequirementMapping(BaseModel):
+    """Mapping between a requirement and supporting documents."""
+
+    requirement_id: str = Field(pattern=r"^REQ-\d{3}$")
+    mapped_documents: list[str] = []  # List of document_ids
+    mapping_status: Literal["suggested", "confirmed", "unmapped", "manual"] = "suggested"
+    confidence: ConfidenceScore | None = None
+    suggested_by: Literal["agent", "manual"] = "agent"
+    confirmed_by: str | None = None
+    confirmed_at: datetime | None = None
+
+
+class MappingCollection(BaseModel):
+    """Collection of all requirement mappings for a session."""
+
+    session_id: str
+    mappings: list[RequirementMapping]
+    total_requirements: int
+    mapped_count: int
+    unmapped_count: int
+    confirmed_count: int
+    created_at: datetime
+    updated_at: datetime
 
 
 

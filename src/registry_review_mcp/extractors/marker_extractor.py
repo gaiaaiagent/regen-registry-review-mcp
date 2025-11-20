@@ -35,7 +35,7 @@ def get_marker_models():
     and cache globally for the lifetime of the process.
 
     Returns:
-        Loaded marker models
+        Loaded marker model dictionary
 
     Raises:
         DocumentExtractionError: If marker import or model loading fails
@@ -45,12 +45,12 @@ def get_marker_models():
     if _marker_models is None:
         try:
             logger.info("Loading marker models (one-time initialization, ~5-10 seconds)...")
-            from marker.convert import convert_single_pdf
-            from marker.models import load_all_models
+            from marker.models import create_model_dict
+            from marker.converters.pdf import PdfConverter
 
             _marker_models = {
-                "models": load_all_models(),
-                "convert_fn": convert_single_pdf,
+                "models": create_model_dict(),
+                "converter_cls": PdfConverter,
             }
             logger.info("✅ Marker models loaded successfully")
         except ImportError as e:
@@ -126,26 +126,33 @@ async def convert_pdf_to_markdown(
         # Load models (lazy, cached globally)
         marker_resources = get_marker_models()
         models = marker_resources["models"]
-        convert_fn = marker_resources["convert_fn"]
+        converter_cls = marker_resources["converter_cls"]
 
-        # Prepare conversion parameters
-        convert_kwargs = {}
+        # Prepare converter config
+        config = {
+            "disable_tqdm": True,  # Disable progress bars in library code
+        }
 
         # Handle page range
         if page_range:
             start_page = page_range[0] - 1  # Convert to 0-indexed
             end_page = page_range[1]  # Inclusive end page
-            convert_kwargs["start_page"] = start_page
-            convert_kwargs["max_pages"] = end_page - start_page
+            config["page_range"] = (start_page, end_page)
             logger.info(f"   Converting pages {page_range[0]}-{page_range[1]}")
 
-        # Convert PDF to markdown
-        # marker's convert_single_pdf returns: (full_text, images, metadata)
-        full_text, images, metadata = convert_fn(
-            str(file_path),
-            models,
-            **convert_kwargs
+        # Convert PDF to markdown using new marker API
+        converter = converter_cls(
+            config=config,
+            artifact_dict=models,
+            processor_list=None,  # Use default processors
+            renderer=None,  # Use default renderer
         )
+        rendered = converter(str(file_path))
+
+        # Extract results from rendered output
+        full_text = rendered.markdown
+        images = rendered.images if hasattr(rendered, 'images') else {}
+        metadata = rendered.metadata if hasattr(rendered, 'metadata') else {}
 
         # Extract page count from metadata or estimate
         page_count = metadata.get("page_count", 0)

@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field
 
 class EvidenceSnippet(BaseModel):
     """Evidence snippet with citation."""
-    text: str = Field(description="Evidence text (50-200 words)")
+    text: str = Field(description="Evidence text (50-500 words, include sufficient context for verification)")
     page: int | None = Field(description="Page number (1-indexed)")
     section: str | None = Field(description="Section header")
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence score")

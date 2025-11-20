@@ -18,10 +18,13 @@ from tests.factories import (
 )
 
 
-pytestmark = pytest.mark.skipif(
-    not settings.anthropic_api_key or not settings.llm_extraction_enabled,
-    reason="LLM extraction not configured (set ANTHROPIC_API_KEY and enable LLM extraction)"
-)
+pytestmark = [
+    pytest.mark.expensive,
+    pytest.mark.skipif(
+        not settings.anthropic_api_key or not settings.llm_extraction_enabled,
+        reason="LLM extraction not configured (set ANTHROPIC_API_KEY and enable LLM extraction)"
+    )
+]
 
 
 class TestRealAPILandTenureExtraction:

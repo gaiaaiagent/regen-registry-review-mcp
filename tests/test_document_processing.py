@@ -7,6 +7,7 @@ from registry_review_mcp.tools import session_tools, document_tools
 from registry_review_mcp.utils.state import StateManager
 
 
+@pytest.mark.usefixtures("cleanup_examples_sessions")
 class TestDocumentDiscovery:
     """Test document discovery functionality."""
 
@@ -88,9 +89,11 @@ class TestDocumentDiscovery:
         assert confidence <= 0.6
 
 
+@pytest.mark.usefixtures("cleanup_examples_sessions")
 class TestPDFExtraction:
     """Test PDF text extraction."""
 
+    @pytest.mark.marker
     @pytest.mark.asyncio
     async def test_extract_pdf_text_basic(self, example_documents_path):
         """Test basic PDF text extraction."""
@@ -116,6 +119,7 @@ class TestPDFExtraction:
         assert "text" in first_page
         assert first_page["page_number"] == 1
 
+    @pytest.mark.marker
     @pytest.mark.asyncio
     async def test_extract_pdf_text_with_page_range(self, example_documents_path):
         """Test PDF extraction with specific page range."""
@@ -133,6 +137,7 @@ class TestPDFExtraction:
         assert results["pages"][0]["page_number"] == 1
         assert results["pages"][1]["page_number"] == 2
 
+    @pytest.mark.marker
     @pytest.mark.asyncio
     async def test_extract_pdf_text_caching(self, example_documents_path):
         """Test that PDF extraction results are cached."""
@@ -153,9 +158,11 @@ class TestPDFExtraction:
         assert results1["page_count"] == results2["page_count"]
 
 
+@pytest.mark.usefixtures("cleanup_examples_sessions")
 class TestEndToEnd:
     """End-to-end workflow tests."""
 
+    @pytest.mark.marker
     @pytest.mark.asyncio
     async def test_full_discovery_workflow(self, example_documents_path):
         """Test complete discovery workflow from session to results."""

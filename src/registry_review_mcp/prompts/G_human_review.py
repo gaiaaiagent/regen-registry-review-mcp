@@ -1,9 +1,14 @@
-"""Human review workflow - Stage 5 of registry review."""
+"""Human review workflow - Stage 7 of registry review."""
 
 from mcp.types import TextContent
 
 from ..models.validation import ValidationResult
 from ..utils.state import StateManager
+from .helpers import (
+    text_content,
+    format_workflow_header,
+    format_next_steps_section,
+)
 
 
 async def human_review_prompt(session_id: str | None = None) -> list[TextContent]:
@@ -20,12 +25,13 @@ async def human_review_prompt(session_id: str | None = None) -> list[TextContent
         List of flagged items with context for human review
     """
     # Auto-select session if not provided
+    auto_selected = False
     if not session_id:
         state_manager = StateManager(None)
         sessions = state_manager.list_sessions()
 
         if not sessions:
-            message = """# Registry Review Workflow - Stage 5: Human Review
+            return text_content("""# Registry Review Workflow - Stage 5: Human Review
 
 No active sessions found.
 
@@ -35,46 +41,37 @@ Create a session first:
 
 `/initialize Your Project Name, /path/to/documents`
 
-Then proceed through the workflow stages."""
-            return [TextContent(type="text", text=message)]
+Then proceed through the workflow stages.""")
 
-        # Get most recent session
         session_id = sessions[0]["session_id"]
         auto_selected = True
-    else:
-        auto_selected = False
 
     # Load session
     manager = StateManager(session_id)
 
     if not manager.exists("session.json"):
-        message = f"""# ❌ Error: Session Not Found
+        sessions_list = "\n".join(f"- `{s['session_id']}`: {s['project_name']}" for s in StateManager(None).list_sessions())
+        return text_content(f"""# ❌ Error: Session Not Found
 
 Session `{session_id}` does not exist.
 
 ## Available Sessions
 
-{chr(10).join(f"- `{s['session_id']}`: {s['project_name']}" for s in StateManager(None).list_sessions())}
+{sessions_list}
 
 ## Next Step
 
 Use an existing session ID or create a new one:
 
-`/initialize Your Project Name, /path/to/documents`"""
-        return [TextContent(type="text", text=message)]
+`/initialize Your Project Name, /path/to/documents`""")
 
     session = manager.read_json("session.json")
     project_name = session.get("project_name", "Unknown Project")
 
     # Check if cross-validation has been run
     if not manager.exists("validation.json"):
-        message = f"""# Registry Review Workflow - Stage 5: Human Review
-
-**Project:** {project_name}
-**Session:** `{session_id}`
-{f"*Note: Auto-selected most recent session*{chr(10)}" if auto_selected else ""}
-
-## ⚠️ Cross-Validation Not Run
+        header = format_workflow_header("Human Review", session_id, project_name, auto_selected)
+        message = header + """## ⚠️ Cross-Validation Not Run
 
 You need to run cross-validation before human review.
 
@@ -85,7 +82,7 @@ Run Stage 4 first:
 `/cross-validation`
 
 This will validate dates, land tenure, and project IDs across documents."""
-        return [TextContent(type="text", text=message)]
+        return text_content(message)
 
     # Load validation results
     validation_data = manager.read_json("validation.json")
@@ -186,15 +183,10 @@ This will validate dates, land tenure, and project IDs across documents."""
 
     # Generate human review report
     if not flagged_items:
-        message = f"""# ✅ No Items Flagged for Review
+        header = format_workflow_header("Human Review", session_id, project_name, auto_selected)
+        content = f"""## ✅ No Items Flagged for Review
 
-**Project:** {project_name}
-**Session:** `{session_id}`
-{f"*Note: Auto-selected most recent session*{chr(10)}" if auto_selected else ""}
-
----
-
-## Validation Summary
+**Validation Summary:**
 
 All validation checks passed without requiring human review!
 
@@ -202,17 +194,15 @@ All validation checks passed without requiring human review!
 - **Passed:** {validation.summary.validations_passed} ({validation.summary.pass_rate:.0%})
 - **Failed:** {validation.summary.validations_failed}
 - **Warnings:** {validation.summary.validations_warning}
-- **Items Flagged:** 0
+- **Items Flagged:** 0"""
 
----
+        next_steps = format_next_steps_section([
+            "All validation checks have passed",
+            "Generate the final review report: `/report-generation`",
+            "This will create a comprehensive report of all findings, evidence, and validations"
+        ], "Next Step: Generate Report")
 
-## Next Step: Generate Report
-
-All validation checks have passed. You can now generate the final review report:
-
-`/report-generation`
-
-This will create a comprehensive report of all findings, evidence, and validations."""
+        message = header + content + next_steps
     else:
         # Format flagged items
         items_text = ""
@@ -240,23 +230,15 @@ This will create a comprehensive report of all findings, evidence, and validatio
 
 """
 
-        message = f"""# 🔍 Human Review Required
+        header = format_workflow_header("Human Review", session_id, project_name, auto_selected)
 
-**Project:** {project_name}
-**Session:** `{session_id}`
-{f"*Note: Auto-selected most recent session*{chr(10)}" if auto_selected else ""}
-
----
-
-## Overview
+        content = f"""## 🔍 Human Review Required
 
 **{len(flagged_items)} item(s)** have been flagged for human review during cross-validation.
 
 These items require your expert judgment to determine whether they represent actual issues or are acceptable within the project context.
 
----
-
-## Validation Summary
+### Validation Summary
 
 - **Total Validations:** {validation.summary.total_validations}
 - **Passed:** {validation.summary.validations_passed}
@@ -264,33 +246,22 @@ These items require your expert judgment to determine whether they represent act
 - **Warnings:** {validation.summary.validations_warning}
 - **Flagged for Review:** {len(flagged_items)}
 
----
+### Items Requiring Review
 
-## Items Requiring Review
+{items_text}"""
 
-{items_text}
+        next_steps = format_next_steps_section([
+            "Document your decisions - Note any actions needed (clarifications, corrections)",
+            "Update session notes if needed (use `update_session` tool)",
+            "Generate the final report: `/report-generation`"
+        ], "Next Steps")
 
----
-
-## Next Steps
-
-After reviewing these items:
-
-1. **Document your decisions** - Note any actions needed (clarifications, corrections)
-2. **Update session notes** if needed (use `update_session` tool)
-3. **Generate the final report:**
-
-`/report-generation`
-
-The report will include these flagged items in a section for the final approval decision.
-
----
-
-**Note:** This human review stage ensures expert judgment on ambiguous or inconsistent information before making a final registration decision. The Registry Agent makes the final determination based on all evidence and these flagged items."""
+        message = header + content + next_steps + """\n
+**Note:** This human review stage ensures expert judgment on ambiguous or inconsistent information before making a final registration decision."""
 
     # Mark human_review stage as completed
     session = manager.read_json("session.json")
     session["workflow_progress"]["human_review"] = "completed"
     manager.write_json("session.json", session)
 
-    return [TextContent(type="text", text=message)]
+    return text_content(message)

@@ -1,31 +1,32 @@
 """Integration tests for complete end-to-end workflow.
 
-These tests validate the full 7-stage workflow from initialization through completion,
+These tests validate the full 8-stage workflow from initialization through completion,
 using real examples and ensuring proper state transitions and data flow.
 """
 
 import pytest
-import shutil
 from pathlib import Path
-from datetime import datetime
 
-from registry_review_mcp.tools import (
-    session_tools,
-    document_tools,
-    evidence_tools,
-    validation_tools,
-    report_tools
-)
+from registry_review_mcp.tools import session_tools, mapping_tools
 from registry_review_mcp.prompts import (
     A_initialize as initialize,
     B_document_discovery as document_discovery,
-    C_evidence_extraction as evidence_extraction,
-    D_cross_validation as cross_validation,
-    E_report_generation as report_generation,
-    F_human_review as human_review,
-    G_complete as complete
+    C_requirement_mapping as requirement_mapping,
+    D_evidence_extraction as evidence_extraction,
+    E_cross_validation as cross_validation,
+    F_report_generation as report_generation,
+    G_human_review as human_review,
+    H_completion as completion
 )
 from registry_review_mcp.utils.state import StateManager
+
+# Import factory infrastructure
+from tests.factories import (
+    SessionBuilder,
+    SessionManager,
+    SessionAssertions,
+    path_based_session
+)
 
 
 # Mark all tests in this module as integration tests
@@ -41,30 +42,6 @@ def botany_farm_path():
     return str(path.absolute())
 
 
-@pytest.fixture
-async def cleanup_sessions():
-    """Clean up all test sessions before and after tests."""
-    # Cleanup before
-    sessions = await session_tools.list_sessions()
-    for session in sessions:
-        if session['project_name'].startswith('Test'):
-            try:
-                await session_tools.delete_session(session['session_id'])
-            except:
-                pass
-
-    yield
-
-    # Cleanup after
-    sessions = await session_tools.list_sessions()
-    for session in sessions:
-        if session['project_name'].startswith('Test'):
-            try:
-                await session_tools.delete_session(session['session_id'])
-            except:
-                pass
-
-
 class TestHappyPathEndToEnd:
     """Test complete happy path workflow on Botany Farm example."""
 
@@ -76,11 +53,12 @@ class TestHappyPathEndToEnd:
         This test validates:
         1. Session creation
         2. Document discovery (7 files)
-        3. Evidence extraction (18+ requirements)
-        4. Cross-validation (3+ checks)
-        5. Report generation (Markdown + JSON)
-        6. Human review (flagged items)
-        7. Completion (finalization)
+        3. Requirement mapping (document-to-requirement matching)
+        4. Evidence extraction (18+ requirements)
+        5. Cross-validation (3+ checks)
+        6. Report generation (Markdown + JSON)
+        7. Human review (flagged items)
+        8. Completion (finalization)
         """
 
         # Stage 1: Initialize
@@ -94,84 +72,81 @@ class TestHappyPathEndToEnd:
         response_text = result[0].text
         assert "Session ID:" in response_text
         session_id = response_text.split("Session ID:")[1].split("`")[1]
-
         print(f"✓ Session created: {session_id}")
 
-        # Verify session exists
+        # Verify session state
+        await SessionAssertions.assert_session_status(session_id, "initialized")
+        await SessionAssertions.assert_workflow_stage_completed(session_id, "initialize")
         session = await session_tools.load_session(session_id)
-        assert session["status"] == "initialized"
         assert session["project_metadata"]["project_name"] == "Test Botany Farm E2E"
-        assert session["workflow_progress"]["initialize"] == "completed"
 
         # Stage 2: Document Discovery
         print("\n=== Stage 2: Document Discovery ===")
-        result = await document_discovery.document_discovery_prompt(
-            session_id=session_id
-        )
-
+        result = await document_discovery.document_discovery_prompt(session_id=session_id)
         response_text = result[0].text
         assert "Discovery Complete" in response_text or "documents found" in response_text
 
-        # Verify documents were discovered
+        # Verify documents discovered
         manager = StateManager(session_id)
         documents_data = manager.read_json("documents.json")
-        documents = documents_data.get("documents", documents_data)  # Handle both formats
-
+        documents = documents_data.get("documents", documents_data)
         print(f"✓ Documents discovered: {len(documents)}")
-        assert len(documents) >= 4  # Botany Farm has 7 documents
+        assert len(documents) >= 4
 
         # Verify classification
         doc_types = [doc["classification"] for doc in documents]
         assert "project_plan" in doc_types or "project-plan" in doc_types
 
-        # Stage 3: Evidence Extraction
-        print("\n=== Stage 3: Evidence Extraction ===")
-        result = await evidence_extraction.evidence_extraction(session_id)
+        # Stage 3: Requirement Mapping
+        print("\n=== Stage 3: Requirement Mapping ===")
+        result = await requirement_mapping.requirement_mapping_prompt(session_id)
+        response_text = result[0].text
+        assert "Mapping Complete" in response_text or "requirements mapped" in response_text
 
-        # Parse results
+        # Verify mappings created
+        mappings_data = manager.read_json("mappings.json")
+        mapped_count = mappings_data.get("mapped_count", 0)
+        total_requirements = mappings_data.get("total_requirements", 0)
+        print(f"✓ Requirements mapped: {mapped_count}/{total_requirements}")
+        assert mapped_count > 0, "At least some requirements should be mapped"
+
+        # Stage 4: Evidence Extraction
+        print("\n=== Stage 4: Evidence Extraction ===")
+        result = await evidence_extraction.evidence_extraction(session_id)
         response_text = result if isinstance(result, str) else result[0].text
         assert "Evidence Extraction Complete" in response_text or "Coverage Summary" in response_text
 
-        # Verify evidence was extracted
+        # Verify evidence extracted
         evidence_data = manager.read_json("evidence.json")
-
         requirements_covered = evidence_data.get("requirements_covered", 0)
         requirements_total = evidence_data.get("requirements_total", 0)
-
         print(f"✓ Evidence extracted: {requirements_covered}/{requirements_total} requirements")
-
-        # Should cover at least some requirements (without LLM, coverage will be lower)
         coverage_rate = requirements_covered / requirements_total if requirements_total > 0 else 0
-        assert coverage_rate >= 0.30  # At least 30% coverage (realistic without LLM calls)
+        assert coverage_rate >= 0.30
 
-        # Stage 4: Cross-Validation
-        print("\n=== Stage 4: Cross-Validation ===")
+        # Stage 5: Cross-Validation
+        print("\n=== Stage 5: Cross-Validation ===")
         result = await cross_validation.cross_validation_prompt(session_id)
-
         response_text = result[0].text
         assert ("Validation Complete" in response_text or
                 "Validation Results" in response_text or
                 "CROSS-VALIDATION RESULTS" in response_text)
 
-        # Verify validation was run
+        # Verify validation ran
         validation_data = manager.read_json("validation.json")
-
         total_validations = validation_data.get("summary", {}).get("total_validations", 0)
         print(f"✓ Validation complete: {total_validations} checks run")
+        assert total_validations >= 1
 
-        assert total_validations >= 1  # Should run at least one validation
-
-        # Stage 5: Report Generation
-        print("\n=== Stage 5: Report Generation ===")
+        # Stage 6: Report Generation
+        print("\n=== Stage 6: Report Generation ===")
         result = await report_generation.report_generation_prompt(session_id)
-
         response_text = result[0].text
         assert "Report Generated" in response_text or "report.md" in response_text
 
         # Verify reports exist
         report_md_path = manager.session_dir / "report.md"
         report_json_path = manager.session_dir / "report.json"
-
         assert report_md_path.exists(), "Markdown report should be generated"
         assert report_json_path.exists(), "JSON report should be generated"
 
@@ -179,276 +154,195 @@ class TestHappyPathEndToEnd:
         report_md = report_md_path.read_text()
         assert "Test Botany Farm E2E" in report_md
         assert "Evidence Extraction Results" in report_md or "Requirements" in report_md
-
         print(f"✓ Reports generated: {report_md_path.name}, {report_json_path.name}")
 
-        # Stage 6: Human Review
-        print("\n=== Stage 6: Human Review ===")
+        # Stage 7: Human Review
+        print("\n=== Stage 7: Human Review ===")
         result = await human_review.human_review_prompt(session_id)
-
         response_text = result[0].text
-        # Either has flagged items or shows "No Items Flagged"
         assert ("Human Review" in response_text or
                 "No Items Flagged" in response_text or
                 "Items Requiring Review" in response_text)
-
         print("✓ Human review stage accessible")
 
-        # Stage 7: Complete
-        print("\n=== Stage 7: Complete ===")
-        result = await complete.complete_prompt(session_id)
-
+        # Stage 8: Completion
+        print("\n=== Stage 8: Completion ===")
+        result = await completion.completion_prompt(session_id)
         response_text = result[0].text
         assert "Registry Review Complete" in response_text or "Complete" in response_text
         assert "Assessment" in response_text
 
         # Verify session marked as completed
-        session = await session_tools.load_session(session_id)
-        assert session["status"] == "completed"
-        assert session["workflow_progress"]["complete"] == "completed"
-
+        await SessionAssertions.assert_session_status(session_id, "completed")
+        await SessionAssertions.assert_workflow_stage_completed(session_id, "completion")
         print("✓ Review completed successfully")
 
-        # Final verification: All 7 stages completed
+        # Final verification: All 8 stages completed
+        session = await session_tools.load_session(session_id)
         workflow = session["workflow_progress"]
         completed_stages = sum(1 for status in workflow.values() if status == "completed")
 
         print(f"\n=== Workflow Summary ===")
-        print(f"Stages completed: {completed_stages}/7")
+        print(f"Stages completed: {completed_stages}/8")
         print(f"Workflow details: {workflow}")
         print(f"Documents found: {len(documents)}")
+        print(f"Requirements mapped: {mapped_count}/{total_requirements}")
         print(f"Requirements covered: {requirements_covered}/{requirements_total} ({coverage_rate:.1%})")
         print(f"Validations run: {total_validations}")
 
-        # Should complete all 7 stages
-        assert completed_stages == 7, f"Expected 7 stages completed, got {completed_stages}. Workflow: {workflow}"
-
+        assert completed_stages == 8, f"Expected 8 stages completed, got {completed_stages}. Workflow: {workflow}"
         print("\n✅ Full E2E workflow test PASSED")
 
 
+@pytest.mark.usefixtures("cleanup_examples_sessions")
 class TestStateTransitions:
     """Test workflow state transitions and preconditions."""
 
     @pytest.mark.asyncio
-    async def test_cannot_skip_stages(self, botany_farm_path, cleanup_sessions):
+    async def test_cannot_skip_stages(self, botany_farm_path):
         """Verify stages must be executed in order."""
+        async with SessionManager() as manager:
+            session_id = await manager.create(
+                path_based_session(botany_farm_path, "Test Stage Order")
+            )
 
-        # Create session
-        session = await session_tools.create_session(
-            "Test Stage Order",
-            botany_farm_path,
-            "soil-carbon-v1.2.2"
-        )
-        session_id = session["session_id"]
+            # Try to run requirement mapping without discovery
+            result = await requirement_mapping.requirement_mapping_prompt(session_id)
+            response_text = result if isinstance(result, str) else result[0].text
 
-        # Try to run evidence extraction without discovery
-        result = await evidence_extraction.evidence_extraction(session_id)
-        response_text = result if isinstance(result, str) else result[0].text
+            # Should get error or guidance to run discovery first
+            assert ("discovery" in response_text.lower() or
+                    "documents" in response_text.lower() or
+                    "stage 2" in response_text.lower())
+            print("✓ Cannot skip discovery stage")
 
-        # Should get error or guidance to run discovery first
-        assert ("discovery" in response_text.lower() or
-                "documents" in response_text.lower() or
-                "stage 2" in response_text.lower())
+            # Run discovery
+            await document_discovery.document_discovery_prompt(session_id=session_id)
 
-        print("✓ Cannot skip discovery stage")
+            # Try to run evidence extraction without mapping
+            with pytest.raises(ValueError) as exc_info:
+                await evidence_extraction.evidence_extraction(session_id)
+
+            # Should get error about mapping not complete
+            assert "mapping" in str(exc_info.value).lower()
+            print("✓ Cannot skip requirement mapping stage")
 
     @pytest.mark.asyncio
-    async def test_idempotent_stages(self, botany_farm_path, cleanup_sessions):
+    async def test_idempotent_stages(self, botany_farm_path):
         """Verify stages can be re-run safely."""
+        async with SessionManager() as manager:
+            session_id = await manager.create(
+                path_based_session(botany_farm_path, "Test Idempotency")
+            )
 
-        # Create session and run discovery
-        session = await session_tools.create_session(
-            "Test Idempotency",
-            botany_farm_path,
-            "soil-carbon-v1.2.2"
-        )
-        session_id = session["session_id"]
+            # Run discovery twice
+            result1 = await document_discovery.document_discovery_prompt(session_id=session_id)
+            result2 = await document_discovery.document_discovery_prompt(session_id=session_id)
 
-        # Run discovery twice
-        result1 = await document_discovery.document_discovery_prompt(session_id=session_id)
-        result2 = await document_discovery.document_discovery_prompt(session_id=session_id)
+            # Both should succeed
+            assert result1[0].text
+            assert result2[0].text
 
-        # Both should succeed
-        assert result1[0].text
-        assert result2[0].text
-
-        # Should produce same results
-        manager = StateManager(session_id)
-        documents_data = manager.read_json("documents.json")
-        documents = documents_data.get("documents", documents_data)  # Handle both formats
-
-        assert len(documents) >= 4  # Botany Farm has 7 documents
-
-        print("✓ Discovery is idempotent")
+            # Should produce same results
+            manager_state = StateManager(session_id)
+            documents_data = manager_state.read_json("documents.json")
+            documents = documents_data.get("documents", documents_data)
+            assert len(documents) >= 4
+            print("✓ Discovery is idempotent")
 
     @pytest.mark.asyncio
-    async def test_session_resumption(self, botany_farm_path, cleanup_sessions):
+    async def test_session_resumption(self, botany_farm_path):
         """Verify can resume interrupted workflow."""
+        async with SessionManager() as manager:
+            session_id = await manager.create(
+                path_based_session(botany_farm_path, "Test Resumption")
+            )
 
-        # Create session and run discovery
-        session = await session_tools.create_session(
-            "Test Resumption",
-            botany_farm_path,
-            "soil-carbon-v1.2.2"
-        )
-        session_id = session["session_id"]
+            await document_discovery.document_discovery_prompt(session_id=session_id)
 
-        await document_discovery.document_discovery_prompt(session_id=session_id)
+            # Simulate interruption (reload session)
+            session = await session_tools.load_session(session_id)
+            assert session is not None
 
-        # Simulate interruption (no action, just reload)
-        session = await session_tools.load_session(session_id)
-
-        # Should be able to continue with evidence extraction
-        result = await evidence_extraction.evidence_extraction(session_id)
-
-        # Should succeed
-        response_text = result if isinstance(result, str) else result[0].text
-        assert "Evidence" in response_text or "Coverage" in response_text
-
-        print("✓ Can resume after interruption")
+            # Should be able to continue with requirement mapping
+            result = await requirement_mapping.requirement_mapping_prompt(session_id)
+            response_text = result[0].text
+            assert "Mapping" in response_text or "requirements" in response_text
+            print("✓ Can resume after interruption")
 
 
+@pytest.mark.usefixtures("cleanup_sessions")
 class TestErrorRecovery:
     """Test error handling and recovery scenarios."""
 
     @pytest.mark.asyncio
-    async def test_missing_documents_path(self, cleanup_sessions):
+    async def test_missing_documents_path(self):
         """Test handling of non-existent documents path."""
-
         with pytest.raises(Exception) as exc_info:
-            await session_tools.create_session(
-                "Test Missing Path",
-                "/nonexistent/path/to/nowhere",
-                "soil-carbon-v1.2.2"
-            )
+            await SessionBuilder() \
+                .with_project_name("Test Missing Path") \
+                .with_documents_path("/nonexistent/path/to/nowhere") \
+                .create()
 
         # Should raise validation error about path not existing
         assert "not exist" in str(exc_info.value).lower() or "path" in str(exc_info.value).lower()
-
         print("✓ Handles missing documents path")
 
     @pytest.mark.skip(reason="Duplicate detection works in production but test needs refactoring - see issue #TBD")
     @pytest.mark.asyncio
     async def test_duplicate_session_detection(self, botany_farm_path):
         """Test duplicate session detection and warning."""
-        from src.registry_review_mcp.config.settings import settings
-        from src.registry_review_mcp.tools import session_tools
-        import shutil
-        import json
-
-        sessions_dir = settings.sessions_dir
-
-        # Clean up any existing sessions for botany farm path BEFORE test
-        if sessions_dir.exists():
-            for session_dir in list(sessions_dir.iterdir()):
-                if session_dir.is_dir() and (session_dir / "session.json").exists():
-                    try:
-                        with open(session_dir / "session.json") as f:
-                            data = json.load(f)
-                            session_path = data.get("project_metadata", {}).get("documents_path", "")
-                            if session_path and str(botany_farm_path) in session_path:
-                                shutil.rmtree(session_dir, ignore_errors=True)
-                    except Exception:
-                        pass
-
-        # Create first session using the tool directly (more reliable)
-        session1 = await session_tools.create_session(
-            project_name="Test Duplicate Detection",
-            documents_path=str(botany_farm_path),
-            methodology="soil-carbon-v1.2.2"
-        )
-        session_id1 = session1["session_id"]
-
-        try:
-            # Try to create duplicate via prompt (should detect existing)
-            result2 = await initialize.initialize_prompt(
-                "Test Duplicate Detection",
-                str(botany_farm_path)
-            )
-
-            # Should show warning about existing session
-            response_text = result2[0].text
-            assert "Session Already Exists for This Directory" in response_text, \
-                f"Expected duplicate warning but got: {response_text[:200]}"
-
-            # Try with different name - should still detect as duplicate
-            result3 = await initialize.initialize_prompt(
-                "Different Name",
-                str(botany_farm_path)
-            )
-
-            response_text3 = result3[0].text
-            assert "Session Already Exists for This Directory" in response_text3
-            assert "One Directory = One Session" in response_text3
-            assert 'You provided the name "Different Name"' in response_text3
-
-            # Should offer continue/resume option
-            assert ("Continue" in response_text or
-                    "Resume" in response_text or "resume" in response_text)
-
-            print("✓ Duplicate session detection works")
-
-        finally:
-            # Cleanup: Delete the session we created
-            if session_id1 and sessions_dir.exists():
-                session_path = sessions_dir / session_id1
-                if session_path.exists():
-                    shutil.rmtree(session_path, ignore_errors=True)
+        # This test is skipped because duplicate detection logic needs refactoring
+        # It works in production but the test fixture interaction needs improvement
+        pass
 
     @pytest.mark.asyncio
-    async def test_corrupted_session_handling(self, botany_farm_path, cleanup_sessions):
+    async def test_corrupted_session_handling(self, botany_farm_path):
         """Test handling of corrupted session state."""
+        async with SessionManager() as manager:
+            session_id = await manager.create(
+                path_based_session(botany_farm_path, "Test Corruption")
+            )
 
-        # Create session
-        session = await session_tools.create_session(
-            "Test Corruption",
-            botany_farm_path,
-            "soil-carbon-v1.2.2"
-        )
-        session_id = session["session_id"]
+            # Corrupt session file
+            state_manager = StateManager(session_id)
+            session_file = state_manager.session_dir / "session.json"
+            session_file.write_text("{ invalid json }")
 
-        # Corrupt session file
-        manager = StateManager(session_id)
-        session_file = manager.session_dir / "session.json"
-        session_file.write_text("{ invalid json }")
-
-        # Try to load
-        with pytest.raises(Exception):
-            await session_tools.load_session(session_id)
-
-        print("✓ Detects corrupted session")
+            # Try to load - should raise exception
+            with pytest.raises(Exception):
+                await session_tools.load_session(session_id)
+            print("✓ Detects corrupted session")
 
 
+@pytest.mark.usefixtures("cleanup_examples_sessions")
 class TestPerformance:
     """Test performance and scalability."""
 
     @pytest.mark.asyncio
     @pytest.mark.slow
-    async def test_workflow_performance(self, botany_farm_path, cleanup_sessions):
+    async def test_workflow_performance(self, botany_farm_path):
         """Test that workflow completes in reasonable time."""
         import time
 
-        start_time = time.time()
+        async with SessionManager() as manager:
+            start_time = time.time()
 
-        # Run full workflow (without LLM extraction to keep test fast)
-        session = await session_tools.create_session(
-            "Test Performance",
-            botany_farm_path,
-            "soil-carbon-v1.2.2"
-        )
-        session_id = session["session_id"]
+            session_id = await manager.create(
+                path_based_session(botany_farm_path, "Test Performance")
+            )
 
-        # Discovery should be fast
-        discovery_start = time.time()
-        await document_discovery.document_discovery_prompt(session_id=session_id)
-        discovery_time = time.time() - discovery_start
+            # Discovery should be fast
+            discovery_start = time.time()
+            await document_discovery.document_discovery_prompt(session_id=session_id)
+            discovery_time = time.time() - discovery_start
 
-        assert discovery_time < 10, f"Discovery took {discovery_time:.1f}s, should be <10s"
+            assert discovery_time < 10, f"Discovery took {discovery_time:.1f}s, should be <10s"
 
-        total_time = time.time() - start_time
-        print(f"\n✓ Performance acceptable:")
-        print(f"  Discovery: {discovery_time:.1f}s")
-        print(f"  Total: {total_time:.1f}s")
+            total_time = time.time() - start_time
+            print(f"\n✓ Performance acceptable:")
+            print(f"  Discovery: {discovery_time:.1f}s")
+            print(f"  Total: {total_time:.1f}s")
 
 
 @pytest.mark.asyncio
@@ -461,10 +355,10 @@ async def test_integration_suite_health():
 # Test execution summary
 if __name__ == "__main__":
     print("=" * 80)
-    print("Registry Review MCP - Integration Test Suite")
+    print("Registry Review MCP - Integration Test Suite (8-Stage Workflow)")
     print("=" * 80)
     print("\nTests included:")
-    print("  1. Happy Path E2E (full workflow on Botany Farm)")
+    print("  1. Happy Path E2E (full 8-stage workflow on Botany Farm)")
     print("  2. State Transitions (stage ordering, idempotency, resumption)")
     print("  3. Error Recovery (missing paths, duplicates, corruption)")
     print("  4. Performance (timing targets)")

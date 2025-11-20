@@ -12,7 +12,7 @@ from ..models.schemas import (
     SessionStatistics,
     WorkflowProgress,
 )
-from ..utils.state import StateManager
+from ..utils.state import StateManager, get_session_or_raise
 
 
 def generate_session_id() -> str:
@@ -90,14 +90,7 @@ async def create_session(
 async def load_session(session_id: str) -> dict[str, Any]:
     """Load an existing session.
     """
-    state_manager = StateManager(session_id)
-
-    if not state_manager.exists():
-        raise SessionNotFoundError(
-            f"Session not found: {session_id}",
-            details={"session_id": session_id},
-        )
-
+    state_manager = get_session_or_raise(session_id)
     session_data = state_manager.read_json("session.json")
     return session_data
 
@@ -108,13 +101,7 @@ async def update_session_state(
 ) -> dict[str, Any]:
     """Update session state with partial changes.
     """
-    state_manager = StateManager(session_id)
-
-    if not state_manager.exists():
-        raise SessionNotFoundError(
-            f"Session not found: {session_id}",
-            details={"session_id": session_id},
-        )
+    state_manager = get_session_or_raise(session_id)
 
     # Add updated timestamp
     updates["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -143,6 +130,7 @@ async def list_sessions() -> list[dict[str, Any]]:
                             "project_name"
                         ),
                         "created_at": session_data.get("created_at"),
+                        "updated_at": session_data.get("updated_at"),
                         "status": session_data.get("status"),
                         "methodology": session_data.get("project_metadata", {}).get("methodology"),
                         "workflow_progress": session_data.get("workflow_progress", {}),
@@ -165,13 +153,7 @@ async def delete_session(session_id: str) -> dict[str, Any]:
     """
     import shutil
 
-    state_manager = StateManager(session_id)
-
-    if not state_manager.exists():
-        raise SessionNotFoundError(
-            f"Session not found: {session_id}",
-            details={"session_id": session_id},
-        )
+    state_manager = get_session_or_raise(session_id)
 
     # Remove entire session directory
     shutil.rmtree(state_manager.session_dir)

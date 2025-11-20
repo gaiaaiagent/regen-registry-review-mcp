@@ -189,3 +189,24 @@ class StateManager:
             for f in self.session_dir.iterdir()
             if f.is_file() and not f.name.startswith(".")
         ]
+
+
+def get_session_or_raise(session_id: str) -> StateManager:
+    """Get StateManager for session, raising SessionNotFoundError if not found.
+
+    Args:
+        session_id: Session identifier
+
+    Returns:
+        StateManager instance for the session
+
+    Raises:
+        SessionNotFoundError: If session does not exist
+    """
+    state_manager = StateManager(session_id)
+    if not state_manager.exists():
+        raise SessionNotFoundError(
+            f"Session not found: {session_id}",
+            details={"session_id": session_id},
+        )
+    return state_manager

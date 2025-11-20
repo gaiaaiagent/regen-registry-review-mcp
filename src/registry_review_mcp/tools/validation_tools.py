@@ -1,13 +1,13 @@
 """Cross-document validation tools."""
 
 import re
-import uuid
 from datetime import datetime, UTC
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
 
 from ..config.settings import settings
+from ..utils.tool_helpers import generate_validation_id
 from ..models.validation import (
     DateField,
     DateAlignmentValidation,
@@ -18,7 +18,7 @@ from ..models.validation import (
     ValidationSummary,
     ValidationResult,
 )
-from ..utils.state import StateManager
+from ..utils.state import StateManager, get_session_or_raise
 
 
 async def validate_date_alignment(
@@ -66,7 +66,7 @@ async def validate_date_alignment(
 
     # Create validation result
     validation = DateAlignmentValidation(
-        validation_id=f"VAL-DATE-{uuid.uuid4().hex[:8]}",
+        validation_id=generate_validation_id("date_alignment"),
         validation_type="date_alignment",
         date1=DateField(
             field_name=field1_name,
@@ -203,7 +203,7 @@ async def validate_land_tenure(
         flagged = True
 
     validation = LandTenureValidation(
-        validation_id=f"VAL-TENURE-{uuid.uuid4().hex[:8]}",
+        validation_id=generate_validation_id("land_tenure"),
         validation_type="land_tenure",
         fields=tenure_fields,
         owner_name_match=owner_name_match,
@@ -303,7 +303,7 @@ async def validate_project_id(
         flagged = True
 
     validation = ProjectIDValidation(
-        validation_id=f"VAL-PID-{uuid.uuid4().hex[:8]}",
+        validation_id=generate_validation_id("project_id"),
         validation_type="project_id",
         expected_pattern=expected_pattern,
         found_ids=found_ids,

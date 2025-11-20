@@ -1,0 +1,30 @@
+# Development assets
+examples/
+docs/archive/
+.claude/skills/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Development tools
+.venv/
+.env
+*.log
+
+# Test artifacts
+htmlcov/
+.coverage
+.hypothesis/
+
+# IDE
+.vscode/
+.idea/
+
+# Data directories
+data/sessions/
+data/cache/

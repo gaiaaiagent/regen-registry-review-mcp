@@ -1,7 +1,8 @@
 """Validation result data models."""
 
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import Field
+from .base import BaseModel, ConfidenceScore
 
 
 class DateField(BaseModel):
@@ -11,7 +12,7 @@ class DateField(BaseModel):
     value: datetime
     source: str  # "DOC-123, Page 5"
     document_id: str
-    confidence: float = Field(..., ge=0.0, le=1.0)
+    confidence: ConfidenceScore
 
 
 class DateAlignmentValidation(BaseModel):
@@ -36,7 +37,7 @@ class LandTenureField(BaseModel):
     tenure_type: str | None = None  # "lease", "ownership", "easement"
     source: str  # "DOC-123, Page 8"
     document_id: str
-    confidence: float = Field(..., ge=0.0, le=1.0)
+    confidence: ConfidenceScore
 
 
 class LandTenureValidation(BaseModel):

@@ -12,7 +12,7 @@ from ..models.report import (
     ReportSummary,
     ReviewReport,
 )
-from ..utils.state import StateManager
+from ..utils.state import StateManager, get_session_or_raise
 
 
 async def generate_review_report(

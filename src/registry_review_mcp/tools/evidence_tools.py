@@ -13,7 +13,7 @@ from ..models.evidence import (
     StructuredField,
 )
 from ..models.errors import SessionNotFoundError, DocumentExtractionError
-from ..utils.state import StateManager
+from ..utils.state import StateManager, get_session_or_raise
 
 
 # Stop words to filter out from keyword extraction
@@ -60,7 +60,11 @@ def extract_keywords(requirement: dict[str, Any]) -> list[str]:
 
 
 async def get_markdown_content(document: dict[str, Any], session_id: str) -> str | None:
-    """Get markdown content for a document.
+    """Get markdown content for a document, converting lazily if needed.
+
+    This implements lazy PDF→markdown conversion during evidence extraction (Stage 5)
+    rather than eagerly during discovery (Stage 2). Only converts PDFs when actually
+    needed for evidence extraction.
     """
     # First: Check if document has markdown_path from discovery
     if document.get("has_markdown") and document.get("markdown_path"):
@@ -83,6 +87,25 @@ async def get_markdown_content(document: dict[str, Any], session_id: str) -> str
     md_path_alt = pdf_path.with_suffix(".md")
     if md_path_alt.exists():
         return md_path_alt.read_text(encoding="utf-8")
+
+    # Lazy conversion: If no markdown exists and this is a PDF, convert it now
+    # This only happens during evidence extraction when content is actually needed
+    if document["filepath"].lower().endswith(".pdf"):
+        try:
+            from ..extractors.marker_extractor import convert_pdf_to_markdown
+
+            # Convert PDF to markdown on-demand
+            markdown_result = await convert_pdf_to_markdown(document["filepath"])
+
+            # Cache the markdown next to the PDF for future use
+            md_cache_path = pdf_path.with_suffix('.md')
+            md_cache_path.write_text(markdown_result["markdown"], encoding="utf-8")
+
+            return markdown_result["markdown"]
+        except Exception as e:
+            # If conversion fails, return None and let caller handle it
+            print(f"⚠️  Lazy markdown conversion failed for {pdf_path.name}: {e}")
+            return None
 
     return None
 
@@ -175,6 +198,11 @@ async def extract_evidence_snippets(
             words_match = content[start_pos:end_pos].split()
 
             snippet_text = ' '.join(words_before + words_match + words_after)
+
+            # Truncate to fit within EvidenceSnippet max_length (5000 chars)
+            # This can happen with tables or very long markdown content
+            if len(snippet_text) > 5000:
+                snippet_text = snippet_text[:4997] + "..."
 
             # Extract page and section
             text_before = content[:start_pos]
@@ -302,9 +330,33 @@ async def map_requirement(
 
 
 async def extract_all_evidence(session_id: str) -> dict[str, Any]:
-    """Extract evidence for all requirements.
+    """Extract evidence for all requirements from mapped documents.
+
+    This is Stage 4 of the workflow. It requires that Stage 3 (Requirement Mapping)
+    has been completed first. Evidence is only extracted from documents that have been
+    mapped to requirements.
     """
     state_manager = StateManager(session_id)
+
+    # Check that requirement mapping was completed (Stage 3)
+    session_data = state_manager.read_json("session.json")
+    workflow_progress = session_data.get("workflow_progress", {})
+
+    if workflow_progress.get("requirement_mapping") != "completed":
+        raise ValueError(
+            "Requirement mapping not complete. Run Stage 3 first: /C-requirement-mapping\n\n"
+            "Evidence extraction requires mapped documents. You must complete requirement "
+            "mapping before extracting evidence."
+        )
+
+    # Load mappings from Stage 3
+    if not state_manager.exists("mappings.json"):
+        raise FileNotFoundError(
+            "mappings.json not found. Run Stage 3 first: /C-requirement-mapping"
+        )
+
+    mappings_data = state_manager.read_json("mappings.json")
+    mappings = {m["requirement_id"]: m for m in mappings_data.get("mappings", [])}
 
     # Load checklist
     checklist_path = settings.get_checklist_path("soil-carbon-v1.2.2")
@@ -314,23 +366,43 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
     requirements = checklist_data.get("requirements", [])
 
     total_requirements = len(requirements)
-    print(f"📋 Extracting evidence for {total_requirements} requirements", flush=True)
+    mapped_count = sum(1 for m in mappings.values() if m.get("mapped_documents"))
+    print(f"📋 Extracting evidence for {total_requirements} requirements ({mapped_count} mapped)", flush=True)
 
     # Extract evidence for each requirement with progress
     all_evidence = []
     for i, requirement in enumerate(requirements, 1):
         requirement_id = requirement["requirement_id"]
+        mapping = mappings.get(requirement_id)
 
         # Show progress every 5 requirements or on first/last
         if i % 5 == 0 or i == 1 or i == total_requirements:
             percentage = (i / total_requirements * 100)
             print(f"  ⏳ Processing {i}/{total_requirements} ({percentage:.0f}%): {requirement_id}", flush=True)
 
+        # Skip unmapped requirements - mark as missing
+        if not mapping or not mapping.get("mapped_documents"):
+            print(f"  ⏭️  Skipping unmapped: {requirement_id}", flush=True)
+            all_evidence.append(RequirementEvidence(
+                requirement_id=requirement_id,
+                requirement_text=requirement.get("requirement_text", ""),
+                category=requirement.get("category", ""),
+                status="missing",
+                confidence=0.0,
+                mapped_documents=[],
+                evidence_snippets=[],
+                notes="No documents mapped to this requirement in Stage 3"
+            ))
+            continue
+
+        # Extract evidence only from mapped documents
         try:
             evidence = await map_requirement(session_id, requirement_id)
             all_evidence.append(RequirementEvidence(**evidence))
         except Exception as e:
             # Create a flagged entry for failed requirements
+            # Note: mapped_documents should be empty list for error cases
+            # since we can't construct MappedDocument objects without full document data
             print(f"⚠️  Warning: Failed to extract {requirement_id}: {e}", flush=True)
             all_evidence.append(RequirementEvidence(
                 requirement_id=requirement_id,
@@ -338,7 +410,7 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
                 category=requirement.get("category", ""),
                 status="flagged",
                 confidence=0.0,
-                mapped_documents=[],
+                mapped_documents=[],  # Can't include partial data - let map_requirement handle it
                 evidence_snippets=[],
                 notes=f"Error during extraction: {str(e)}"
             ))

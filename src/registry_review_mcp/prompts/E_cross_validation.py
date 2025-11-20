@@ -1,4 +1,4 @@
-"""Cross-validation workflow prompt."""
+"""Cross-validation workflow - Stage 5 of registry review."""
 
 from mcp.types import TextContent
 
@@ -6,11 +6,16 @@ from ..config.settings import settings
 from ..tools import validation_tools, session_tools
 from ..utils.state import StateManager
 from ..models.errors import SessionNotFoundError
+from .helpers import (
+    text_content,
+    format_error,
+    format_workflow_header,
+    format_next_steps_section,
+)
 
 
 async def cross_validation_prompt(session_id: str | None = None) -> list[TextContent]:
-    """
-    Execute cross-document validation workflow.
+    """Execute cross-document validation workflow.
 
     This prompt orchestrates all validation checks:
     1. Loads session and evidence data
@@ -31,9 +36,7 @@ async def cross_validation_prompt(session_id: str | None = None) -> list[TextCon
     if not session_id:
         sessions = await session_tools.list_sessions()
         if not sessions:
-            return [TextContent(
-                type="text",
-                text="""# Cross-Validation Workflow
+            return text_content("""# Cross-Validation Workflow
 
 No review sessions found. To run cross-validation, you need to:
 
@@ -49,12 +52,9 @@ No review sessions found. To run cross-validation, you need to:
 ```
 
 The workflow will guide you through each step.
-"""
-            )]
-        # Use most recent session
+""")
         session_id = sessions[0]["session_id"]
         auto_selected = True
-        print(f"Auto-selected most recent session: {session_id}")
 
     # Verify session exists
     try:
@@ -62,23 +62,16 @@ The workflow will guide you through each step.
     except SessionNotFoundError:
         sessions = await session_tools.list_sessions()
         session_list = "\n".join([f"- {s['session_id']} ({s['project_name']})" for s in sessions])
-        return [TextContent(
-            type="text",
-            text=f"""Session '{session_id}' not found.
-
-Available sessions:
-{session_list}
-
-Use one of the above session IDs or create a new session.
-"""
-        )]
+        return format_error(
+            "Session Not Found",
+            f"Session '{session_id}' not found.\n\nAvailable sessions:\n{session_list}",
+            "Use one of the above session IDs or create a new session."
+        )
 
     # Check prerequisites
     workflow = session.get("workflow_progress", {})
     if workflow.get("evidence_extraction") != "completed":
-        return [TextContent(
-            type="text",
-            text=f"""Evidence extraction has not been completed for session {session_id}.
+        return text_content(f"""Evidence extraction has not been completed for session {session_id}.
 
 Please run evidence extraction first:
 ```
@@ -86,88 +79,73 @@ Please run evidence extraction first:
 ```
 
 Then return here for cross-validation.
-"""
-        )]
+""")
 
     # Extract project info
     project_metadata = session.get('project_metadata', {})
     project_name = project_metadata.get('project_name', 'Unknown')
 
-    print(f"\n{'='*80}")
-    print(f"Cross-Document Validation for: {project_name}")
-    print(f"Session: {session_id}")
-    print(f"{'='*80}\n")
-
-    # Load evidence data
+    # Load evidence data and run validation
     state_manager = StateManager(session_id)
-    evidence_data = state_manager.read_json("evidence.json")
 
-    # Run cross-validation (use LLM-native if enabled)
     if settings.use_llm_native_extraction:
-        print("🤖 Using LLM-native unified validation...")
         from ..tools import analyze_llm
         validation_results = await analyze_llm.cross_validate_llm(session_id)
     else:
-        print("Running cross-document validation checks...")
         validation_results = await validation_tools.cross_validate(session_id)
-
-    # TODO: In future, extract actual validation fields from evidence
-    # For now, validation checks return placeholder data
-
-    # Format results
-    report = []
-    report.append(f"\n{'='*80}")
-    report.append("CROSS-VALIDATION RESULTS")
-    report.append(f"{'='*80}\n")
-
-    # Add auto-selection notice if applicable
-    if auto_selected:
-        report.append(f"*Note: Auto-selected most recent session*\n")
 
     summary = validation_results["summary"]
 
-    report.append("📊 Validation Summary:")
-    report.append(f"  Total Checks: {summary['total_validations']}")
+    # Build header
+    header = format_workflow_header("Cross-Validation", session_id, project_name, auto_selected)
+
+    # Build validation summary
+    content = ["## ✅ Cross-Validation Complete\n"]
+
+    content.append("**Validation Summary:**")
+    content.append(f"- Total Checks: {summary['total_validations']}")
 
     if summary['total_validations'] > 0:
-        report.append(f"  ✅ Passed: {summary['validations_passed']} ({summary['validations_passed']/summary['total_validations']*100:.1f}%)")
-        report.append(f"  ⚠️  Warnings: {summary['validations_warning']} ({summary['validations_warning']/summary['total_validations']*100:.1f}%)")
-        report.append(f"  ❌ Failed: {summary['validations_failed']} ({summary['validations_failed']/summary['total_validations']*100:.1f}%)")
+        total = summary['total_validations']
+        passed = summary.get('passed', summary.get('validations_passed', 0))
+        warnings = summary.get('warnings', summary.get('validations_warning', 0))
+        failed = summary.get('failed', summary.get('validations_failed', 0))
+        content.append(f"- ✅ Passed: {passed} ({passed/total*100:.1f}%)")
+        content.append(f"- ⚠️  Warnings: {warnings} ({warnings/total*100:.1f}%)")
+        content.append(f"- ❌ Failed: {failed} ({failed/total*100:.1f}%)")
     else:
-        report.append("  No validation checks performed yet.")
-        report.append("  (Validation checks will be added as features are implemented)")
+        content.append("- No validation checks performed yet.")
+        content.append("- (Validation checks will be added as features are implemented)")
 
-    report.append("")
+    content.append("")
 
-    # Date alignment checks
+    # Detailed checks
     if validation_results.get("date_alignments"):
-        report.append("## Date Alignment Checks")
+        content.append("### Date Alignment Checks")
         for val in validation_results["date_alignments"]:
             status_icon = {"pass": "✅", "warning": "⚠️", "fail": "❌"}.get(val["status"], "❓")
-            report.append(f"{status_icon} {val['message']}")
-        report.append("")
+            content.append(f"{status_icon} {val['message']}")
+        content.append("")
 
-    # Land tenure checks
     if validation_results.get("land_tenure"):
-        report.append("## Land Tenure Checks")
+        content.append("### Land Tenure Checks")
         for val in validation_results["land_tenure"]:
             status_icon = {"pass": "✅", "warning": "⚠️", "fail": "❌"}.get(val["status"], "❓")
             flag_icon = " 🚩" if val.get("flagged_for_review") else ""
-            report.append(f"{status_icon}{flag_icon} {val['message']}")
+            content.append(f"{status_icon}{flag_icon} {val['message']}")
             if val.get("discrepancies"):
                 for disc in val["discrepancies"]:
-                    report.append(f"  - {disc}")
-        report.append("")
+                    content.append(f"  - {disc}")
+        content.append("")
 
-    # Project ID checks
     if validation_results.get("project_ids"):
-        report.append("## Project ID Checks")
+        content.append("### Project ID Checks")
         for val in validation_results["project_ids"]:
             status_icon = {"pass": "✅", "warning": "⚠️", "fail": "❌"}.get(val["status"], "❓")
-            report.append(f"{status_icon} {val['message']}")
-        report.append("")
+            content.append(f"{status_icon} {val['message']}")
+        content.append("")
 
-    # Items flagged for review
+    # Flagged items
     flagged_items = []
     for val_list in [
         validation_results.get("date_alignments", []),
@@ -179,40 +157,34 @@ Then return here for cross-validation.
                 flagged_items.append(val.get("message", "Unknown issue"))
 
     if flagged_items:
-        report.append("## Items Flagged for Review")
+        content.append("### Items Flagged for Review")
         for idx, item in enumerate(flagged_items, 1):
-            report.append(f"{idx}. {item}")
-        report.append("")
+            content.append(f"{idx}. {item}")
+        content.append("")
+
+    content.append("📄 Validation results saved to: validation.json")
+    content.append("📊 Session updated with validation statistics")
 
     # Next steps
-    report.append(f"{'='*80}")
-    report.append("NEXT STEPS")
-    report.append(f"{'='*80}\n")
-
-    report.append("📄 Validation results saved to: validation.json")
-    report.append("📊 Session updated with validation statistics")
-    report.append("")
-    report.append("**Next:** Generate the review report with `/report-generation`")
-    report.append("")
-    report.append("This will create:")
-    report.append("  • Markdown report with all findings")
-    report.append("  • JSON report for programmatic access")
-    report.append("  • Summary statistics and items for human review")
+    next_steps = format_next_steps_section([
+        "Review the validation results above",
+        "Generate the review report: `/report-generation`",
+        "This will create Markdown and JSON reports with all findings"
+    ], "Next Step: Report Generation")
 
     # Update workflow progress and statistics
     workflow["cross_validation"] = "completed"
-
-    # Update statistics with validation results
     stats = session.get("statistics", {})
-    stats["validations_passed"] = summary["validations_passed"]
-    stats["validations_failed"] = summary["validations_failed"]
+    stats["validations_passed"] = summary.get("passed", summary.get("validations_passed", 0))
+    stats["validations_failed"] = summary.get("failed", summary.get("validations_failed", 0))
 
     state_manager.update_json("session.json", {
         "workflow_progress": workflow,
         "statistics": stats
     })
 
-    return [TextContent(type="text", text="\n".join(report))]
+    message = header + "\n".join(content) + next_steps
+    return text_content(message)
 
 
 __all__ = ["cross_validation_prompt"]

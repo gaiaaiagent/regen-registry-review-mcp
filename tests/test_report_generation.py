@@ -13,6 +13,7 @@ from registry_review_mcp.models.report import (
 )
 
 
+@pytest.mark.usefixtures("cleanup_sessions")
 class TestMarkdownReportGeneration:
     """Test Markdown report generation."""
 
@@ -66,7 +67,7 @@ class TestMarkdownReportGeneration:
         # Should have requirements section
         assert "Requirements" in content or "REQ-" in content
 
-    async def test_markdown_report_includes_citations(self, tmp_path):
+    async def test_markdown_report_includes_citations(self, tmp_path, cleanup_examples_sessions):
         """Test that Markdown report includes page citations."""
         example_path = Path(__file__).parent.parent / "examples" / "22-23"
 
@@ -96,6 +97,7 @@ class TestMarkdownReportGeneration:
         assert "Page" in content or "page" in content
 
 
+@pytest.mark.usefixtures("cleanup_sessions")
 class TestJSONReportGeneration:
     """Test JSON report generation."""
 
@@ -155,6 +157,7 @@ class TestJSONReportGeneration:
         assert "project_name" in report_data["metadata"]
 
 
+@pytest.mark.usefixtures("cleanup_sessions")
 class TestReportFormatting:
     """Test report formatting and content."""
 
@@ -209,6 +212,7 @@ class TestReportFormatting:
         assert "fail" in formatted_text.lower() or "❌" in formatted_text
 
 
+@pytest.mark.usefixtures("cleanup_sessions")
 class TestReportExport:
     """Test report export functionality."""
 
@@ -243,7 +247,7 @@ class TestReportExport:
 class TestCompleteWorkflow:
     """Test complete report generation workflow."""
 
-    async def test_full_report_workflow(self, tmp_path):
+    async def test_full_report_workflow(self, tmp_path, cleanup_examples_sessions):
         """Test complete workflow from session to report."""
         example_path = Path(__file__).parent.parent / "examples" / "22-23"
 

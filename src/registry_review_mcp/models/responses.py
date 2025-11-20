@@ -10,7 +10,8 @@ Benefit: Type-safe, predictable API responses
 
 from typing import Any, Literal
 from datetime import datetime
-from pydantic import BaseModel, Field
+from .base import BaseModel
+from pydantic import Field
 
 
 class ToolResponse(BaseModel):

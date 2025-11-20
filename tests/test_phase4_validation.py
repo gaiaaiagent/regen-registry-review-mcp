@@ -25,10 +25,13 @@ from registry_review_mcp.prompts.unified_analysis import (
 )
 
 
-pytestmark = pytest.mark.skipif(
-    not settings.anthropic_api_key or not settings.llm_extraction_enabled,
-    reason="LLM extraction not configured (set ANTHROPIC_API_KEY and enable LLM extraction)"
-)
+pytestmark = [
+    pytest.mark.expensive,
+    pytest.mark.skipif(
+        not settings.anthropic_api_key or not settings.llm_extraction_enabled,
+        reason="LLM extraction not configured (set ANTHROPIC_API_KEY and enable LLM extraction)"
+    )
+]
 
 
 # Ground truth for Botany Farm project

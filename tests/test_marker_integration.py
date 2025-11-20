@@ -23,6 +23,7 @@ from registry_review_mcp.tools.evidence_tools import get_markdown_content
 class TestMarkerExtractor:
     """Test marker PDF to markdown conversion."""
 
+    @pytest.mark.marker
     @pytest.mark.asyncio
     @patch("registry_review_mcp.extractors.marker_extractor.get_marker_models")
     async def test_convert_pdf_to_markdown_basic(self, mock_get_models, tmp_path):
@@ -52,6 +53,7 @@ class TestMarkerExtractor:
         assert result["extraction_method"] == "marker"
         assert "extracted_at" in result
 
+    @pytest.mark.marker
     @pytest.mark.asyncio
     @patch("registry_review_mcp.extractors.marker_extractor.get_marker_models")
     async def test_convert_with_page_range(self, mock_get_models, tmp_path):
@@ -81,6 +83,7 @@ class TestMarkerExtractor:
         assert call_kwargs["start_page"] == 0  # 0-indexed
         assert call_kwargs["max_pages"] == 1
 
+    @pytest.mark.marker
     @pytest.mark.asyncio
     @patch("registry_review_mcp.extractors.marker_extractor.get_marker_models")
     async def test_markdown_caching(self, mock_get_models, tmp_path):
@@ -363,6 +366,7 @@ class TestMarkerQuality:
     better quality than pdfplumber for common document patterns.
     """
 
+    @pytest.mark.marker
     @pytest.mark.asyncio
     @patch("registry_review_mcp.extractors.marker_extractor.get_marker_models")
     async def test_preserves_section_structure(self, mock_get_models, tmp_path):
@@ -393,6 +397,7 @@ class TestMarkerQuality:
         hierarchy = extract_section_hierarchy(markdown)
         assert hierarchy["section_count"] == 3
 
+    @pytest.mark.marker
     @pytest.mark.asyncio
     @patch("registry_review_mcp.extractors.marker_extractor.get_marker_models")
     async def test_table_extraction_quality(self, mock_get_models, tmp_path):
