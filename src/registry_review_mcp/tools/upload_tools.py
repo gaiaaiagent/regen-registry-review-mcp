@@ -224,6 +224,8 @@ async def detect_existing_session(
     project_name: str,
 ) -> dict[str, Any] | None:
     """Check if a session already exists for these files.
+
+    Uses universal duplicate detection that works across all source types.
     """
     # Calculate hash of file contents
     file_hashes = set()
@@ -239,55 +241,12 @@ async def detect_existing_session(
     if not file_hashes:
         return None
 
-    # Search existing sessions
-    sessions_dir = settings.data_dir / "sessions"
-    if not sessions_dir.exists():
-        return None
+    # Use universal duplicate detection from document_tools
+    duplicate_result = await document_tools.detect_duplicates(project_name, file_hashes)
 
-    for session_dir in sessions_dir.glob("session-*"):
-        session_file = session_dir / "session.json"
-        if not session_file.exists():
-            continue
-
-        try:
-            session_data = json.loads(session_file.read_text())
-        except Exception:
-            continue
-
-        # Fuzzy match on project name (80% similarity)
-        session_proj_name = session_data.get("project_metadata", {}).get("project_name", "")
-        similarity = SequenceMatcher(None, project_name.lower(), session_proj_name.lower()).ratio()
-        if similarity < 0.8:
-            continue
-
-        # Get documents path and compute hashes from actual files
-        documents_path_str = session_data.get("project_metadata", {}).get("documents_path")
-        if not documents_path_str:
-            continue
-
-        documents_path = Path(documents_path_str)
-        if not documents_path.exists():
-            continue
-
-        # Compute SHA256 hashes for all files in session directory
-        session_hashes = set()
-        for file_path in documents_path.glob("*"):
-            if file_path.is_file():
-                try:
-                    file_content = file_path.read_bytes()
-                    file_hash = hashlib.sha256(file_content).hexdigest()
-                    session_hashes.add(file_hash)
-                except Exception:
-                    continue
-
-        # Check for significant overlap (>80% of files match)
-        if len(file_hashes) == 0 or len(session_hashes) == 0:
-            continue
-
-        overlap = len(file_hashes & session_hashes) / len(file_hashes)
-
-        if overlap > 0.8:
-            return session_data
+    if duplicate_result:
+        # Return session data (unwrap from detect_duplicates response)
+        return duplicate_result["session"]
 
     return None
 

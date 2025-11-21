@@ -4,7 +4,7 @@ import pytest
 from datetime import datetime
 from pathlib import Path
 
-from registry_review_mcp.tools import report_tools, session_tools, document_tools, evidence_tools
+from registry_review_mcp.tools import report_tools, session_tools, document_tools, evidence_tools, mapping_tools
 from registry_review_mcp.models.report import (
     ReportMetadata,
     RequirementFinding,
@@ -83,6 +83,7 @@ class TestMarkdownReportGeneration:
 
         # Discover documents and extract evidence
         await document_tools.discover_documents(session_id)
+        await mapping_tools.map_all_requirements(session_id)
         await evidence_tools.extract_all_evidence(session_id)
 
         # Generate report
@@ -265,6 +266,9 @@ class TestCompleteWorkflow:
         # Discovery
         docs = await document_tools.discover_documents(session_id)
         assert docs["documents_found"] > 0
+
+        # Mapping
+        await mapping_tools.map_all_requirements(session_id)
 
         # Extraction
         evidence = await evidence_tools.extract_all_evidence(session_id)

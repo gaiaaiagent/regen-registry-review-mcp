@@ -3,7 +3,7 @@
 import pytest
 from pathlib import Path
 
-from registry_review_mcp.tools import session_tools, document_tools, evidence_tools
+from registry_review_mcp.tools import session_tools, document_tools, evidence_tools, mapping_tools
 from registry_review_mcp.utils.state import StateManager
 
 
@@ -164,6 +164,9 @@ class TestEvidenceExtraction:
         try:
             # Discover documents first
             await document_tools.discover_documents(session_id)
+
+            # Map requirements to documents (Stage 3)
+            await mapping_tools.map_all_requirements(session_id)
 
             # Extract all evidence
             results = await evidence_tools.extract_all_evidence(session_id)
