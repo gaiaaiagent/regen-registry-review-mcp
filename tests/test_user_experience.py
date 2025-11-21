@@ -128,6 +128,11 @@ class TestQuickStart:
             methodology="soil-carbon-v1.2.2",
         )
 
-        # Should create session but fail gracefully on discovery
-        # (The session is still created even if documents_path is invalid)
-        assert "Session ID:" in result or "Error" in result
+        # Should create session successfully even with invalid path
+        # Discovery will find 0 documents (documents_path is optional now)
+        import json
+        data = json.loads(result)
+        assert "session" in data
+        assert "discovery" in data
+        assert data["session"]["project_name"] == "Invalid Path Test"
+        assert data["discovery"]["documents_found"] == 0

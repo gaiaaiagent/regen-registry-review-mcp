@@ -222,7 +222,7 @@ class TestSessionConsistency:
             "cross_validation",
             "report_generation",
             "human_review",
-            "complete"
+            "completion"  # Fixed: was "complete", should be "completion"
         ]
 
         for stage in expected_stages:
