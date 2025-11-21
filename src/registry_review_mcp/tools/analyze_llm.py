@@ -200,9 +200,18 @@ async def analyze_session_unified(session_id: str) -> dict[str, Any]:
         ]
     }
 
-    # 2. Validation format (for validation.json)
+    # 2. Validation format (for validation.json) - matches ValidationResult model schema
+    from datetime import datetime, UTC
+
     validation_result = {
         "session_id": session_id,
+        "validated_at": datetime.now(UTC).isoformat(),
+        # LLM validation checks - store as generic validations for now
+        # (not date/tenure/project_id specific since LLM does unified analysis)
+        "date_alignments": [],
+        "land_tenure": [],
+        "project_ids": [],
+        "contradictions": [],
         "validations": {
             check.check_type: {
                 "status": check.status,
@@ -213,10 +222,14 @@ async def analyze_session_unified(session_id: str) -> dict[str, Any]:
         },
         "summary": {
             "total_validations": len(result.validation_checks),
-            "passed": sum(1 for c in result.validation_checks if c.status == "pass"),
-            "warnings": sum(1 for c in result.validation_checks if c.status == "warning"),
-            "failed": sum(1 for c in result.validation_checks if c.status == "fail"),
-        }
+            "validations_passed": sum(1 for c in result.validation_checks if c.status == "pass"),
+            "validations_warning": sum(1 for c in result.validation_checks if c.status == "warning"),
+            "validations_failed": sum(1 for c in result.validation_checks if c.status == "fail"),
+            "items_flagged": 0,  # LLM ValidationCheck doesn't have flagged_for_review field
+            "pass_rate": sum(1 for c in result.validation_checks if c.status == "pass") / len(result.validation_checks) if result.validation_checks else 0.0,
+            "extraction_method": "llm"
+        },
+        "all_passed": all(c.status == "pass" for c in result.validation_checks) if result.validation_checks else True
     }
 
     # 3. Extracted fields (new format)

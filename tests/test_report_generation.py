@@ -67,7 +67,7 @@ class TestMarkdownReportGeneration:
         # Should have requirements section
         assert "Requirements" in content or "REQ-" in content
 
-    async def test_markdown_report_includes_citations(self, tmp_path, cleanup_examples_sessions):
+    async def test_markdown_report_includes_citations(self, tmp_path):
         """Test that Markdown report includes page citations."""
         example_path = Path(__file__).parent.parent / "examples" / "22-23"
 
@@ -247,7 +247,7 @@ class TestReportExport:
 class TestCompleteWorkflow:
     """Test complete report generation workflow."""
 
-    async def test_full_report_workflow(self, tmp_path, cleanup_examples_sessions):
+    async def test_full_report_workflow(self, tmp_path):
         """Test complete workflow from session to report."""
         example_path = Path(__file__).parent.parent / "examples" / "22-23"
 

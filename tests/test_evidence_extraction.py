@@ -29,7 +29,6 @@ class TestKeywordExtraction:
         assert "of" not in keywords
 
 
-@pytest.mark.usefixtures("cleanup_examples_sessions")
 class TestDocumentRelevance:
     """Test document relevance scoring."""
 
@@ -75,7 +74,6 @@ class TestDocumentRelevance:
             await session_tools.delete_session(session_id)
 
 
-@pytest.mark.usefixtures("cleanup_examples_sessions")
 class TestEvidenceSnippetExtraction:
     """Test evidence snippet extraction."""
 
@@ -118,7 +116,6 @@ class TestEvidenceSnippetExtraction:
             await session_tools.delete_session(session_id)
 
 
-@pytest.mark.usefixtures("cleanup_examples_sessions")
 class TestRequirementMapping:
     """Test full requirement mapping workflow."""
 
@@ -151,7 +148,6 @@ class TestRequirementMapping:
             await session_tools.delete_session(session_id)
 
 
-@pytest.mark.usefixtures("cleanup_examples_sessions")
 class TestEvidenceExtraction:
     """Test complete evidence extraction workflow."""
 
@@ -196,7 +192,6 @@ class TestEvidenceExtraction:
             await session_tools.delete_session(session_id)
 
 
-@pytest.mark.usefixtures("cleanup_examples_sessions")
 class TestStructuredFieldExtraction:
     """Test extraction of specific structured fields."""
 

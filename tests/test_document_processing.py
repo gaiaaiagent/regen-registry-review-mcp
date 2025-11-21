@@ -7,7 +7,6 @@ from registry_review_mcp.tools import session_tools, document_tools
 from registry_review_mcp.utils.state import StateManager
 
 
-@pytest.mark.usefixtures("cleanup_examples_sessions")
 class TestDocumentDiscovery:
     """Test document discovery functionality."""
 
@@ -89,7 +88,6 @@ class TestDocumentDiscovery:
         assert confidence <= 0.6
 
 
-@pytest.mark.usefixtures("cleanup_examples_sessions")
 class TestPDFExtraction:
     """Test PDF text extraction."""
 
@@ -158,7 +156,6 @@ class TestPDFExtraction:
         assert results1["page_count"] == results2["page_count"]
 
 
-@pytest.mark.usefixtures("cleanup_examples_sessions")
 class TestEndToEnd:
     """End-to-end workflow tests."""
 

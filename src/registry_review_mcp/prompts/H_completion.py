@@ -109,7 +109,7 @@ This will create Markdown and JSON reports with all findings."""
 
     # Mark session as completed
     session["status"] = "completed"
-    session["workflow_progress"]["complete"] = "completed"
+    session["workflow_progress"]["completion"] = "completed"
     manager.write_json("session.json", session)
 
     # Extract statistics

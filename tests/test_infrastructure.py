@@ -154,7 +154,7 @@ class TestSessionTools:
     """Test session management tools."""
 
     @pytest.mark.asyncio
-    async def test_create_session(self, test_settings, example_documents_path, cleanup_examples_sessions):
+    async def test_create_session(self, test_settings, example_documents_path):
         """Test creating a new session."""
         result = await session_tools.create_session(
             project_name="Test Project",
@@ -173,7 +173,7 @@ class TestSessionTools:
         assert manager.exists("findings.json")
 
     @pytest.mark.asyncio
-    async def test_load_session(self, test_settings, example_documents_path, cleanup_examples_sessions):
+    async def test_load_session(self, test_settings, example_documents_path):
         """Test loading an existing session."""
         # Create session
         create_result = await session_tools.create_session(
@@ -195,7 +195,7 @@ class TestSessionTools:
             await session_tools.load_session("nonexistent-session")
 
     @pytest.mark.asyncio
-    async def test_update_session_state(self, test_settings, example_documents_path, cleanup_examples_sessions):
+    async def test_update_session_state(self, test_settings, example_documents_path):
         """Test updating session state."""
         # Create session
         create_result = await session_tools.create_session(
@@ -214,7 +214,7 @@ class TestSessionTools:
         assert "updated_at" in updated
 
     @pytest.mark.asyncio
-    async def test_list_sessions(self, test_settings, example_documents_path, cleanup_examples_sessions):
+    async def test_list_sessions(self, test_settings, example_documents_path):
         """Test listing all sessions."""
         # Create multiple sessions
         await session_tools.create_session(
@@ -234,7 +234,7 @@ class TestSessionTools:
         assert all("project_name" in s for s in sessions)
 
     @pytest.mark.asyncio
-    async def test_delete_session(self, test_settings, example_documents_path, cleanup_examples_sessions):
+    async def test_delete_session(self, test_settings, example_documents_path):
         """Test deleting a session."""
         # Create session
         create_result = await session_tools.create_session(

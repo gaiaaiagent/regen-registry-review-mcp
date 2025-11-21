@@ -29,8 +29,11 @@ uv sync
 # Run the MCP server (for Claude Desktop integration)
 uv run python -m registry_review_mcp.server
 
-# Or run tests
+# Run tests (fast only - expensive tests excluded by default)
 uv run pytest
+
+# ⚠️ DON'T override test markers (-m "") - runs expensive tests!
+# See docs/TESTING_GUIDE.md
 ```
 
 Once integrated with Claude Desktop, try the complete workflow:

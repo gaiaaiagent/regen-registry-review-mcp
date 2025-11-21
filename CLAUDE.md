@@ -54,4 +54,27 @@ ASK QUESTIONS FOR CLARIFICATION. SEEK FIRST TO UNDERSTAND BEFORE SEEKING TO BE U
 DON'T DO VERSION CONTROL AUTOMATICALLY. I WILL INSTRUCT YOU WHEN IT'S TIME.
 NEVER CREATE INCOMPLETE FUNCTION STUBS. ALWAYS COMPLETE FUNCTIONS.
 
-Minimize number of characters in the repository while maximizing feature completeness, code quality, system accuracy, reliability, and maintainability. 
+Minimize number of characters in the repository while maximizing feature completeness, code quality, system accuracy, reliability, and maintainability.
+
+## Testing Protocol
+
+**CRITICAL: This project has expensive API-based tests.**
+
+### Always Run
+
+```bash
+pytest
+```
+
+This runs fast tests only (configured in `pytest.ini`). You'll see "X deselected" showing expensive tests were skipped.
+
+### Never Override
+
+**❌ DO NOT:**
+- Add `-m ""` flag (runs expensive tests)
+- Run markers like `expensive`, `marker`, or `accuracy` without explicit user instruction
+- Override test selection unless specifically asked
+
+### Rule
+
+Only run `pytest` with no marker overrides. If you see all tests collected with none deselected, you're running expensive tests. See `docs/TESTING_GUIDE.md` for details.

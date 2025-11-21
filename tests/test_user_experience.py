@@ -7,7 +7,6 @@ from registry_review_mcp.tools import session_tools
 from registry_review_mcp.server import start_review
 
 
-@pytest.mark.usefixtures("cleanup_examples_sessions")
 class TestDocumentDiscoveryUX:
     """Test document discovery prompt user experience."""
 
@@ -85,7 +84,6 @@ class TestDocumentDiscoveryUX:
             await session_tools.delete_session(session_id)
 
 
-@pytest.mark.usefixtures("cleanup_examples_sessions")
 class TestQuickStart:
     """Test the start_review quick-start tool."""
 

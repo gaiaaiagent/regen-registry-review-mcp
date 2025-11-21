@@ -5,8 +5,12 @@ import pytest_asyncio
 import json
 import shutil
 import tempfile
+import time
 from pathlib import Path
 from datetime import datetime
+
+# Load cost control plugin
+pytest_plugins = ["tests.plugins.cost_control"]
 
 from registry_review_mcp.config.settings import settings, Settings
 from registry_review_mcp.extractors.llm_extractors import (
@@ -132,14 +136,15 @@ def botany_farm_markdown():
     return markdown[:20000]
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="module")
 async def botany_farm_dates(botany_farm_markdown):
-    """Extract dates from Botany Farm ONCE for entire test session.
+    """Extract dates from Botany Farm ONCE per test module.
 
-    Session scope is safe because:
+    Module scope is safe because:
     - Data is read-only (tests only read/filter, never mutate)
     - Eliminates expensive duplicate API calls (~$0.03 each)
     - Result is deterministic (same input → same output)
+    - Compatible with pytest-asyncio (session scope has issues)
 
     Requires API key and LLM extraction to be enabled.
     """
@@ -155,14 +160,15 @@ async def botany_farm_dates(botany_farm_markdown):
     return results
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="module")
 async def botany_farm_tenure(botany_farm_markdown):
-    """Extract land tenure from Botany Farm ONCE for entire test session.
+    """Extract land tenure from Botany Farm ONCE per test module.
 
-    Session scope is safe because:
+    Module scope is safe because:
     - Data is read-only (tests only read/filter, never mutate)
     - Eliminates expensive duplicate API calls (~$0.03 each)
     - Result is deterministic
+    - Compatible with pytest-asyncio (session scope has issues)
 
     Requires API key and LLM extraction to be enabled.
     """
@@ -178,14 +184,15 @@ async def botany_farm_tenure(botany_farm_markdown):
     return results
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="module")
 async def botany_farm_project_ids(botany_farm_markdown):
-    """Extract project IDs from Botany Farm ONCE for entire test session.
+    """Extract project IDs from Botany Farm ONCE per test module.
 
-    Session scope is safe because:
+    Module scope is safe because:
     - Data is read-only (tests only read/filter, never mutate)
     - Eliminates expensive duplicate API calls (~$0.03 each)
     - Result is deterministic
+    - Compatible with pytest-asyncio (session scope has issues)
 
     Requires API key and LLM extraction to be enabled.
     """
@@ -287,129 +294,44 @@ def cache(test_settings):
 def cleanup_sessions(tmp_path_factory, worker_id):
     """Clean up TEST sessions before and after each test.
 
+    CRITICAL: Tests ALWAYS use temporary directories, NEVER production data/.
+    This prevents tests from polluting or deleting production sessions.
+
     Worker-isolated for parallel execution: each xdist worker gets its own
-    sessions directory to prevent race conditions.
-
-    CRITICAL: Only removes sessions that are DEFINITELY from tests:
-    - Sessions with names starting with "test-"
-    - Sessions pointing to /tmp/pytest directories (pytest temp dirs)
-    - Corrupted session files (likely failed tests)
-
-    PRESERVES:
-    - Sessions pointing to examples/ (user might be manually testing)
-    - Sessions pointing to real project directories outside the repo
-    - Any session that might be from actual MCP server usage
-
-    NOTE: Tests that use examples/ directory should use the separate
-    `cleanup_examples_sessions` fixture to clean up after themselves.
+    temp sessions directory to prevent race conditions.
     """
-    # Worker isolation: each xdist worker uses its own sessions directory
+    # ALWAYS use temp directory - NEVER touch production data/sessions/
     if worker_id == "master":
-        # Not running with xdist (single process)
-        data_dir = Path(__file__).parent.parent / "data"
-        sessions_dir = data_dir / "sessions"
+        # Not running with xdist (single process) - use pytest temp dir
+        root_tmp_dir = tmp_path_factory.getbasetemp()
+        sessions_dir = root_tmp_dir / "sessions"
+        sessions_dir.mkdir(exist_ok=True)
     else:
-        # Running with xdist: use worker-specific directory
+        # Running with xdist: use worker-specific temp directory
         root_tmp_dir = tmp_path_factory.getbasetemp().parent
         worker_tmp = root_tmp_dir / worker_id
         worker_tmp.mkdir(exist_ok=True)
         sessions_dir = worker_tmp / "sessions"
         sessions_dir.mkdir(exist_ok=True)
 
-        # Update settings to use worker-specific directory
-        from registry_review_mcp.config.settings import settings
-        settings.sessions_dir = sessions_dir
+    # Update settings to use test temp directory
+    from registry_review_mcp.config.settings import settings
+    settings.sessions_dir = sessions_dir
 
     def cleanup_test_sessions():
-        """Remove ONLY definitively test-created sessions."""
-        if not sessions_dir.exists():
-            return
-
-        for session_path in sessions_dir.iterdir():
-            if not session_path.is_dir():
-                continue
-
-            # Delete test-* sessions (explicitly test-prefixed)
-            if session_path.name.startswith("test-"):
-                shutil.rmtree(session_path, ignore_errors=True)
-                continue
-
-            # Check if session points to pytest temp directory
-            try:
-                session_file = session_path / "session.json"
-                if session_file.exists():
-                    with open(session_file) as f:
-                        session_data = json.load(f)
-                        docs_path_str = session_data.get("project_metadata", {}).get("documents_path", "")
-                        if docs_path_str:
-                            # ONLY delete if pointing to /tmp/pytest-*
-                            # (definitively a pytest temp directory)
-                            if "/tmp/pytest-" in docs_path_str or "/tmp/pytest_" in docs_path_str:
-                                shutil.rmtree(session_path, ignore_errors=True)
-                                continue
-            except Exception:
-                # If we can't read the session or it's corrupted, delete it
-                # (likely a failed test)
-                shutil.rmtree(session_path, ignore_errors=True)
+        """Clean up all sessions in temp directory."""
+        # Since we're ALWAYS in a temp directory, we can safely delete everything
+        if sessions_dir.exists():
+            shutil.rmtree(sessions_dir, ignore_errors=True)
+            sessions_dir.mkdir(exist_ok=True)
 
     # Cleanup before test
     cleanup_test_sessions()
 
     yield  # Run the test
 
-    # Cleanup after test
+    # Cleanup after test (optional - pytest cleans up tmp_path automatically)
     cleanup_test_sessions()
-
-
-@pytest.fixture(scope="function")
-def cleanup_examples_sessions():
-    """Clean up sessions pointing to examples directory.
-
-    Use this fixture explicitly in tests that use the examples/ directory
-    to ensure they don't leave sessions behind.
-
-    This is separate from the autouse cleanup_sessions to preserve user
-    sessions that might be manually testing with examples.
-    """
-    data_dir = Path(__file__).parent.parent / "data"
-    sessions_dir = data_dir / "sessions"
-    examples_dir = (Path(__file__).parent.parent / "examples").resolve()
-
-    def cleanup_examples():
-        """Remove sessions pointing to examples directory."""
-        if not sessions_dir.exists():
-            return
-
-        for session_path in sessions_dir.iterdir():
-            if not session_path.is_dir():
-                continue
-
-            try:
-                session_file = session_path / "session.json"
-                if session_file.exists():
-                    with open(session_file) as f:
-                        session_data = json.load(f)
-                        docs_path_str = session_data.get("project_metadata", {}).get("documents_path", "")
-                        if docs_path_str:
-                            try:
-                                docs_path = Path(docs_path_str).resolve()
-                                docs_path.relative_to(examples_dir)
-                                # This session uses examples - delete it
-                                shutil.rmtree(session_path, ignore_errors=True)
-                            except (ValueError, OSError):
-                                # Not under examples or path doesn't exist
-                                pass
-            except Exception:
-                # Can't read session - skip it
-                pass
-
-    # Cleanup before test
-    cleanup_examples()
-
-    yield  # Run the test
-
-    # Cleanup after test
-    cleanup_examples()
 
 
 @pytest.fixture(scope="session")

@@ -47,7 +47,7 @@ class TestHappyPathEndToEnd:
 
     @pytest.mark.asyncio
     @pytest.mark.slow
-    async def test_full_workflow_botany_farm(self, botany_farm_path, cleanup_examples_sessions):
+    async def test_full_workflow_botany_farm(self, botany_farm_path):
         """Complete workflow from initialization to completion on real example.
 
         This test validates:
@@ -167,7 +167,7 @@ class TestHappyPathEndToEnd:
 
         # Stage 8: Completion
         print("\n=== Stage 8: Completion ===")
-        result = await completion.completion_prompt(session_id)
+        result = await completion.complete_prompt(session_id)
         response_text = result[0].text
         assert "Registry Review Complete" in response_text or "Complete" in response_text
         assert "Assessment" in response_text
@@ -194,7 +194,6 @@ class TestHappyPathEndToEnd:
         print("\n✅ Full E2E workflow test PASSED")
 
 
-@pytest.mark.usefixtures("cleanup_examples_sessions")
 class TestStateTransitions:
     """Test workflow state transitions and preconditions."""
 
@@ -220,11 +219,13 @@ class TestStateTransitions:
             await document_discovery.document_discovery_prompt(session_id=session_id)
 
             # Try to run evidence extraction without mapping
-            with pytest.raises(ValueError) as exc_info:
-                await evidence_extraction.evidence_extraction(session_id)
+            # Note: Prompts return error messages (strings) instead of raising exceptions
+            result = await evidence_extraction.evidence_extraction(session_id)
 
-            # Should get error about mapping not complete
-            assert "mapping" in str(exc_info.value).lower()
+            # Should get error message about mapping not complete
+            assert isinstance(result, str), "Evidence extraction should return error message string"
+            assert ("mapping" in result.lower() or "stage 3" in result.lower()), \
+                f"Expected error about mapping, got: {result}"
             print("✓ Cannot skip requirement mapping stage")
 
     @pytest.mark.asyncio
@@ -315,7 +316,6 @@ class TestErrorRecovery:
             print("✓ Detects corrupted session")
 
 
-@pytest.mark.usefixtures("cleanup_examples_sessions")
 class TestPerformance:
     """Test performance and scalability."""
 
