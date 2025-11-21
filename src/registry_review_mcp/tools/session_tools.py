@@ -23,14 +23,29 @@ def generate_session_id() -> str:
 
 async def create_session(
     project_name: str,
-    documents_path: str,
     methodology: str = "soil-carbon-v1.2.2",
     project_id: str | None = None,
     proponent: str | None = None,
     crediting_period: str | None = None,
     submission_date: datetime | None = None,
+    documents_path: str | None = None,  # Deprecated: Use add_documents() instead
 ) -> dict[str, Any]:
     """Create a new registry review session.
+
+    Stage 1: Initialize session with metadata only.
+    No document sources are added yet - use add_documents() for that.
+
+    Args:
+        project_name: Name of the project being reviewed
+        methodology: Methodology identifier (default: soil-carbon-v1.2.2)
+        project_id: Optional project ID (e.g., C06-4997)
+        proponent: Optional project proponent name
+        crediting_period: Optional crediting period
+        submission_date: Optional submission date
+        documents_path: DEPRECATED - Use add_documents() instead
+
+    Returns:
+        Session creation result with session_id and metadata
     """
     import json
 
@@ -42,7 +57,7 @@ async def create_session(
         submission_date=submission_date,
         methodology=methodology,
         proponent=proponent,
-        documents_path=documents_path,
+        documents_path=documents_path,  # Backward compatibility
     )
 
     # Generate session
@@ -57,13 +72,14 @@ async def create_session(
             checklist_data = json.load(f)
         requirements_count = len(checklist_data.get("requirements", []))
 
-    # Create session with proper statistics and mark initialize stage complete
+    # Create session with empty document_sources list
     session = Session(
         session_id=session_id,
         created_at=now,
         updated_at=now,
         status="initialized",
         project_metadata=project_metadata,
+        document_sources=[],  # Start with no sources
         workflow_progress=WorkflowProgress(initialize="completed"),
         statistics=SessionStatistics(requirements_total=requirements_count),
     )
@@ -80,7 +96,6 @@ async def create_session(
         "session_id": session_id,
         "project_name": project_name,
         "created_at": now.isoformat(),
-        "documents_path": project_metadata.documents_path,
         "methodology": methodology,
         "requirements_total": requirements_count,
         "message": f"Session created successfully for project: {project_name}",

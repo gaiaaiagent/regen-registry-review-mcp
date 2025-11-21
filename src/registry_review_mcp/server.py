@@ -51,13 +51,19 @@ logger.info("Initializing Registry Review MCP Server v2.0.0")
 @with_error_handling("create_session")
 async def create_session(
     project_name: str,
-    documents_path: str,
     methodology: str = "soil-carbon-v1.2.2",
+    documents_path: str | None = None,
     project_id: str | None = None,
     proponent: str | None = None,
     crediting_period: str | None = None,
 ) -> str:
-    """Create a new registry review session."""
+    """Create a new registry review session.
+
+    Stage 1: Initialize (metadata only)
+    Creates session with project information. Documents can be added later.
+
+    Note: documents_path is deprecated - use add_documents() tool instead.
+    """
     result = await session_tools.create_session(
         project_name=project_name,
         documents_path=documents_path,
@@ -161,6 +167,35 @@ async def delete_session(session_id: str) -> str:
         Confirmation message
     """
     result = await session_tools.delete_session(session_id)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+@with_error_handling("add_documents")
+async def add_documents(
+    session_id: str,
+    source: dict,
+    check_duplicates: bool = True,
+) -> str:
+    """Add document sources to session.
+
+    Stage 1b: Add sources before discovery
+
+    Args:
+        session_id: Existing session ID
+        source: Document source specification. Supported types:
+            - Upload: {"type": "upload", "files": [{"filename": "...", "content_base64": "..."}]}
+            - Path: {"type": "path", "path": "/absolute/path/to/documents"}
+        check_duplicates: Detect existing sessions with similar content (default: True)
+
+    Returns:
+        Result with source details and optional duplicate warning
+    """
+    result = await document_tools.add_documents(
+        session_id=session_id,
+        source=source,
+        check_duplicates=check_duplicates,
+    )
     return json.dumps(result, indent=2)
 
 

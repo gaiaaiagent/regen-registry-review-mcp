@@ -17,6 +17,19 @@ from .evidence import EvidenceSnippet
 # ============================================================================
 
 
+class DocumentSource(BaseModel):
+    """Tracks a single document source (upload, path, or link)."""
+
+    source_type: Literal["upload", "path", "link"]
+    added_at: datetime
+    metadata: dict  # Type-specific metadata
+
+    # Example metadata by type:
+    # upload: {"directory": "/path/to/temp", "file_count": 3}
+    # path: {"path": "/absolute/path", "file_count": 4}
+    # link: {"url": "https://...", "access_mode": "mirror|reference"}
+
+
 class ProjectMetadata(BaseModel):
     """Metadata about the project being reviewed."""
 
@@ -26,18 +39,21 @@ class ProjectMetadata(BaseModel):
     submission_date: datetime | None = None
     methodology: str = "soil-carbon-v1.2.2"
     proponent: str | None = None
-    documents_path: str
+    documents_path: str | None = None  # Optional for backward compatibility
 
     @field_validator("documents_path")
     @classmethod
-    def validate_path_exists(cls, value: str) -> str:
-        """Validate that the documents path exists."""
-        path = Path(value)
-        if not path.exists():
-            raise ValueError(f"Path does not exist: {value}")
-        if not path.is_dir():
+    def validate_path_exists(cls, value: str | None) -> str | None:
+        """Validate that the documents path exists (for backward compatibility)."""
+        if value is None:
+            return None
+        # Convert to absolute path
+        path = Path(value).absolute()
+        # For backward compatibility, allow non-existent paths
+        # (they will be validated when documents are actually accessed)
+        if path.exists() and not path.is_dir():
             raise ValueError(f"Path is not a directory: {value}")
-        return str(path.absolute())
+        return str(path)
 
 
 class WorkflowProgress(BaseModel):
@@ -73,6 +89,7 @@ class Session(BaseModel):
     updated_at: datetime
     status: str
     project_metadata: ProjectMetadata
+    document_sources: list[DocumentSource] = Field(default_factory=list)
     workflow_progress: WorkflowProgress
     statistics: SessionStatistics
 
