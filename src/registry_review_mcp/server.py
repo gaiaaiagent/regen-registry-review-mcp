@@ -430,7 +430,8 @@ async def extract_evidence(session_id: str) -> str:
     Returns:
         Summary of evidence extraction results with coverage statistics
     """
-    results = await evidence_tools.extract_all_evidence(session_id)
+    from .tools.evidence_tools import extract_all_evidence
+    results = await extract_all_evidence(session_id)
     return json.dumps(results, indent=2)
 
 

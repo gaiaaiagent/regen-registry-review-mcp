@@ -21,6 +21,36 @@ from ..models.validation import (
 from ..utils.state import StateManager, get_session_or_raise
 
 
+def extract_page_number(source: str) -> int | None:
+    """Extract page number from source string.
+
+    Handles formats like:
+    - "Document Name, Page 5"
+    - "Document Name, p. 5"
+    - "Document Name (Page 5)"
+    - "Page 5"
+    """
+    if not source:
+        return None
+
+    # Try various page number patterns
+    patterns = [
+        r'[Pp]age\s+(\d+)',  # "Page 5" or "page 5"
+        r'[Pp]\.\s*(\d+)',   # "p. 5"
+        r'\((\d+)\)',        # "(5)"
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, source)
+        if match:
+            try:
+                return int(match.group(1))
+            except (ValueError, IndexError):
+                continue
+
+    return None
+
+
 async def validate_date_alignment(
     session_id: str,
     field1_name: str,
@@ -575,7 +605,7 @@ async def cross_validate(session_id: str) -> dict[str, Any]:
                         "project_id": field.value,
                         "document_id": field.source.split(",")[0].strip() if "," in field.source else None,
                         "document_name": field.source.split(",")[0].strip(),
-                        "page": None,  # TODO: Extract from source
+                        "page": extract_page_number(field.source),
                         "section": field.source,
                         "confidence": field.confidence
                     })

@@ -1,6 +1,7 @@
 """Evidence extraction workflow - Stage 4 of registry review."""
 
-from ..tools import session_tools, evidence_tools
+from ..tools import session_tools
+from ..tools.evidence_tools import extract_all_evidence
 from ..models.errors import SessionNotFoundError
 from .helpers import (
     format_error,
@@ -66,8 +67,8 @@ Run document discovery first: `/document-discovery {session_id}`
     project_name = session.get("project_metadata", {}).get("project_name", "Unknown")
 
     try:
-        # Run evidence extraction
-        results = await evidence_tools.extract_all_evidence(session_id)
+        # Run evidence extraction (optimized with LLM)
+        results = await extract_all_evidence(session_id)
 
         # Build header
         header = format_workflow_header("Evidence Extraction", session_id, project_name)

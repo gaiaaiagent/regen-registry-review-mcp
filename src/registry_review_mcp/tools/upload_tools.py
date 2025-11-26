@@ -501,7 +501,8 @@ async def start_review_from_uploads(
     # Optionally extract evidence
     if auto_extract and session_result["documents_found"] > 0:
         try:
-            evidence_result = await evidence_tools.extract_all_evidence(session_id)
+            from .evidence_tools import extract_all_evidence
+            evidence_result = await extract_all_evidence(session_id)
             response["evidence_extraction"] = evidence_result
         except Exception as e:
             # Include error but don't fail the whole operation

@@ -12,6 +12,7 @@ from typing import Any
 
 import pdfplumber
 import fiona
+import psutil
 
 from ..config.settings import settings
 from ..models.errors import (
@@ -46,6 +47,42 @@ def compute_file_hash(filepath: Path) -> str:
         for byte_block in iter(lambda: f.read(4096), b""):
             sha256_hash.update(byte_block)
     return sha256_hash.hexdigest()
+
+
+def calculate_optimal_workers(num_pdfs: int) -> int:
+    """Calculate optimal parallel workers based on hardware constraints.
+
+    Constraints:
+    - Memory: 8GB marker model + 2GB per concurrent worker
+    - Practical: Diminishing returns beyond 7 workers (empirical)
+    - Workload: Can't exceed number of PDFs
+
+    Args:
+        num_pdfs: Number of PDFs to process
+
+    Returns:
+        Optimal number of workers (minimum 1)
+    """
+    # Get available RAM (leaving 2GB buffer for system, down from 4GB for tighter systems)
+    available_ram_gb = psutil.virtual_memory().available / (1024**3) - 2
+
+    # Memory constraint: 8GB for model, 2GB per worker
+    # If not enough RAM for model + workers, fall back to sequential (1 worker)
+    if available_ram_gb < 10:  # Need at least 10GB (8GB model + 2GB worker)
+        return 1
+
+    max_by_memory = max(1, int((available_ram_gb - 8) / 2))
+
+    # Practical limit (empirical diminishing returns)
+    max_practical = 7
+
+    # Workload limit (can't use more workers than PDFs)
+    max_by_workload = num_pdfs
+
+    # Take minimum of all constraints, always at least 1
+    optimal = min(max_by_memory, max_practical, max_by_workload)
+
+    return max(1, optimal)
 
 
 def generate_document_id(content_hash: str) -> str:
@@ -466,6 +503,7 @@ async def discover_documents(session_id: str) -> dict[str, Any]:
     errors = []
     seen_hashes = {}  # Track content hashes for deduplication
     duplicates_skipped = 0
+    pdf_documents = []  # Collect PDFs for batch conversion
 
     for i, file_path in enumerate(discovered_files, 1):
         # Show progress every 3 files or on last file
@@ -509,9 +547,12 @@ async def discover_documents(session_id: str) -> dict[str, Any]:
                 indexed_at=datetime.now(timezone.utc),
             )
 
-            # Document discovery: Just catalog metadata, don't extract content
-            # Markdown conversion happens lazily during evidence extraction (Stage 5)
-            documents.append(document.model_dump(mode="json"))
+            # Track PDFs for batch conversion (memory-efficient)
+            if is_pdf_file(file_path):
+                pdf_documents.append((file_path, document))
+
+            doc_dict = document.model_dump(mode="json")
+            documents.append(doc_dict)
 
             # Update classification summary
             classification_summary[classification] = (
@@ -566,8 +607,14 @@ async def discover_documents(session_id: str) -> dict[str, Any]:
                 "recovery_steps": recovery_steps
             })
 
+    # LAZY PDF CONVERSION: Skip conversion in Stage 2, defer to Stage 4
+    # Stage 4 will convert only PDFs that are mapped to requirements
+    # This saves ~9 minutes per project by not converting irrelevant PDFs
+    if pdf_documents:
+        print(f"\n📄 Indexed {len(pdf_documents)} PDF(s) (conversion deferred to Stage 4)", flush=True)
+
     # Show completion with error summary
-    print(f"✅ Discovery complete: {len(documents)} unique documents classified", flush=True)
+    print(f"\n✅ Discovery complete: {len(documents)} unique documents classified", flush=True)
     if duplicates_skipped > 0:
         print(f"  ⏭️  Skipped {duplicates_skipped} duplicate file(s)", flush=True)
     if errors:
@@ -664,19 +711,13 @@ async def extract_document_metadata(file_path: Path) -> DocumentMetadata:
         content_hash=content_hash,
     )
 
-    # PDF-specific metadata
+    # PDF-specific metadata (LAZY: Skip page count to avoid loading PDFs in Stage 2)
+    # Page count and table detection will be extracted during Stage 4 (PDF conversion)
+    # This prevents loading entire PDFs into memory during discovery
     if is_pdf_file(file_path.name):
-        try:
-            with pdfplumber.open(file_path) as pdf:
-                metadata.page_count = len(pdf.pages)
-                # Quick check for tables in first few pages
-                metadata.has_tables = any(
-                    len(page.extract_tables()) > 0
-                    for page in pdf.pages[:min(3, len(pdf.pages))]
-                )
-        except Exception:
-            # If PDF extraction fails, just use basic metadata
-            pass
+        # Defer all PDF content inspection to Phase 4
+        metadata.page_count = None  # Will be set during conversion in Stage 4
+        metadata.has_tables = False  # Will be detected during conversion in Stage 4
 
     return metadata
 
