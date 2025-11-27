@@ -20,6 +20,17 @@ T = TypeVar('T')
 def with_error_handling(tool_name: str):
     """Decorator to add consistent error handling and logging to tools.
 
+    Ensures MCP protocol compliance by:
+    - Logging all operations (start, success, failure)
+    - Re-raising exceptions for proper MCP error propagation
+    - Providing consistent error logging with full context
+
+    The MCP protocol expects tools to either:
+    - Return a result on success, OR
+    - Raise an exception on failure
+
+    This decorator preserves that contract while adding comprehensive logging.
+
     Before (per tool):
         try:
             logger.info(f"Starting operation")
@@ -28,7 +39,7 @@ def with_error_handling(tool_name: str):
             return json.dumps(result, indent=2)
         except Exception as e:
             logger.error(f"Operation failed: {e}", exc_info=True)
-            return f"✗ Error: {str(e)}"
+            raise
 
     After (per tool):
         @with_error_handling("operation_name")
@@ -47,28 +58,14 @@ def with_error_handling(tool_name: str):
                 logger.info(f"{tool_name}: Success")
                 return result
             except Exception as e:
+                # Log the error with full context and traceback for debugging
                 logger.error(f"{tool_name}: Failed - {e}", exc_info=True)
-                return format_error(e, tool_name)
+
+                # Re-raise to ensure MCP client sees it as a failure
+                # The MCP framework will format the error appropriately for the client
+                raise
         return wrapper
     return decorator
-
-
-def format_error(error: Exception, context: str | None = None) -> str:
-    """Format error response consistently.
-
-    Args:
-        error: Exception that occurred
-        context: Optional context string (e.g., tool name)
-
-    Returns:
-        Formatted error string with type and message
-    """
-    error_type = type(error).__name__
-    error_msg = str(error)
-
-    if context:
-        return f"✗ Error in {context}: [{error_type}] {error_msg}"
-    return f"✗ Error: [{error_type}] {error_msg}"
 
 
 def generate_validation_id(validation_type: str) -> str:
