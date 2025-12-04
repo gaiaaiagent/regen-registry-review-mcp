@@ -409,3 +409,54 @@ def _skip_children(sections: list[dict], parent_idx: int, parent_level: int) -> 
     while i < len(sections) and sections[i]["level"] > parent_level:
         i += 1
     return i - 1
+
+
+async def batch_convert_pdfs_parallel(
+    filepaths: list[str],
+    max_workers: int = 3,
+    unload_after: bool = True,
+) -> dict[str, Any]:
+    """Batch convert multiple PDFs to markdown.
+
+    Uses fast extraction by default (PyMuPDF4LLM). Falls back to marker
+    only if USE_MARKER=true is set in environment.
+
+    Args:
+        filepaths: List of PDF file paths to convert
+        max_workers: Number of concurrent workers (ignored for fast extraction)
+        unload_after: Whether to unload models after conversion (ignored for fast)
+
+    Returns:
+        Dictionary mapping filepath to conversion result:
+        {
+            "path/to/file.pdf": {
+                "filepath": "path/to/file.pdf",
+                "markdown": "...",
+                "page_count": N,
+                ...
+            }
+        }
+    """
+    if not filepaths:
+        return {}
+
+    # Use fast extraction by default
+    if not USE_MARKER:
+        from .fast_extractor import batch_fast_extract_pdfs
+        return await batch_fast_extract_pdfs(filepaths)
+
+    # Heavy marker extraction (USE_MARKER=true)
+    results = {}
+    for filepath in filepaths:
+        try:
+            result = await convert_pdf_to_markdown(filepath)
+            results[filepath] = result
+        except Exception as e:
+            logger.error(f"Failed to convert {filepath}: {e}")
+            results[filepath] = {
+                "filepath": filepath,
+                "error": str(e),
+                "success": False,
+            }
+
+    return results

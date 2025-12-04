@@ -1254,7 +1254,7 @@ async def upload_form(upload_id: str, token: str = Query(...)):
                 selectedFiles.forEach(file => formData.append('files', file));
 
                 try {{
-                    const response = await fetch('/upload/{upload_id}?token={token}', {{
+                    const response = await fetch('/registry/upload/{upload_id}?token={token}', {{
                         method: 'POST',
                         body: formData
                     }});
