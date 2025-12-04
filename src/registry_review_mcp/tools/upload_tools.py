@@ -7,10 +7,7 @@ with web applications, chat interfaces, and APIs.
 
 import base64
 import hashlib
-import tempfile
-import shutil
 import re
-import json
 import os
 from pathlib import Path
 from typing import Any
@@ -320,15 +317,26 @@ async def create_session_from_uploads(
                 f"Set deduplicate=False to upload anyway."
             )
 
-    # Create temporary directory
-    sanitized_name = _sanitize_project_name(project_name)
-    temp_dir = None
+    # Create session FIRST to get session_id for persistent storage
+    # This ensures documents are stored in data/sessions/{session_id}/uploads/
+    # instead of /tmp/ which is cleared on reboot
+    session_result = await session_tools.create_session(
+        project_name=project_name,
+        methodology=methodology,
+        project_id=project_id,
+        proponent=proponent,
+        crediting_period=crediting_period,
+    )
+
+    session_id = session_result["session_id"]
+    uploads_dir = None
+    files_saved = []
 
     try:
-        temp_dir = Path(tempfile.mkdtemp(prefix=f"registry-{sanitized_name}-"))
+        # Get persistent uploads directory (created automatically)
+        uploads_dir = session_tools.get_session_uploads_dir(session_id)
 
-        # Write files to temp directory
-        files_saved = []
+        # Write files to persistent uploads directory
         for file in files:
             filename = file["filename"]
             content_base64 = file["content_base64"]
@@ -341,22 +349,16 @@ async def create_session_from_uploads(
                     f"Failed to decode base64 content for '{filename}': {str(e)}"
                 ) from e
 
-            # Write to temp directory
-            file_path = temp_dir / filename
+            # Write to persistent uploads directory
+            file_path = uploads_dir / filename
             file_path.write_bytes(file_content)
             files_saved.append(filename)
 
-        # Create session using the temp directory
-        session_result = await session_tools.create_session(
-            project_name=project_name,
-            documents_path=str(temp_dir),
-            methodology=methodology,
-            project_id=project_id,
-            proponent=proponent,
-            crediting_period=crediting_period,
+        # Update session with documents_path pointing to persistent storage
+        await session_tools.update_session_state(
+            session_id,
+            {"project_metadata.documents_path": str(uploads_dir)}
         )
-
-        session_id = session_result["session_id"]
 
         # Discover documents
         discovery_result = await document_tools.discover_documents(session_id)
@@ -365,7 +367,7 @@ async def create_session_from_uploads(
         return {
             "success": True,
             "session_id": session_id,
-            "temp_directory": str(temp_dir),
+            "documents_directory": str(uploads_dir),
             "files_uploaded": original_file_count,
             "files_saved": files_saved,
             "deduplication": {
@@ -384,9 +386,11 @@ async def create_session_from_uploads(
         }
 
     except Exception as e:
-        # Clean up temp directory on error
-        if temp_dir and temp_dir.exists():
-            shutil.rmtree(temp_dir, ignore_errors=True)
+        # Clean up session on error (includes uploads directory)
+        try:
+            await session_tools.delete_session(session_id)
+        except Exception:
+            pass  # Ignore cleanup errors
         raise
 
 
@@ -411,13 +415,27 @@ async def upload_additional_files(
 
     # Load session to get documents path
     session_data = await session_tools.load_session(session_id)
-    documents_path = Path(session_data["project_metadata"]["documents_path"])
+    documents_path_str = session_data.get("project_metadata", {}).get("documents_path")
 
-    if not documents_path.exists():
-        raise ValueError(
-            f"Documents directory not found: {documents_path}. "
-            "The session may have been created with a temporary directory that no longer exists."
+    # Check if we need to migrate from /tmp/ or missing path to persistent storage
+    needs_migration = False
+    if not documents_path_str:
+        needs_migration = True
+    else:
+        documents_path = Path(documents_path_str)
+        # Check if path is in /tmp/ or doesn't exist
+        if str(documents_path).startswith("/tmp/") or not documents_path.exists():
+            needs_migration = True
+
+    if needs_migration:
+        # Migrate to persistent storage
+        documents_path = session_tools.get_session_uploads_dir(session_id)
+        await session_tools.update_session_state(
+            session_id,
+            {"project_metadata.documents_path": str(documents_path)}
         )
+    else:
+        documents_path = Path(documents_path_str)
 
     # Write files to session directory
     files_added = []
