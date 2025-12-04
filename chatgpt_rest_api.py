@@ -1422,9 +1422,9 @@ def main():
     print("Registry Review REST API for ChatGPT")
     print("=" * 70)
     print("Host:     localhost")
-    print("Port:     8001")
-    print("Endpoint: http://localhost:8001")
-    print("Docs:     http://localhost:8001/docs")
+    print("Port:     8003")
+    print("Endpoint: http://localhost:8003")
+    print("Docs:     http://localhost:8003/docs")
     print("=" * 70)
     print("")
     print("Next Steps:")
@@ -1435,7 +1435,7 @@ def main():
     print("Press Ctrl+C to stop")
     print("=" * 70)
 
-    uvicorn.run(app, host="0.0.0.0", port=8001, log_level="info")
+    uvicorn.run(app, host="0.0.0.0", port=8003, log_level="info")
 
 
 if __name__ == "__main__":

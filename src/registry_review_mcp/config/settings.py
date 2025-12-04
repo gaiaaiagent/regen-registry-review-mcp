@@ -132,6 +132,9 @@ class Settings(BaseSettings):
     # Performance
     enable_caching: bool = True
 
+    # Session Monitoring (for REST API)
+    monitor_sessions: bool = False
+
     def __init__(self, **kwargs):
         """Initialize settings and create required directories.
 
