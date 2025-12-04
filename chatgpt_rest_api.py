@@ -30,6 +30,12 @@ from registry_review_mcp.tools import (
     upload_tools,
     human_review_tools,
 )
+from registry_review_mcp.config.settings import settings
+
+# Start session monitoring if enabled
+if settings.monitor_sessions:
+    from registry_review_mcp.utils.session_monitor import start_session_monitor
+    start_session_monitor(settings.sessions_dir)
 
 # ============================================================================
 # Status Derivation Helper
@@ -444,6 +450,144 @@ async def extract_evidence(session_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/sessions/{session_id}/evidence-matrix", summary="Get evidence matrix")
+async def get_evidence_matrix(session_id: str):
+    """Get structured evidence matrix for display.
+
+    USE THIS ENDPOINT when user asks for "evidence matrix" or "checklist".
+    This is the primary endpoint for viewing extracted evidence.
+
+    Returns a standardized matrix with ALL columns:
+    - requirement_id: Unique requirement identifier (e.g., REQ-001)
+    - category: Requirement category (e.g., "Land Tenure")
+    - status: Evidence status (covered/partial/missing)
+    - confidence: Confidence score (0.0-1.0)
+    - source_document: Document where evidence was found
+    - page: Page number in source document
+    - section: Section header where evidence appears
+    - extracted_value: THE SPECIFIC VALUE for the registry checklist (e.g., "January 1, 2022", "Nicholas Denman")
+    - validation_type: Type of validation (auto vs human judgment)
+    - human_review_required: Whether human review is needed
+
+    IMPORTANT: Always display ALL columns including 'extracted_value' which contains
+    the specific answer to enter in the registry checklist's "Submitted Material" column.
+    """
+    try:
+        from registry_review_mcp.utils.state import StateManager
+        import json
+
+        state_manager = StateManager(session_id)
+
+        # Load evidence data
+        evidence_path = state_manager.session_dir / "evidence.json"
+        if not evidence_path.exists():
+            raise HTTPException(
+                status_code=400,
+                detail="Evidence not yet extracted. Run evidence extraction first.",
+            )
+
+        with open(evidence_path) as f:
+            evidence_data = json.load(f)
+
+        # Load checklist for validation_type mapping
+        session_data = state_manager.read_json("session.json")
+        methodology = session_data.get("project_metadata", {}).get(
+            "methodology", "soil-carbon-v1.2.2"
+        )
+        checklist_path = settings.get_checklist_path(methodology)
+
+        validation_types = {}
+        if checklist_path.exists():
+            with open(checklist_path) as f:
+                checklist = json.load(f)
+            for req in checklist.get("requirements", []):
+                validation_types[req["requirement_id"]] = req.get(
+                    "validation_type", "manual"
+                )
+
+        # Build matrix rows
+        matrix = []
+        auto_validated = 0
+        human_review_required = 0
+
+        for req_evidence in evidence_data.get("evidence", []):
+            req_id = req_evidence.get("requirement_id", "")
+            validation_type = validation_types.get(req_id, "manual")
+            is_auto = validation_type in [
+                "document_presence",
+                "cross_document",
+                "date_alignment",
+                "structured_field",
+            ]
+
+            if is_auto:
+                auto_validated += 1
+            else:
+                human_review_required += 1
+
+            # Get best evidence snippet for this requirement
+            snippets = req_evidence.get("evidence_snippets", [])
+            best_snippet = snippets[0] if snippets else None
+
+            matrix.append(
+                {
+                    "requirement_id": req_id,
+                    "category": req_evidence.get("category", ""),
+                    "requirement_text": req_evidence.get("requirement_text", "")[:200],
+                    "validation_type": validation_type,
+                    "auto_validatable": is_auto,
+                    "status": req_evidence.get("status", "missing"),
+                    "confidence": req_evidence.get("confidence", 0.0),
+                    "source_document": (
+                        best_snippet.get("document_name", "") if best_snippet else ""
+                    ),
+                    "page": best_snippet.get("page") if best_snippet else None,
+                    "section": best_snippet.get("section", "") if best_snippet else "",
+                    "extracted_value": (
+                        best_snippet.get("extracted_value", "") if best_snippet else ""
+                    ),
+                    "evidence_text": (
+                        best_snippet.get("text", "")[:300] if best_snippet else ""
+                    ),
+                    "evidence_count": len(snippets),
+                    "human_review_required": not is_auto,
+                }
+            )
+
+        return {
+            "session_id": session_id,
+            "matrix": matrix,
+            "summary": {
+                "total_requirements": len(matrix),
+                "auto_validatable": auto_validated,
+                "human_review_required": human_review_required,
+                "covered": sum(1 for r in matrix if r["status"] == "covered"),
+                "partial": sum(1 for r in matrix if r["status"] == "partial"),
+                "missing": sum(1 for r in matrix if r["status"] == "missing"),
+                "coverage": evidence_data.get("overall_coverage", 0.0),
+            },
+            "columns": [
+                "requirement_id",
+                "category",
+                "status",
+                "confidence",
+                "source_document",
+                "page",
+                "section",
+                "extracted_value",
+                "validation_type",
+                "human_review_required",
+            ],
+            "display_hint": "ALWAYS render as table with ALL columns: ID | Category | Status | Confidence | Source | Page | Section | Value | Type | Review. The 'extracted_value' column contains the specific answer for the registry checklist.",
+        }
+    except HTTPException:
+        raise
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/sessions/{session_id}/validate", summary="Cross-validate evidence")
 async def cross_validate(session_id: str):
     """Run cross-document validation checks.
@@ -460,6 +604,35 @@ async def cross_validate(session_id: str):
 
         result = await validation_tools.cross_validate(session_id)
 
+        # Add clear warning for zero-validation cases
+        summary = result.get("summary", {})
+        total_validations = summary.get("total_validations", 0)
+        diagnostics = summary.get("extraction_diagnostics", {})
+
+        if total_validations == 0:
+            # Build explanation of why no validations ran
+            reasons = []
+            if diagnostics:
+                if not diagnostics.get("date_validation_possible"):
+                    reasons.append(
+                        f"Date validation: {diagnostics.get('date_validation_reason', 'insufficient data')}"
+                    )
+                if not diagnostics.get("tenure_validation_possible"):
+                    reasons.append(
+                        f"Tenure validation: {diagnostics.get('tenure_validation_reason', 'insufficient data')}"
+                    )
+                if not diagnostics.get("project_id_validation_possible"):
+                    reasons.append(
+                        f"Project ID validation: {diagnostics.get('project_id_validation_reason', 'insufficient data')}"
+                    )
+
+            result["warning"] = {
+                "status": "NO_VALIDATIONS_RAN",
+                "message": "Zero automated validations were performed. This does NOT mean the documents are validated.",
+                "reasons": reasons,
+                "recommendation": "All requirements require human review when automated validation cannot extract structured data.",
+            }
+
         # Add workflow guidance for ChatGPT
         result["next_steps"] = {
             "recommended": {
@@ -468,6 +641,11 @@ async def cross_validate(session_id: str):
                 "description": "Create structured summary for registry submission",
             },
             "optional": [
+                {
+                    "action": "View evidence matrix",
+                    "endpoint": f"/sessions/{session_id}/evidence-matrix",
+                    "description": "See structured view of all evidence with validation status",
+                },
                 {
                     "action": "Review validation details",
                     "endpoint": f"/sessions/{session_id}/review-status",
