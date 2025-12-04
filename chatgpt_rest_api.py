@@ -87,7 +87,7 @@ app = FastAPI(
     description="Carbon credit project registry review tools for ChatGPT",
     version="1.0.0",
     servers=[
-        {"url": "https://sharri-cartographic-cagily.ngrok-free.dev", "description": "Public endpoint"}
+        {"url": "https://regen.gaiaai.xyz/registry", "description": "Production endpoint"}
     ],
 )
 
@@ -1088,7 +1088,7 @@ async def generate_upload_url(request: GenerateUploadUrlRequest):
         "files": [],
     }
 
-    base_url = "https://sharri-cartographic-cagily.ngrok-free.dev"
+    base_url = "https://regen.gaiaai.xyz/registry"
     upload_url = f"{base_url}/upload/{upload_id}?token={token}"
 
     response = {
