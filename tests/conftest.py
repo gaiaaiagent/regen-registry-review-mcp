@@ -1,11 +1,37 @@
-"""Pytest configuration and shared fixtures."""
+"""Pytest configuration and shared fixtures.
 
+CRITICAL SECURITY: Environment-level test isolation.
+XDG environment variables are set BEFORE any package imports to ensure
+the settings singleton initializes with /tmp paths from the very start.
+This prevents the dual-singleton bug that caused production data loss.
+"""
+
+# =============================================================================
+# ENVIRONMENT ISOLATION - MUST BE FIRST (before any package imports)
+# =============================================================================
+import os
+import sys
+import tempfile
+
+# Check if we're running under pytest
+_PYTEST_RUNNING = "pytest" in sys.modules or "py.test" in sys.modules
+
+if _PYTEST_RUNNING:
+    # Create isolated test directory BEFORE any settings imports
+    _TEST_ROOT = tempfile.mkdtemp(prefix="pytest-registry-")
+    os.environ["XDG_DATA_HOME"] = os.path.join(_TEST_ROOT, "data")
+    os.environ["XDG_CACHE_HOME"] = os.path.join(_TEST_ROOT, "cache")
+
+    # Ensure directories exist
+    os.makedirs(os.environ["XDG_DATA_HOME"], exist_ok=True)
+    os.makedirs(os.environ["XDG_CACHE_HOME"], exist_ok=True)
+
+# =============================================================================
+# Now safe to import from our package - settings will see /tmp paths
+# =============================================================================
 import pytest
 import pytest_asyncio
 import json
-import shutil
-import tempfile
-import time
 from pathlib import Path
 from datetime import datetime
 
@@ -18,6 +44,7 @@ from registry_review_mcp.extractors.llm_extractors import (
     LandTenureExtractor,
     ProjectIDExtractor,
 )
+from registry_review_mcp.utils.safe_delete import safe_rmtree
 
 
 # Global cost tracker for aggregating all test costs
@@ -40,6 +67,19 @@ def pytest_configure(config):
     # Register custom markers
     config.addinivalue_line("markers", "slow: marks tests as slow (real API calls)")
     config.addinivalue_line("markers", "expensive: marks tests with high API costs")
+
+    # SAFETY VALIDATION: Ensure settings point to /tmp
+    # This catches any edge case where environment isolation failed
+    if not str(settings.sessions_dir).startswith("/tmp"):
+        raise RuntimeError(
+            f"SAFETY FAILURE: Test isolation failed!\n"
+            f"sessions_dir = {settings.sessions_dir}\n"
+            f"Expected /tmp prefix. Production data at risk.\n"
+            f"XDG_DATA_HOME = {os.environ.get('XDG_DATA_HOME', 'NOT SET')}"
+        )
+
+    # Store test root for cleanup
+    config._test_root = _TEST_ROOT if _PYTEST_RUNNING else None
 
 
 def pytest_sessionfinish(session, exitstatus):
@@ -233,8 +273,8 @@ def temp_data_dir(tmp_path):
 
     yield data_dir
 
-    # Cleanup
-    shutil.rmtree(data_dir, ignore_errors=True)
+    # Cleanup using safe_rmtree (will work because tmp_path is in /tmp)
+    safe_rmtree(data_dir)
 
 
 @pytest.fixture
@@ -271,9 +311,6 @@ def cleanup_cache_once():
 
     yield  # Run all tests
 
-    # Optional: Clean up after tests (commented out to preserve for inspection)
-    # cache.clear()
-
 
 @pytest.fixture
 def cache(test_settings):
@@ -292,46 +329,38 @@ def cache(test_settings):
 
 @pytest.fixture(autouse=True, scope="function")
 def cleanup_sessions(tmp_path_factory, worker_id):
-    """Clean up TEST sessions before and after each test.
+    """Ensure each test starts with clean session state.
 
-    CRITICAL: Tests ALWAYS use temporary directories, NEVER production data/.
-    This prevents tests from polluting or deleting production sessions.
+    STRUCTURAL SAFETY: Environment-level isolation is now the primary defense.
+    XDG_DATA_HOME is set to /tmp BEFORE settings is imported, so the settings
+    singleton initializes with /tmp paths. This fixture provides additional
+    per-test cleanup as a secondary defense.
 
-    Worker-isolated for parallel execution: each xdist worker gets its own
-    temp sessions directory to prevent race conditions.
+    This fixture cleans the actual settings.sessions_dir to ensure test isolation
+    in parallel execution.
     """
-    # ALWAYS use temp directory - NEVER touch production data/sessions/
-    if worker_id == "master":
-        # Not running with xdist (single process) - use pytest temp dir
-        root_tmp_dir = tmp_path_factory.getbasetemp()
-        sessions_dir = root_tmp_dir / "sessions"
-        sessions_dir.mkdir(exist_ok=True)
-    else:
-        # Running with xdist: use worker-specific temp directory
-        root_tmp_dir = tmp_path_factory.getbasetemp().parent
-        worker_tmp = root_tmp_dir / worker_id
-        worker_tmp.mkdir(exist_ok=True)
-        sessions_dir = worker_tmp / "sessions"
-        sessions_dir.mkdir(exist_ok=True)
-
-    # Update settings to use test temp directory
-    from registry_review_mcp.config.settings import settings
-    settings.sessions_dir = sessions_dir
+    # SAFETY: Verify structural isolation is working
+    # This should never fail with the new architecture, but we check anyway
+    if not str(settings.sessions_dir).startswith("/tmp"):
+        raise RuntimeError(
+            f"STRUCTURAL ISOLATION FAILURE: settings.sessions_dir = {settings.sessions_dir}\n"
+            f"Expected /tmp prefix. The environment isolation is not working."
+        )
 
     def cleanup_test_sessions():
-        """Clean up all sessions in temp directory."""
-        # Since we're ALWAYS in a temp directory, we can safely delete everything
-        if sessions_dir.exists():
-            shutil.rmtree(sessions_dir, ignore_errors=True)
-            sessions_dir.mkdir(exist_ok=True)
+        """Clean up sessions in the settings directory using safe_rmtree."""
+        if settings.sessions_dir.exists():
+            safe_rmtree(settings.sessions_dir)
+            settings.sessions_dir.mkdir(exist_ok=True)
 
     # Cleanup before test
     cleanup_test_sessions()
 
-    yield  # Run the test
-
-    # Cleanup after test (optional - pytest cleans up tmp_path automatically)
-    cleanup_test_sessions()
+    try:
+        yield  # Run the test
+    finally:
+        # Cleanup after test
+        cleanup_test_sessions()
 
 
 @pytest.fixture(scope="session")

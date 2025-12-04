@@ -140,144 +140,134 @@ class TestChunking:
         # Last chunk should extend to end
         assert chunks[-1][-10:] == content[-10:]
 
-    def test_chunk_overlap_validation(self):
+    def test_chunk_overlap_validation(self, monkeypatch):
         """Test that invalid overlap raises error."""
+        # Create extractor with patched settings that have invalid overlap
+        from registry_review_mcp.config.settings import Settings
+        from registry_review_mcp.extractors import llm_extractors as llm_module
+
+        # Create new settings with invalid configuration
+        # llm_chunk_size must be >= 10000 per Settings validation
+        new_settings = Settings(
+            llm_chunk_size=10000,
+            llm_chunk_overlap=15000  # Invalid: overlap >= chunk_size
+        )
+        monkeypatch.setattr(llm_module, "settings", new_settings)
+
         extractor = DateExtractor()
 
-        # Temporarily modify settings to create invalid overlap
-        original_chunk_size = settings.llm_chunk_size
-        original_overlap = settings.llm_chunk_overlap
+        with pytest.raises(ValueError, match="Chunk overlap .* must be less than chunk size"):
+            extractor._chunk_content("A" * 200000)
 
-        try:
-            settings.llm_chunk_size = 1000
-            settings.llm_chunk_overlap = 1500  # Invalid: overlap >= chunk_size
-
-            with pytest.raises(ValueError, match="Chunk overlap .* must be less than chunk size"):
-                extractor._chunk_content("A" * 200000)
-        finally:
-            settings.llm_chunk_size = original_chunk_size
-            settings.llm_chunk_overlap = original_overlap
-
-    def test_chunk_overlap_equal_to_size(self):
+    def test_chunk_overlap_equal_to_size(self, monkeypatch):
         """Test that overlap equal to chunk size raises error."""
+        from registry_review_mcp.config.settings import Settings
+        from registry_review_mcp.extractors import llm_extractors as llm_module
+
+        # Create new settings with invalid configuration
+        # llm_chunk_size must be >= 10000 per Settings validation
+        new_settings = Settings(
+            llm_chunk_size=10000,
+            llm_chunk_overlap=10000  # Invalid: creates infinite loop
+        )
+        monkeypatch.setattr(llm_module, "settings", new_settings)
+
         extractor = DateExtractor()
 
-        original_chunk_size = settings.llm_chunk_size
-        original_overlap = settings.llm_chunk_overlap
-
-        try:
-            settings.llm_chunk_size = 1000
-            settings.llm_chunk_overlap = 1000  # Invalid: creates infinite loop
-
-            with pytest.raises(ValueError, match="Chunk overlap .* must be less than chunk size"):
-                extractor._chunk_content("A" * 200000)
-        finally:
-            settings.llm_chunk_size = original_chunk_size
-            settings.llm_chunk_overlap = original_overlap
+        with pytest.raises(ValueError, match="Chunk overlap .* must be less than chunk size"):
+            extractor._chunk_content("A" * 200000)
 
 
 class TestBoundaryAwareChunking:
     """Test intelligent boundary-aware chunking."""
 
-    def test_boundary_aware_splits_at_paragraph(self):
+    def test_boundary_aware_splits_at_paragraph(self, monkeypatch):
         """Test that chunking prefers paragraph boundaries."""
         from registry_review_mcp.extractors.llm_extractors import DateExtractor
-        from registry_review_mcp.config.settings import settings
+        from registry_review_mcp.config.settings import Settings
+        from registry_review_mcp.extractors import llm_extractors as llm_module
+
+        # Create new settings with valid chunk sizes (must be >= 10000)
+        new_settings = Settings(
+            llm_chunk_size=15000,
+            llm_max_input_chars=20000,
+            llm_chunk_overlap=1000
+        )
+        monkeypatch.setattr(llm_module, "settings", new_settings)
 
         extractor = DateExtractor()
 
-        # Temporarily reduce chunk size for faster testing
-        original_chunk_size = settings.llm_chunk_size
-        original_max_chars = settings.llm_max_input_chars
-        original_overlap = settings.llm_chunk_overlap
-        try:
-            settings.llm_chunk_size = 1000
-            settings.llm_max_input_chars = 1500
-            settings.llm_chunk_overlap = 100
+        # Create content with clear paragraph boundaries
+        paragraph = "This is a test paragraph with some content.\n\n"
+        content = paragraph * 500  # ~22,000 chars - enough to require chunking
 
-            # Create content with clear paragraph boundaries
-            paragraph = "This is a test paragraph with some content.\n\n"
-            content = paragraph * 40  # ~1,800 chars
+        chunks = extractor._chunk_content(content)
 
-            chunks = extractor._chunk_content(content)
+        # Should create chunks
+        assert len(chunks) >= 2, "Should split long content into chunks"
 
-            # Should create chunks
-            assert len(chunks) >= 2, "Should split long content into chunks"
+        # Verify chunks don't split mid-paragraph
+        for i, chunk in enumerate(chunks[:-1]):  # Check all but last chunk
+            # If split at paragraph boundary, should end with double newline
+            # or at least not end mid-word
+            assert chunk[-1] in '\n ' or i == len(chunks) - 1, f"Chunk {i} should end at natural boundary"
 
-            # Verify chunks don't split mid-paragraph
-            for i, chunk in enumerate(chunks[:-1]):  # Check all but last chunk
-                # If split at paragraph boundary, should end with double newline
-                # or at least not end mid-word
-                assert chunk[-1] in '\n ' or i == len(chunks) - 1, f"Chunk {i} should end at natural boundary"
-        finally:
-            settings.llm_chunk_size = original_chunk_size
-            settings.llm_max_input_chars = original_max_chars
-            settings.llm_chunk_overlap = original_overlap
-
-    def test_boundary_aware_splits_at_sentence(self):
+    def test_boundary_aware_splits_at_sentence(self, monkeypatch):
         """Test that chunking falls back to sentence boundaries."""
         from registry_review_mcp.extractors.llm_extractors import DateExtractor
-        from registry_review_mcp.config.settings import settings
+        from registry_review_mcp.config.settings import Settings
+        from registry_review_mcp.extractors import llm_extractors as llm_module
+
+        # Create new settings with valid chunk sizes (must be >= 10000)
+        new_settings = Settings(
+            llm_chunk_size=12000,
+            llm_max_input_chars=18000,
+            llm_chunk_overlap=1000
+        )
+        monkeypatch.setattr(llm_module, "settings", new_settings)
 
         extractor = DateExtractor()
 
-        # Temporarily reduce chunk size for faster testing
-        original_chunk_size = settings.llm_chunk_size
-        original_max_chars = settings.llm_max_input_chars
-        original_overlap = settings.llm_chunk_overlap
-        try:
-            settings.llm_chunk_size = 800
-            settings.llm_max_input_chars = 1200
-            settings.llm_chunk_overlap = 80
+        # Create content with sentences but no paragraph breaks
+        sentence = "This is sentence number X with some details. "
+        # Build content that will require splitting (need > 18000 chars)
+        sentences = [sentence.replace("X", str(i)) for i in range(500)]
+        content = "".join(sentences)  # ~22,500 chars
 
-            # Create content with sentences but no paragraph breaks
-            sentence = "This is sentence number X with some details. "
-            # Build content that will require splitting
-            sentences = [sentence.replace("X", str(i)) for i in range(30)]
-            content = "".join(sentences)  # ~1,350 chars
+        chunks = extractor._chunk_content(content)
 
-            chunks = extractor._chunk_content(content)
+        # Should create multiple chunks
+        assert len(chunks) >= 2
 
-            # Should create multiple chunks
-            assert len(chunks) >= 2
+        # Verify chunks end at sentence boundaries (or natural breaks)
+        for chunk in chunks[:-1]:  # All but last
+            # Should end with sentence punctuation + space, or newline
+            last_chars = chunk[-3:] if len(chunk) >= 3 else chunk
+            has_sentence_end = any(p in last_chars for p in ['. ', '! ', '? ', '\n'])
+            has_word_boundary = chunk[-1] == ' '
+            assert has_sentence_end or has_word_boundary, "Should end at natural boundary"
 
-            # Verify chunks end at sentence boundaries (or natural breaks)
-            for chunk in chunks[:-1]:  # All but last
-                # Should end with sentence punctuation + space, or newline
-                last_chars = chunk[-3:] if len(chunk) >= 3 else chunk
-                has_sentence_end = any(p in last_chars for p in ['. ', '! ', '? ', '\n'])
-                has_word_boundary = chunk[-1] == ' '
-                assert has_sentence_end or has_word_boundary, "Should end at natural boundary"
-        finally:
-            settings.llm_chunk_size = original_chunk_size
-            settings.llm_max_input_chars = original_max_chars
-            settings.llm_chunk_overlap = original_overlap
-
-    def test_boundary_aware_fallback_to_char(self):
+    def test_boundary_aware_fallback_to_char(self, monkeypatch):
         """Test that chunking falls back gracefully when no boundaries found."""
         from registry_review_mcp.extractors.llm_extractors import DateExtractor
-        from registry_review_mcp.config.settings import settings
+        from registry_review_mcp.config.settings import Settings
+        from registry_review_mcp.extractors import llm_extractors as llm_module
+
+        # Create new settings with valid chunk sizes (must be >= 10000)
+        new_settings = Settings(
+            llm_chunk_size=12000,
+            llm_max_input_chars=18000,
+            llm_chunk_overlap=1000
+        )
+        monkeypatch.setattr(llm_module, "settings", new_settings)
 
         extractor = DateExtractor()
 
-        # Temporarily reduce chunk size for faster testing
-        original_chunk_size = settings.llm_chunk_size
-        original_max_chars = settings.llm_max_input_chars
-        original_overlap = settings.llm_chunk_overlap
-        try:
-            settings.llm_chunk_size = 800
-            settings.llm_max_input_chars = 1200
-            settings.llm_chunk_overlap = 80
+        # Create content with no natural boundaries (one giant "word")
+        content = "A" * 25000
 
-            # Create content with no natural boundaries (one giant "word")
-            content = "A" * 1500
+        chunks = extractor._chunk_content(content)
 
-            chunks = extractor._chunk_content(content)
-
-            # Should still create chunks (fallback to character-based)
-            assert len(chunks) >= 2
-            assert all(len(chunk) > 0 for chunk in chunks)
-        finally:
-            settings.llm_chunk_size = original_chunk_size
-            settings.llm_max_input_chars = original_max_chars
-            settings.llm_chunk_overlap = original_overlap
+        # Should still create chunks (fallback to character-based)
+        assert len(chunks) >= 2
+        assert all(len(chunk) > 0 for chunk in chunks)

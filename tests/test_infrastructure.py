@@ -274,19 +274,24 @@ class TestSessionTools:
             assert Path(project["path"]).exists()
 
     @pytest.mark.asyncio
-    async def test_list_example_projects_no_examples(self, test_settings, tmp_path, monkeypatch):
+    async def test_list_example_projects_no_examples(self, tmp_path, monkeypatch):
         """Test list_example_projects when examples directory doesn't exist."""
-        # Import settings module to patch it
         from registry_review_mcp.tools import session_tools as st_module
 
         # Create temp data dir without examples
         temp_data_dir = tmp_path / "data"
         temp_data_dir.mkdir()
 
-        # Mock the settings object in session_tools module
-        mock_settings = test_settings
-        mock_settings.data_dir = temp_data_dir
-        monkeypatch.setattr(st_module, "settings", mock_settings)
+        # Create a new Settings instance with the temp data dir
+        # by setting environment variables before instantiation
+        monkeypatch.setenv("REGISTRY_REVIEW_DATA_DIR", str(temp_data_dir))
+
+        # Create new settings instance (not frozen yet during __init__)
+        from registry_review_mcp.config.settings import Settings
+        new_settings = Settings(data_dir=temp_data_dir)
+
+        # Patch the settings in the session_tools module
+        monkeypatch.setattr(st_module, "settings", new_settings)
 
         result = await session_tools.list_example_projects()
 

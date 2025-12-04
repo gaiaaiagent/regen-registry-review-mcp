@@ -18,6 +18,7 @@ dependencies = [
     "anthropic>=0.40.0",
     "rapidfuzz>=3.14.3",
     "marker-pdf>=0.2.17",
+    "psutil>=5.9.0",
 ]
 
 [project.scripts]
@@ -46,6 +47,12 @@ exclude-newer = "2025-11-12T00:00:00Z"
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"src.registry_review_mcp".msg = "Import from 'registry_review_mcp', not 'src.registry_review_mcp'. The 'src.' prefix creates a separate module singleton."
 
 [tool.black]
 line-length = 100

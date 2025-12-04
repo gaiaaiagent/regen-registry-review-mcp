@@ -50,23 +50,36 @@ class TestErrorPropagation:
             await session_tools.load_session("nonexistent-session-id")
 
     @pytest.mark.asyncio
-    async def test_successful_operation_returns_result(self, tmp_path):
+    async def test_successful_operation_returns_result(self, tmp_path, monkeypatch):
         """Verify that successful operations return results normally."""
-        # Use tmp_path for session storage
-        with patch('registry_review_mcp.config.settings.settings.sessions_dir', tmp_path):
-            result = await session_tools.create_session(
-                project_name="Test Project",
-                methodology="soil-carbon-v1.2.2"
-            )
+        # Set up temp sessions directory via environment and new Settings instance
+        from registry_review_mcp.config.settings import Settings
+        from registry_review_mcp.tools import session_tools as st_module
+        from registry_review_mcp.utils import state as state_module
 
-            # Should return dict result, not error string
-            assert isinstance(result, dict)
-            assert result["project_name"] == "Test Project"
-            assert "session_id" in result
-            assert result["message"].startswith("Session created successfully")
+        sessions_dir = tmp_path / "sessions"
+        sessions_dir.mkdir()
 
-            # Verify no error prefix
-            assert not str(result).startswith("✗ Error")
+        # Create a new settings instance with the temp directory
+        new_settings = Settings(sessions_dir=sessions_dir)
+
+        # Patch settings in both modules that use it
+        monkeypatch.setattr(st_module, "settings", new_settings)
+        monkeypatch.setattr(state_module, "settings", new_settings)
+
+        result = await session_tools.create_session(
+            project_name="Test Project",
+            methodology="soil-carbon-v1.2.2"
+        )
+
+        # Should return dict result, not error string
+        assert isinstance(result, dict)
+        assert result["project_name"] == "Test Project"
+        assert "session_id" in result
+        assert result["message"].startswith("Session created successfully")
+
+        # Verify no error prefix
+        assert not str(result).startswith("✗ Error")
 
     @pytest.mark.asyncio
     async def test_error_logged_before_raising(self, tmp_path):

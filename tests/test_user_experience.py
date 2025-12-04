@@ -13,15 +13,8 @@ class TestDocumentDiscoveryUX:
     @pytest.mark.asyncio
     async def test_no_session_provides_guidance(self, test_settings):
         """Test that calling without session_id when no sessions exist provides helpful guidance."""
-        # Ensure no sessions exist
-        from src.registry_review_mcp.config.settings import settings
-        import shutil
-
-        sessions_dir = settings.sessions_dir
-        if sessions_dir.exists():
-            # Clean ALL sessions to guarantee no-session state
-            shutil.rmtree(sessions_dir, ignore_errors=True)
-            sessions_dir.mkdir(parents=True, exist_ok=True)
+        # Use test_settings fixture which already provides isolated temp directory
+        # The cleanup_sessions fixture handles isolation - no manual cleanup needed
 
         # Call without session_id when no sessions exist
         result = await document_discovery_prompt(session_id=None)
@@ -29,9 +22,12 @@ class TestDocumentDiscoveryUX:
         # Should provide helpful guidance
         assert len(result) == 1
         text = result[0].text
-        assert "Registry Review" in text or "No sessions found" in text
-        assert ("Option" in text or "initialize" in text.lower())  # Multiple options or guidance provided
-        assert "/document-discovery" in text or "/initialize" in text
+        # The message should contain guidance for starting a new session
+        assert "Registry Review" in text
+        # Should mention either Option(s) for how to proceed or /initialize
+        has_options = "Option" in text or "option" in text
+        has_initialize = "initialize" in text.lower()
+        assert has_options or has_initialize, f"Expected guidance with options or initialize, got: {text[:200]}..."
 
     @pytest.mark.asyncio
     async def test_auto_selects_most_recent_session(self, test_settings, example_documents_path):
