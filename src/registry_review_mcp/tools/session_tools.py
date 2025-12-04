@@ -1,10 +1,15 @@
 """Session management tools for creating, loading, and updating review sessions."""
 
+import logging
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from ..config.settings import settings
+from ..utils.safe_delete import safe_rmtree
+
+logger = logging.getLogger(__name__)
 from ..models.errors import SessionNotFoundError
 from ..models.schemas import (
     ProjectMetadata,
@@ -19,6 +24,23 @@ def generate_session_id() -> str:
     """Generate a unique session ID.
     """
     return f"session-{uuid.uuid4().hex[:12]}"
+
+
+def get_session_uploads_dir(session_id: str) -> Path:
+    """Get the persistent uploads directory for a session.
+
+    This is where uploaded documents should be stored to survive reboots.
+    Located at: data/sessions/{session_id}/uploads/
+
+    Args:
+        session_id: Unique session identifier
+
+    Returns:
+        Path to the uploads directory (created if it doesn't exist)
+    """
+    uploads_dir = settings.get_session_path(session_id) / "uploads"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    return uploads_dir
 
 
 async def create_session(
@@ -165,13 +187,60 @@ async def list_sessions() -> list[dict[str, Any]]:
 
 async def delete_session(session_id: str) -> dict[str, Any]:
     """Delete a session and all its data.
-    """
-    import shutil
 
+    Safety: Validates that the session directory is within the expected
+    sessions_dir before deletion to prevent accidental data loss.
+
+    Audit: All deletion attempts are logged for forensic analysis.
+    """
     state_manager = get_session_or_raise(session_id)
 
-    # Remove entire session directory
-    shutil.rmtree(state_manager.session_dir)
+    # SAFETY CHECK: Verify session_dir is within expected sessions_dir
+    # This prevents accidental deletion if settings.sessions_dir was corrupted
+    session_dir = state_manager.session_dir.resolve()
+    expected_parent = settings.sessions_dir.resolve()
+
+    # AUDIT: Log deletion attempt with full context
+    logger.warning(
+        f"SESSION DELETE REQUESTED: session_id={session_id}, "
+        f"path={session_dir}, parent={expected_parent}"
+    )
+
+    # Ensure the session directory is a child of sessions_dir
+    try:
+        session_dir.relative_to(expected_parent)
+    except ValueError:
+        logger.error(
+            f"SESSION DELETE BLOCKED: Security violation - {session_dir} "
+            f"not within {expected_parent}"
+        )
+        raise ValueError(
+            f"Security violation: session directory {session_dir} "
+            f"is not within expected sessions directory {expected_parent}. "
+            f"Deletion aborted to prevent data loss."
+        )
+
+    # Additional safety: verify it looks like a session directory
+    if not (session_dir / "session.json").exists():
+        logger.error(
+            f"SESSION DELETE BLOCKED: Invalid directory - no session.json in {session_dir}"
+        )
+        raise ValueError(
+            f"Invalid session directory: {session_dir} does not contain session.json. "
+            f"Deletion aborted."
+        )
+
+    # AUDIT: Log successful deletion with timestamp
+    logger.warning(
+        f"SESSION DELETE EXECUTING: Removing {session_dir} "
+        f"at {datetime.now(timezone.utc).isoformat()}"
+    )
+
+    # Remove entire session directory using safe_rmtree
+    # force=True because we've done our own validation above
+    safe_rmtree(session_dir, force=True)
+
+    logger.info(f"SESSION DELETE COMPLETE: {session_id} removed successfully")
 
     return {
         "session_id": session_id,
