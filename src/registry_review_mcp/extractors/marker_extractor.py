@@ -9,9 +9,13 @@ Marker provides state-of-the-art PDF extraction with:
 - Image descriptions
 
 This module provides a clean interface to marker with caching and error handling.
+
+Environment Variables:
+    USE_MARKER: Set to "true" to use heavy Marker models. Default uses fast PyMuPDF extraction.
 """
 
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -20,6 +24,9 @@ from ..models.errors import DocumentExtractionError
 from ..utils.cache import Cache
 
 logger = logging.getLogger(__name__)
+
+# Check if we should use heavy Marker models (default: use fast extraction)
+USE_MARKER = os.environ.get("USE_MARKER", "").lower() == "true"
 
 # Global model cache (loaded once, reused across conversions)
 _marker_models = None
@@ -120,6 +127,15 @@ async def convert_pdf_to_markdown(
                 f"PDF file not found: {filepath}",
                 details={"filepath": filepath},
             )
+
+        # Use fast extraction by default (unless USE_MARKER=true)
+        if not USE_MARKER:
+            logger.info(f"⚡ Fast extraction for {file_path.name} (PyMuPDF)")
+            from .fast_extractor import fast_extract_pdf
+            result = await fast_extract_pdf(filepath)
+            # Cache the result
+            pdf_markdown_cache.set(cache_key, result)
+            return result
 
         logger.info(f"🔄 Converting {file_path.name} to markdown using marker...")
 
