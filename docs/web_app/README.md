@@ -1,0 +1,181 @@
+# Registry Review Web Application
+
+## Overview
+
+A purpose-built web application for carbon credit project verification, transforming the existing MCP-based workflow into a document-centric interface with an embedded AI assistant.
+
+**Status:** Planning
+**Version:** 1.3
+**Updated:** January 2026
+
+---
+
+## Vision
+
+Registry reviewers currently spend 6-8 hours per project, manually cross-referencing 5-15 PDF documents against a methodology checklist. This application reduces that to 60-90 minutes by:
+
+1. **Side-by-side view** - Documents visible alongside the checklist
+2. **Drag-and-drop evidence linking** - No tedious popup menus
+3. **AI assistant** - Chat panel that explains, extracts, and automates
+4. **Batch processing** - Templates for 111+ farm clusters
+5. **Collaboration** - Revision requests and proponent responses
+
+---
+
+## User Personas
+
+### Primary: Registry Reviewer (Becca)
+
+- Soil scientist with 3+ years in carbon credit verification
+- Deep methodology expertise, not a software developer
+- Needs: side-by-side documents, drag-drop linking, AI assistance, clear progress tracking
+
+### Secondary: Project Proponent (Thomas)
+
+- Farm owner or project developer
+- Needs: view revision requests, upload responses, track status
+- Must NOT see internal reviewer deliberations
+
+### Tertiary: Registry Administrator
+
+- Manages multiple reviewers
+- Needs: dashboard of all reviews, bulk actions, metrics export, template management
+
+---
+
+## MVP Scope
+
+### In Scope (MVP)
+
+- Single-user review workflow
+- PDF viewing with persistent highlighting
+- Drag-and-drop evidence linking
+- Evidence scratchpad
+- AI chat panel (assistant + automation)
+- Soft-gated stage navigation
+- Cross-validation fact sheets
+- Basic RBAC (reviewer/proponent/admin)
+- Markdown/JSON report export
+- Google Drive integration (import docs from shared folders)
+- Notifications (Mailjet email + in-app)
+
+### Out of Scope (Future)
+
+- Multi-reviewer concurrent editing
+- Real-time collaboration (WebSockets)
+- Keyboard shortcuts (power-user feature)
+- PDF annotation layers (separate from evidence)
+- Offline support
+- Mobile-optimized interface
+
+---
+
+## Key Decisions (Recommended)
+
+1. **Templates are immutable:** updates create a new template version; child sessions opt-in to changes.
+2. **Separate AI vs manual evidence storage:** AI extraction can regenerate without risking drag-drop highlights.
+3. **Human-in-the-loop agent:** the agent proposes actions; UI requires explicit user confirmation for any state change.
+4. **Explicit artifact “freshness”:** mapping/evidence/validation/report show stale badges after upstream changes (new docs, mapping edits).
+5. **Persistent backend storage required:** sessions/artifacts must live on durable storage (frontend can remain stateless).
+
+---
+
+## Success Metrics
+
+| Metric | Current | Target | With Templates |
+|--------|---------|--------|----------------|
+| Review time (individual) | 6-8 hours | 60-90 min | 60-90 min |
+| Review time (cluster farm) | 6-8 hours | 60-90 min | 20-30 min |
+| 111 farms total time | 832 hours | 166 hours | ~57 hours |
+
+---
+
+## Documentation Structure
+
+| Document | Description |
+|----------|-------------|
+| [FRONTEND_PLANNING.md](./FRONTEND_PLANNING.md) | UI components, user journeys, interactions, implementation phases |
+| [BACKEND_PLANNING.md](./BACKEND_PLANNING.md) | API architecture, AI agent, data models, MCP integration |
+
+---
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           WEB APPLICATION                                    │
+│  ┌─────────────────────────────────────────────────────────────────────────┐│
+│  │                         FRONTEND (Next.js)                              ││
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                  ││
+│  │  │ PDF Viewer   │  │  Checklist   │  │  AI Chat     │                  ││
+│  │  │ + Highlights │  │  + Evidence  │  │  Panel       │                  ││
+│  │  └──────────────┘  └──────────────┘  └──────────────┘                  ││
+│  └─────────────────────────────────────────────────────────────────────────┘│
+│                                    │                                         │
+│                                    ▼                                         │
+│  ┌─────────────────────────────────────────────────────────────────────────┐│
+│  │                         BACKEND (FastAPI)                               ││
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                  ││
+│  │  │ REST API     │  │  AI Agent    │  │  MCP Server  │                  ││
+│  │  │ (existing)   │  │  (Claude)    │  │  (existing)  │                  ││
+│  │  └──────────────┘  └──────────────┘  └──────────────┘                  ││
+│  └─────────────────────────────────────────────────────────────────────────┘│
+│                                    │                                         │
+│                                    ▼                                         │
+│  ┌─────────────────────────────────────────────────────────────────────────┐│
+│  │                         STORAGE                                          ││
+│  │  sessions/  templates/  uploads/  audit_logs/                            ││
+│  └─────────────────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Existing Assets
+
+The following are already built and will be reused:
+
+| Asset | Location | Description |
+|-------|----------|-------------|
+| MCP Server | `src/registry_review_mcp/` | 8-stage workflow, evidence extraction |
+| REST API | `chatgpt_rest_api.py` | 45+ endpoints, FastAPI |
+| Data Models | `src/registry_review_mcp/models/` | Pydantic schemas |
+| LLM Extractors | `src/registry_review_mcp/extractors/` | Evidence extraction |
+
+---
+
+## Authentication
+
+**Decision:** Sign in with Google (reuse the same Regen Google Workspace identity model as `regen-koi-mcp`).
+
+- **Reviewer/Admin:** allowlist (e.g., `@regen.network`) + role assignment
+- **Proponent:** invited per project/session, strict least-privilege view
+
+---
+
+## Resolved Questions
+
+1. **Proponent notifications:** Both email (Mailjet - already configured) and in-app notifications.
+2. **Scanned PDFs:** Warn user when PDF has no searchable text (no OCR for MVP).
+3. **Deployment storage:** Same production server as other Regen services (202.61.196.119).
+4. **Document source:** Connect to existing Google Drive used by reviewers to minimize manual uploads.
+
+---
+
+## Next Steps
+
+1. Review and approve this planning structure
+2. Create Next.js project repository
+3. Begin Phase 1: PDF viewer proof-of-concept
+4. Test with 5+ real project PDFs before proceeding
+
+---
+
+## Document History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| v1.0 | January 2026 | Initial monolithic planning document |
+| v1.1 | January 2026 | UX feedback: drag-drop, scratchpad, soft gating, templates |
+| v1.2 | January 2026 | Architectural feedback: MVP scope, RBAC, data handling |
+| v1.3 | January 2026 | Restructured into separate frontend/backend docs; added AI agent |
