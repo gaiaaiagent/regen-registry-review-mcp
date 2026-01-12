@@ -2,7 +2,7 @@
 
 ## Overview
 
-A Next.js web application providing a document-centric review workspace with an embedded AI chat panel.
+A Vite + React 19 single-page application providing a document-centric review workspace with an embedded AI chat panel. Stack aligned with GAIA repo for component reuse.
 
 ---
 
@@ -450,16 +450,24 @@ App
 
 ## Technical Stack
 
+**Why Vite + React instead of Next.js:**
+- Aligns with GAIA repo (same build tool, React version, routing)
+- PDF libraries (react-pdf-highlighter) use browser APIs that break with SSR
+- This is a workspace app, not a content site - no SEO/SSR benefits needed
+- Simpler deployment: static files via Nginx (no Node.js server process)
+
 ```
-Frontend
-├── Framework: Next.js 14+ (App Router)
+Frontend (aligned with GAIA)
+├── Build Tool: Vite
+├── Framework: React 19
 ├── Language: TypeScript
-├── Styling: Tailwind CSS + shadcn/ui
+├── Routing: React Router 7
+├── Styling: Tailwind CSS 4 + Radix UI (shadcn/ui compatible)
 ├── PDF Viewer: react-pdf-highlighter
 ├── Drag-and-Drop: @dnd-kit/core
-├── State Management: Zustand + React Query
+├── State Management: Zustand + TanStack Query
 ├── API Client: openapi-fetch (generated types)
-└── Deployment: Vercel or self-hosted
+└── Deployment: Nginx serving static files (same as backend server)
 ```
 
 ### Key Libraries
@@ -471,7 +479,8 @@ Frontend
 | `zustand` | Client state with optimistic updates |
 | `@tanstack/react-query` | Server state and caching |
 | `openapi-fetch` | Type-safe API client |
-| `shadcn/ui` | UI components |
+| `@radix-ui/*` | Accessible UI primitives (shadcn/ui compatible) |
+| `react-router` | Client-side routing |
 
 ### Optimistic UI Pattern
 
@@ -501,11 +510,12 @@ const linkEvidence = async (snippetId: string, requirementId: string) => {
 **Goal:** Prove PDF rendering and highlighting works
 
 **Tasks:**
-- [ ] Initialize Next.js project
+- [ ] Initialize Vite + React 19 project (match GAIA config)
+- [ ] Set up React Router 7, Tailwind CSS 4, Radix UI
 - [ ] Integrate react-pdf-highlighter
 - [ ] Test with 5+ real project PDFs
 - [ ] Verify highlight persistence across reload
-- [ ] Set up API client with type generation
+- [ ] Set up API client with type generation (openapi-fetch)
 
 **EXIT CRITERIA:**
 - [ ] 5 different PDFs render correctly

@@ -5,7 +5,7 @@
 A purpose-built web application for carbon credit project verification, transforming the existing MCP-based workflow into a document-centric interface with an embedded AI assistant.
 
 **Status:** Planning
-**Version:** 1.3
+**Version:** 1.4
 **Updated:** January 2026
 
 ---
@@ -72,11 +72,12 @@ Registry reviewers currently spend 6-8 hours per project, manually cross-referen
 
 ## Key Decisions (Recommended)
 
-1. **Templates are immutable:** updates create a new template version; child sessions opt-in to changes.
-2. **Separate AI vs manual evidence storage:** AI extraction can regenerate without risking drag-drop highlights.
-3. **Human-in-the-loop agent:** the agent proposes actions; UI requires explicit user confirmation for any state change.
-4. **Explicit artifact “freshness”:** mapping/evidence/validation/report show stale badges after upstream changes (new docs, mapping edits).
-5. **Persistent backend storage required:** sessions/artifacts must live on durable storage (frontend can remain stateless).
+1. **Vite + React 19 (not Next.js):** Aligns with GAIA repo stack; PDF libraries work better without SSR; simpler Nginx deployment.
+2. **Templates are immutable:** updates create a new template version; child sessions opt-in to changes.
+3. **Separate AI vs manual evidence storage:** AI extraction can regenerate without risking drag-drop highlights.
+4. **Human-in-the-loop agent:** the agent proposes actions; UI requires explicit user confirmation for any state change.
+5. **Explicit artifact "freshness":** mapping/evidence/validation/report show stale badges after upstream changes (new docs, mapping edits).
+6. **Persistent backend storage required:** sessions/artifacts must live on durable storage (frontend can remain stateless).
 
 ---
 
@@ -96,6 +97,7 @@ Registry reviewers currently spend 6-8 hours per project, manually cross-referen
 |----------|-------------|
 | [FRONTEND_PLANNING.md](./FRONTEND_PLANNING.md) | UI components, user journeys, interactions, implementation phases |
 | [BACKEND_PLANNING.md](./BACKEND_PLANNING.md) | API architecture, AI agent, data models, MCP integration |
+| [BACKTEST_DATASET.md](./BACKTEST_DATASET.md) | Official "Botany Farm" dataset for benchmarking extraction and workflow |
 
 ---
 
@@ -105,7 +107,7 @@ Registry reviewers currently spend 6-8 hours per project, manually cross-referen
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                           WEB APPLICATION                                    │
 │  ┌─────────────────────────────────────────────────────────────────────────┐│
-│  │                         FRONTEND (Next.js)                              ││
+│  │                      FRONTEND (Vite + React 19)                         ││
 │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                  ││
 │  │  │ PDF Viewer   │  │  Checklist   │  │  AI Chat     │                  ││
 │  │  │ + Highlights │  │  + Evidence  │  │  Panel       │                  ││
@@ -165,7 +167,7 @@ The following are already built and will be reused:
 ## Next Steps
 
 1. Review and approve this planning structure
-2. Create Next.js project repository
+2. Create Vite + React project (aligned with GAIA stack)
 3. Begin Phase 1: PDF viewer proof-of-concept
 4. Test with 5+ real project PDFs before proceeding
 
@@ -179,3 +181,4 @@ The following are already built and will be reused:
 | v1.1 | January 2026 | UX feedback: drag-drop, scratchpad, soft gating, templates |
 | v1.2 | January 2026 | Architectural feedback: MVP scope, RBAC, data handling |
 | v1.3 | January 2026 | Restructured into separate frontend/backend docs; added AI agent |
+| v1.4 | January 2026 | Switch to Vite + React 19 (align with GAIA); add Google Drive + Mailjet |
