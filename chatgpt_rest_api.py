@@ -20,9 +20,9 @@ logger = logging.getLogger(__name__)
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from fastapi import FastAPI, HTTPException, File, UploadFile, Query
+from fastapi import FastAPI, HTTPException, File, UploadFile, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel, Field
 import uvicorn
 
@@ -91,7 +91,7 @@ app = FastAPI(
     description="Carbon credit project registry review tools for ChatGPT",
     version="1.0.0",
     servers=[
-        {"url": "https://regen.gaiaai.xyz/registry", "description": "Production endpoint"}
+        {"url": "https://regen.gaiaai.xyz/api/registry", "description": "Production endpoint"}
     ],
 )
 
@@ -700,7 +700,7 @@ async def cross_validate(session_id: str):
 
 
 @app.post("/sessions/{session_id}/report", summary="Generate review report")
-async def generate_report(session_id: str, format: str = "markdown"):
+async def generate_report(session_id: str, format: str = "markdown", request: Request = None):
     """Generate complete review report.
 
     Stage 6: Creates review report with:
@@ -710,9 +710,11 @@ async def generate_report(session_id: str, format: str = "markdown"):
     - Items flagged for human review
 
     Args:
-        format: Output format - "markdown" or "json" (default: markdown)
+        format: Output format - "markdown", "json", or "checklist" (default: markdown)
+                "checklist" generates a populated registry submission form
 
     Returns report generation result with path to saved file.
+    For checklist format, includes download_url for direct file download.
     """
     try:
         from registry_review_mcp.tools import report_tools
@@ -721,6 +723,32 @@ async def generate_report(session_id: str, format: str = "markdown"):
             session_id=session_id,
             format=format,
         )
+
+        # Add download URL for all file formats
+        if request and format in ("markdown", "checklist", "docx"):
+            # Use X-Forwarded-Host if available, otherwise fall back to Host header
+            forwarded_host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+            forwarded_proto = request.headers.get("x-forwarded-proto", "https")
+            if forwarded_host:
+                base_url = f"{forwarded_proto}://{forwarded_host}/api/registry"
+            else:
+                base_url = str(request.base_url).rstrip("/")
+
+            if format == "markdown":
+                result["download_url"] = f"{base_url}/sessions/{session_id}/report/download"
+                result["download_instructions"] = (
+                    f"Download your review report (Markdown): {result['download_url']}"
+                )
+            elif format == "checklist":
+                result["download_url"] = f"{base_url}/sessions/{session_id}/checklist/download"
+                result["download_instructions"] = (
+                    f"Download your populated checklist (Markdown): {result['download_url']}"
+                )
+            else:  # docx
+                result["download_url"] = f"{base_url}/sessions/{session_id}/checklist/download-docx"
+                result["download_instructions"] = (
+                    f"Download your populated checklist (Word): {result['download_url']}"
+                )
 
         # Add workflow guidance for ChatGPT
         result["next_steps"] = {
@@ -750,6 +778,137 @@ async def generate_report(session_id: str, format: str = "markdown"):
         return result
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Report Download Endpoint
+# ============================================================================
+
+
+@app.get("/sessions/{session_id}/report/download", summary="Download report")
+async def download_report(session_id: str):
+    """Download the review report as Markdown.
+
+    Returns the report.md file for direct download.
+    Generate the report first with POST /sessions/{session_id}/report?format=markdown
+    """
+    try:
+        from registry_review_mcp.utils.state import StateManager
+
+        state_manager = StateManager(session_id)
+
+        # Validate session exists first
+        if not state_manager.exists():
+            raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+
+        report_path = state_manager.session_dir / "report.md"
+
+        if not report_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"Report not found. Generate it first with "
+                    f"POST /sessions/{session_id}/report?format=markdown"
+                ),
+            )
+
+        # Sanitize session_id for safe filename
+        safe_id = "".join(c for c in session_id[:12] if c.isalnum() or c in "-_")
+
+        return FileResponse(
+            path=report_path,
+            filename=f"report_{safe_id}.md",
+            media_type="text/markdown",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/sessions/{session_id}/checklist/download", summary="Download checklist")
+async def download_checklist(session_id: str):
+    """Download the populated registry checklist.
+
+    Returns the checklist.md file for direct download.
+    Generate the checklist first with POST /sessions/{session_id}/report?format=checklist
+    """
+    try:
+        from registry_review_mcp.utils.state import StateManager
+
+        state_manager = StateManager(session_id)
+
+        # Validate session exists first
+        if not state_manager.exists():
+            raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+
+        checklist_path = state_manager.session_dir / "checklist.md"
+
+        if not checklist_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"Checklist not found. Generate it first with "
+                    f"POST /sessions/{session_id}/report?format=checklist"
+                ),
+            )
+
+        # Sanitize session_id for safe filename
+        safe_id = "".join(c for c in session_id[:12] if c.isalnum() or c in "-_")
+
+        return FileResponse(
+            path=checklist_path,
+            filename=f"checklist_{safe_id}.md",
+            media_type="text/markdown",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/sessions/{session_id}/checklist/download-docx", summary="Download DOCX checklist")
+async def download_checklist_docx(session_id: str):
+    """Download the populated registry checklist as a Word document.
+
+    Returns the checklist.docx file for direct download.
+    Generate the checklist first with POST /sessions/{session_id}/report?format=docx
+    System-generated text appears in blue.
+    """
+    try:
+        from registry_review_mcp.utils.state import StateManager
+
+        state_manager = StateManager(session_id)
+
+        # Validate session exists first
+        if not state_manager.exists():
+            raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+
+        docx_path = state_manager.session_dir / "checklist.docx"
+
+        if not docx_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"DOCX checklist not found. Generate it first with "
+                    f"POST /sessions/{session_id}/report?format=docx"
+                ),
+            )
+
+        # Sanitize session_id for safe filename
+        safe_id = "".join(c for c in session_id[:12] if c.isalnum() or c in "-_")
+
+        return FileResponse(
+            path=docx_path,
+            filename=f"checklist_{safe_id}.docx",
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1346,7 +1505,7 @@ async def start_example_review(request: StartExampleReviewRequest):
 
 
 @app.post("/generate-upload-url", summary="Generate secure upload URL")
-async def generate_upload_url(request: GenerateUploadUrlRequest):
+async def generate_upload_url(request: GenerateUploadUrlRequest, http_request: Request):
     """Generate a secure URL where the user can upload files directly.
 
     This is Step 1 of the two-step upload pattern for ChatGPT integration.
@@ -1367,7 +1526,13 @@ async def generate_upload_url(request: GenerateUploadUrlRequest):
         "files": [],
     }
 
-    base_url = "https://regen.gaiaai.xyz/registry"
+    # Use X-Forwarded-Host if available, otherwise fall back to Host header
+    forwarded_host = http_request.headers.get("x-forwarded-host") or http_request.headers.get("host")
+    forwarded_proto = http_request.headers.get("x-forwarded-proto", "https")
+    if forwarded_host:
+        base_url = f"{forwarded_proto}://{forwarded_host}/api/registry"
+    else:
+        base_url = str(http_request.base_url).rstrip("/")
     upload_url = f"{base_url}/upload/{upload_id}?token={token}"
 
     response = {
@@ -1533,7 +1698,7 @@ async def upload_form(upload_id: str, token: str = Query(...)):
                 selectedFiles.forEach(file => formData.append('files', file));
 
                 try {{
-                    const response = await fetch('/registry/upload/{upload_id}?token={token}', {{
+                    const response = await fetch(window.location.pathname + window.location.search, {{
                         method: 'POST',
                         body: formData
                     }});

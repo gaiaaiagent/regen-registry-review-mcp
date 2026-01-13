@@ -1,0 +1,363 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Registry Review API",
+    "description": "Carbon credit project registry review tools for ChatGPT",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://regen.gaiaai.xyz/api/registry",
+      "description": "Production endpoint"
+    }
+  ],
+  "paths": {
+    "/sessions": {
+      "get": {
+        "summary": "List all sessions",
+        "operationId": "list_sessions",
+        "responses": {
+          "200": { "description": "Successful Response" }
+        }
+      },
+      "post": {
+        "summary": "Create review session",
+        "operationId": "create_session",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateSessionRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Successful Response" }
+        }
+      }
+    },
+    "/sessions/{session_id}": {
+      "get": {
+        "summary": "Get session details",
+        "operationId": "get_session",
+        "parameters": [
+          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Successful Response" }
+        }
+      },
+      "delete": {
+        "summary": "Delete session",
+        "operationId": "delete_session",
+        "parameters": [
+          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Successful Response" }
+        }
+      }
+    },
+    "/examples": {
+      "get": {
+        "summary": "List example projects",
+        "operationId": "list_examples",
+        "responses": {
+          "200": { "description": "Successful Response" }
+        }
+      }
+    },
+    "/sessions/{session_id}/discover": {
+      "post": {
+        "summary": "Discover documents",
+        "operationId": "discover_documents",
+        "parameters": [
+          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Successful Response" }
+        }
+      }
+    },
+    "/sessions/{session_id}/map": {
+      "post": {
+        "summary": "Map requirements to documents",
+        "operationId": "map_requirements",
+        "parameters": [
+          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Successful Response" }
+        }
+      }
+    },
+    "/sessions/{session_id}/mapping-matrix": {
+      "get": {
+        "summary": "Get mapping matrix view",
+        "operationId": "get_mapping_matrix",
+        "parameters": [
+          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Successful Response" }
+        }
+      }
+    },
+    "/sessions/{session_id}/evidence": {
+      "post": {
+        "summary": "Extract evidence",
+        "operationId": "extract_evidence",
+        "parameters": [
+          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Successful Response" }
+        }
+      }
+    },
+    "/sessions/{session_id}/evidence-matrix": {
+      "get": {
+        "summary": "Get evidence matrix",
+        "operationId": "get_evidence_matrix",
+        "parameters": [
+          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Successful Response" }
+        }
+      }
+    },
+    "/sessions/{session_id}/validate": {
+      "post": {
+        "summary": "Cross-validate evidence",
+        "operationId": "cross_validate",
+        "parameters": [
+          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Successful Response" }
+        }
+      }
+    },
+    "/sessions/{session_id}/report": {
+      "post": {
+        "summary": "Generate review report",
+        "operationId": "generate_report",
+        "parameters": [
+          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "format", "in": "query", "schema": { "type": "string", "default": "markdown", "enum": ["markdown", "json", "checklist", "docx"] }, "description": "Output format. Use 'checklist' for Markdown or 'docx' for Word format with color-coded status" }
+        ],
+        "responses": {
+          "200": { "description": "Successful Response with download_url for markdown/checklist/docx formats" }
+        }
+      }
+    },
+    "/sessions/{session_id}/report/download": {
+      "get": {
+        "summary": "Download review report (Markdown)",
+        "operationId": "download_report",
+        "parameters": [
+          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Returns report.md file for download", "content": { "text/markdown": {} } }
+        }
+      }
+    },
+    "/sessions/{session_id}/checklist/download": {
+      "get": {
+        "summary": "Download populated checklist (Markdown)",
+        "operationId": "download_checklist",
+        "parameters": [
+          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Returns checklist.md file for download", "content": { "text/markdown": {} } }
+        }
+      }
+    },
+    "/sessions/{session_id}/checklist/download-docx": {
+      "get": {
+        "summary": "Download populated checklist (Word)",
+        "operationId": "download_checklist_docx",
+        "description": "Download checklist as Word document with color-coded status: Green=covered, Orange=partial, Red=missing, Purple=needs review",
+        "parameters": [
+          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Returns checklist.docx file for download", "content": { "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {} } }
+        }
+      }
+    },
+    "/sessions/{session_id}/review-status": {
+      "get": {
+        "summary": "Get review status",
+        "operationId": "get_review_status",
+        "parameters": [
+          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "requirement_id", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Successful Response" }
+        }
+      }
+    },
+    "/sessions/{session_id}/override": {
+      "post": {
+        "summary": "Set requirement override",
+        "operationId": "set_override",
+        "parameters": [
+          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SetOverrideRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Successful Response" }
+        }
+      }
+    },
+    "/sessions/{session_id}/determination": {
+      "get": {
+        "summary": "Get final determination",
+        "operationId": "get_determination",
+        "parameters": [
+          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Successful Response" }
+        }
+      },
+      "post": {
+        "summary": "Set final determination",
+        "operationId": "set_determination",
+        "parameters": [
+          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SetDeterminationRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Successful Response" }
+        }
+      }
+    },
+    "/start-example-review": {
+      "post": {
+        "summary": "Start review with example project",
+        "operationId": "start_example_review",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/StartExampleReviewRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Successful Response" }
+        }
+      }
+    },
+    "/generate-upload-url": {
+      "post": {
+        "summary": "Generate secure upload URL",
+        "operationId": "generate_upload_url",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/GenerateUploadUrlRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Successful Response" }
+        }
+      }
+    },
+    "/process-upload/{upload_id}": {
+      "post": {
+        "summary": "Process uploaded files",
+        "operationId": "process_upload",
+        "parameters": [
+          { "name": "upload_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Successful Response" }
+        }
+      }
+    },
+    "/upload-status/{upload_id}": {
+      "get": {
+        "summary": "Check upload status",
+        "operationId": "check_upload_status",
+        "parameters": [
+          { "name": "upload_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Successful Response" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreateSessionRequest": {
+        "type": "object",
+        "required": ["project_name"],
+        "properties": {
+          "project_name": { "type": "string", "description": "Name of the project to review" },
+          "methodology": { "type": "string", "default": "soil-carbon-v1.2.2" },
+          "project_id": { "type": "string", "description": "Optional project ID (e.g., C06-4997)" }
+        }
+      },
+      "StartExampleReviewRequest": {
+        "type": "object",
+        "required": ["example_name"],
+        "properties": {
+          "example_name": { "type": "string", "description": "Name of example project (e.g., '22-23')" },
+          "project_name": { "type": "string", "description": "Custom project name (optional)" }
+        }
+      },
+      "GenerateUploadUrlRequest": {
+        "type": "object",
+        "required": ["project_name"],
+        "properties": {
+          "project_name": { "type": "string" },
+          "methodology": { "type": "string", "default": "soil-carbon-v1.2.2" }
+        }
+      },
+      "SetOverrideRequest": {
+        "type": "object",
+        "required": ["requirement_id", "override_status"],
+        "properties": {
+          "requirement_id": { "type": "string" },
+          "override_status": { "type": "string", "description": "approved, rejected, needs_revision, conditional, pending" },
+          "notes": { "type": "string" },
+          "reviewer": { "type": "string", "default": "user" }
+        }
+      },
+      "SetDeterminationRequest": {
+        "type": "object",
+        "required": ["determination", "notes"],
+        "properties": {
+          "determination": { "type": "string", "description": "approve, conditional, reject, hold" },
+          "notes": { "type": "string" },
+          "conditions": { "type": "string" },
+          "reviewer": { "type": "string", "default": "user" }
+        }
+      }
+    }
+  }
+}

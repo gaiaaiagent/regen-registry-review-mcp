@@ -10,6 +10,7 @@ from registry_review_mcp.utils.state import StateManager
 class TestEvidenceExtraction:
     """Test complete evidence extraction workflow using LLM-based extraction."""
 
+    @pytest.mark.expensive
     @pytest.mark.asyncio
     async def test_extract_all_evidence(self, example_documents_path):
         """Test extracting evidence for all requirements."""

@@ -201,11 +201,11 @@ async def analyze_session_unified(session_id: str) -> dict[str, Any]:
     }
 
     # 2. Validation format (for validation.json) - matches ValidationResult model schema
-    from datetime import datetime, UTC
+    from datetime import datetime, timezone
 
     validation_result = {
         "session_id": session_id,
-        "validated_at": datetime.now(UTC).isoformat(),
+        "validated_at": datetime.now(timezone.utc).isoformat(),
         # LLM validation checks - store as generic validations for now
         # (not date/tenure/project_id specific since LLM does unified analysis)
         "date_alignments": [],

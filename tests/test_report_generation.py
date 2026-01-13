@@ -67,8 +67,9 @@ class TestMarkdownReportGeneration:
         # Should have requirements section
         assert "Requirements" in content or "REQ-" in content
 
+    @pytest.mark.expensive
     async def test_markdown_report_includes_citations(self, tmp_path):
-        """Test that Markdown report includes page citations."""
+        """Test that Markdown report includes page citations (requires LLM extraction)."""
         example_path = Path(__file__).parent.parent / "examples" / "22-23"
 
         if not example_path.exists():

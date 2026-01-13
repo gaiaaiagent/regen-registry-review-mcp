@@ -328,16 +328,13 @@ def cache(test_settings):
 
 
 @pytest.fixture(autouse=True, scope="function")
-def cleanup_sessions(tmp_path_factory, worker_id):
+def cleanup_sessions(tmp_path_factory):
     """Ensure each test starts with clean session state.
 
     STRUCTURAL SAFETY: Environment-level isolation is now the primary defense.
     XDG_DATA_HOME is set to /tmp BEFORE settings is imported, so the settings
     singleton initializes with /tmp paths. This fixture provides additional
     per-test cleanup as a secondary defense.
-
-    This fixture cleans the actual settings.sessions_dir to ensure test isolation
-    in parallel execution.
     """
     # SAFETY: Verify structural isolation is working
     # This should never fail with the new architecture, but we check anyway

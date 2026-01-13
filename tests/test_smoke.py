@@ -181,6 +181,92 @@ class TestErrorHandling:
         assert not cache.exists("nonexistent")
 
 
+@pytest.mark.smoke
+class TestLazyLoadingPattern:
+    """Verify heavy dependencies don't block core imports."""
+
+    def test_core_tools_import_without_heavy_deps(self):
+        """Core tools can be imported without fiona/marker.
+
+        This validates the lazy loading pattern: heavy deps (fiona, marker)
+        should only be required when calling specific functions, not at
+        module import time.
+        """
+        # These imports should work even if fiona/marker aren't installed
+        from registry_review_mcp.tools import validation_tools
+        from registry_review_mcp.tools import evidence_tools
+        from registry_review_mcp.models import evidence
+
+        # Verify we got actual modules
+        assert hasattr(validation_tools, "cross_validate")
+        assert hasattr(evidence_tools, "extract_evidence_with_llm")
+        assert hasattr(evidence, "EvidenceSnippet")
+
+    def test_evidence_model_has_structured_fields(self):
+        """EvidenceSnippet model supports structured_fields."""
+        from registry_review_mcp.models.evidence import EvidenceSnippet
+
+        # New field should exist with None default
+        snippet = EvidenceSnippet(
+            document_id="doc-001",
+            document_name="test.pdf",
+            text="Test evidence",
+            confidence=0.95,
+            page=1,
+        )
+        assert snippet.structured_fields is None
+
+        # Should accept structured_fields
+        snippet_with_fields = EvidenceSnippet(
+            document_id="doc-001",
+            document_name="test.pdf",
+            text="Test evidence",
+            confidence=0.95,
+            page=1,
+            structured_fields={"owner_name": "John Doe"},
+        )
+        assert snippet_with_fields.structured_fields == {"owner_name": "John Doe"}
+
+
+@pytest.mark.smoke
+class TestDocumentDiscoveryEdgeCases:
+    """Regression tests for document discovery edge cases."""
+
+    @pytest.mark.asyncio
+    async def test_discovery_in_dot_prefixed_parent_directory(self, test_settings, tmp_path):
+        """Files are found even when parent path contains dot-prefixed directories.
+
+        Regression test for bug where files under ~/.local/share/ were skipped
+        because the hidden file check examined the full absolute path instead of
+        the relative path from the scan root.
+        """
+        # Create a path that mimics ~/.local/share structure
+        dot_parent = tmp_path / ".local" / "share" / "test-uploads"
+        dot_parent.mkdir(parents=True)
+
+        # Create a test PDF file
+        test_pdf = dot_parent / "test_document.pdf"
+        test_pdf.write_bytes(b"%PDF-1.4 fake pdf content")
+
+        from registry_review_mcp.tools import session_tools, document_tools
+
+        # Create session pointing to the dot-prefixed path
+        result = await session_tools.create_session(
+            project_name="Dot Path Test",
+            documents_path=str(dot_parent),
+            methodology="soil-carbon-v1.2.2",
+        )
+        session_id = result["session_id"]
+
+        # Run discovery
+        discovery_result = await document_tools.discover_documents(session_id)
+
+        # The file should be found (not skipped due to .local in path)
+        assert discovery_result["documents_found"] >= 1, (
+            "File in .local path should not be skipped as hidden"
+        )
+
+
 # Summary fixture to track smoke test health
 @pytest.fixture(scope="module", autouse=True)
 def smoke_test_summary(request):

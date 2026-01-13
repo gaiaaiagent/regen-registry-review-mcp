@@ -21,6 +21,10 @@ class EvidenceSnippet(BaseModel):
     )
     snippet_id: str | None = Field(None, description="Unique snippet identifier")
     extraction_method: str | None = Field(None, description="Method: keyword, semantic, or structured")
+    structured_fields: dict[str, Any] | None = Field(
+        None,
+        description="Structured fields extracted for cross-validation (owner_name, project_id, dates, etc.)"
+    )
 
 
 class MappedDocument(BaseModel):
@@ -43,6 +47,10 @@ class RequirementEvidence(BaseModel):
     requirement_id: str = Field(..., description="Requirement ID (e.g., REQ-002)")
     requirement_text: str = Field(..., description="The requirement text")
     category: str = Field(..., description="Requirement category")
+    validation_type: str = Field(
+        "document_presence",
+        description="Validation type from checklist: document_presence, cross_document, structured_field, manual"
+    )
     status: str = Field(
         ..., description="Status: covered, partial, missing, or flagged"
     )

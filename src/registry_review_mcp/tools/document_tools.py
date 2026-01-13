@@ -10,8 +10,6 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
 
-import pdfplumber
-import fiona
 import psutil
 
 from ..config.settings import settings
@@ -489,8 +487,9 @@ async def discover_documents(session_id: str) -> dict[str, Any]:
             if file_path.suffix.lower() not in supported_extensions:
                 continue
 
-            # Skip hidden files and cache directories
-            if any(part.startswith(".") for part in file_path.parts):
+            # Skip hidden files and cache directories (check relative path only)
+            relative_parts = file_path.relative_to(scan_path).parts
+            if any(part.startswith(".") for part in relative_parts):
                 continue
 
             discovered_files.append(file_path)
@@ -749,10 +748,10 @@ async def extract_pdf_text(
         "markdown": result["markdown"],  # NEW: Full markdown
         "full_text": result["markdown"],  # Backward compat (same as markdown)
         "tables": tables,
-        "images": result["images"],
+        "images": result.get("images", []),
         "page_count": result["page_count"],
         "extracted_at": result["extracted_at"],
-        "extraction_method": "marker",
+        "extraction_method": result.get("extraction_method", "marker"),
         "metadata": result.get("metadata", {}),
     }
 
@@ -765,6 +764,15 @@ async def extract_gis_metadata(filepath: str) -> dict[str, Any]:
     cached = gis_cache.get(cache_key)
     if cached is not None:
         return cached
+
+    # Lazy import: fiona is heavy and only needed for GIS extraction
+    try:
+        import fiona
+    except ImportError:
+        raise DocumentExtractionError(
+            "GIS support requires 'fiona'. Install with: pip install fiona",
+            details={"filepath": filepath},
+        )
 
     try:
         file_path = Path(filepath)
