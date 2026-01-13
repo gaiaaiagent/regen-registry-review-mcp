@@ -95,7 +95,8 @@ Registry reviewers currently spend 6-8 hours per project, manually cross-referen
 
 | Document | Description |
 |----------|-------------|
-| [FRONTEND_PLANNING.md](./FRONTEND_PLANNING.md) | UI components, user journeys, interactions, implementation phases |
+| [IMPLEMENTATION_CHECKLIST.md](./IMPLEMENTATION_CHECKLIST.md) | **Start here** - Phased checklist for Claude Code sessions |
+| [FRONTEND_PLANNING.md](./FRONTEND_PLANNING.md) | UI components, user journeys, technical stack details |
 | [BACKEND_PLANNING.md](./BACKEND_PLANNING.md) | API architecture, AI agent, data models, MCP integration |
 | [BACKTEST_DATASET.md](./BACKTEST_DATASET.md) | Official "Botany Farm" dataset for benchmarking extraction and workflow |
 
