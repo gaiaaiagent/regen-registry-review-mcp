@@ -1,21 +1,35 @@
 # Changelog
 
-All notable changes to the Regen Registry Review MCP will be documented here.
+All notable changes to the Registry Review MCP Server are documented here.
 
-## [Unreleased]
+## [2.0.0] - 2025-11-26
 
-### Fixed
-- **CRITICAL:** MCP error handling decorator now properly re-raises exceptions instead of returning error strings, fixing silent failures that violated the MCP protocol contract (all 25+ tools affected)
+Eight-stage workflow implementation for automated carbon credit project registration reviews.
 
 ### Added
-- Comprehensive error propagation regression tests (`tests/test_error_propagation.py`)
-- Documentation of MCP protocol compliance in `with_error_handling` decorator
+- **Eight-stage workflow** (A-H prompts) for guided review process
+- **Session management** - Create, load, list, delete review sessions
+- **Document discovery** - Recursive scanning with intelligent classification
+- **Requirement mapping** - Semantic matching to 23 checklist requirements
+- **Evidence extraction** - Text snippets with page citations
+- **Cross-validation** - Date alignment, land tenure, project ID consistency
+- **Report generation** - Markdown and JSON output formats
+- **File upload tools** - Base64 and path-based upload support
+- **LLM-powered extraction** - Optional Anthropic API integration for field extraction
+- **PDF text extraction** - PyMuPDF fast extraction with marker fallback
+- **GIS metadata extraction** - Shapefile and GeoJSON support
 
-### Removed
-- Unused `format_error()` function from `tool_helpers.py` (14 lines)
+### Configuration
+- Environment-based settings via `.env`
+- Configurable LLM model, chunking, and cost management
+- Test markers for expensive/integration/accuracy tests
 
----
+## [0.1.0] - 2025-11-12
 
-## [0.1.0] - 2025-11-26
+Initial prototype with foundation infrastructure.
 
-Initial prototype implementation of Registry Review MCP with 8-stage workflow.
+### Added
+- MCP server scaffolding with FastMCP
+- Basic session state management
+- Soil Carbon v1.2.2 checklist (23 requirements)
+- Error handling infrastructure

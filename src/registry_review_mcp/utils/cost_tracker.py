@@ -6,7 +6,7 @@ Tracks API calls, tokens, and estimated costs for monitoring and optimization.
 import fcntl
 import json
 import logging
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -54,7 +54,7 @@ PRICING = {
 class APICall(BaseModel):
     """Record of a single API call."""
 
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     model: str
     extractor: str  # "date", "tenure", "project_id"
     document_name: str

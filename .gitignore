@@ -216,5 +216,8 @@ __marimo__/
 data/sessions/
 data/cache/
 
+# Claude conversation logs (may contain sensitive data)
+.claude/logging/**/*.jsonl
+
 # Development assets (23MB - exclude from production)
 examples/

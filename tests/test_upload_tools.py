@@ -91,10 +91,10 @@ class TestCreateSessionFromUploads:
         assert result["session_id"].startswith("session-")
         assert result["files_saved"] == ["test.pdf"]
         assert result["documents_found"] >= 1
-        assert "temp_directory" in result
+        assert "documents_directory" in result
 
-        # Verify temp directory was created and contains file
-        temp_dir = Path(result["temp_directory"])
+        # Verify documents directory was created and contains file
+        temp_dir = Path(result["documents_directory"])
         assert temp_dir.exists()
         assert (temp_dir / "test.pdf").exists()
 

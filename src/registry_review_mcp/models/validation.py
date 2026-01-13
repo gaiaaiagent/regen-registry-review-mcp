@@ -110,6 +110,22 @@ class ValidationSummary(BaseModel):
     pass_rate: float = Field(..., ge=0.0, le=1.0)
     extraction_method: str = "regex"  # "llm", "regex", "llm_fallback", "regex_fallback"
 
+    # Three-layer architecture counts (optional for backward compat)
+    structural_checks: int | None = None
+    cross_document_checks: int | None = None
+    llm_synthesis_available: bool | None = None
+
+
+class SanityCheck(BaseModel):
+    """Result of a single-document sanity check (Layer 1)."""
+
+    validation_id: str
+    validation_type: str
+    field_name: str
+    status: str  # "pass", "warning", "fail"
+    message: str
+    flagged_for_review: bool = False
+
 
 class ValidationResult(BaseModel):
     """Complete validation results for a session."""
@@ -123,6 +139,12 @@ class ValidationResult(BaseModel):
     summary: ValidationSummary
     all_passed: bool
 
+    # Three-layer architecture results (optional for backward compat)
+    sanity_checks: list[SanityCheck] = Field(default_factory=list)
+    structural: dict | None = None  # Full Layer 1 results
+    cross_document: dict | None = None  # Full Layer 2 results
+    llm_synthesis: dict | None = None  # Full Layer 3 results
+
 
 __all__ = [
     "DateField",
@@ -132,6 +154,7 @@ __all__ = [
     "ProjectIDOccurrence",
     "ProjectIDValidation",
     "ContradictionCheck",
+    "SanityCheck",
     "ValidationSummary",
     "ValidationResult",
 ]

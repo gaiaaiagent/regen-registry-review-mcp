@@ -31,6 +31,248 @@ from ..utils.state import StateManager
 logger = logging.getLogger(__name__)
 
 
+# Configuration for type-aware structured field extraction
+# Maps field patterns to their extraction instructions
+STRUCTURED_FIELD_CONFIGS = {
+    "land_tenure": {
+        "keywords": ["land tenure", "ownership", "landowner"],
+        "fields": [
+            ("owner_name", "Full name of landowner or leaseholder (e.g., 'Nicholas Denman')"),
+            ("area_hectares", "Total project area in hectares (numeric, convert acres if needed)"),
+            ("tenure_type", "Type of tenure: ownership, lease, or easement"),
+        ],
+        "warning": "Only extract actual names of people/organizations, NOT generic text like 'The Project' or 'The Farm'.",
+    },
+    "project_identity": {
+        "keywords": ["project id", "registry id", "project name", "project identifier"],
+        "fields": [
+            ("project_id", "Project identifier (e.g., 'C01-1234' or '4997Botany22')"),
+            ("project_name", "Full project name"),
+        ],
+    },
+    "project_start_date": {
+        "keywords": ["start date", "project start"],
+        "fields": [
+            ("project_start_date", "When the project began (format: YYYY-MM-DD)"),
+        ],
+        "warning": "Only extract explicitly stated dates, not inferred ones.",
+    },
+    "crediting_period": {
+        "keywords": ["crediting period"],
+        "fields": [
+            ("crediting_period_years", "Duration in years (integer)"),
+            ("crediting_period_start", "Start date (format: YYYY-MM-DD)"),
+            ("crediting_period_end", "End date (format: YYYY-MM-DD)"),
+        ],
+    },
+    "buffer_pool": {
+        "keywords": ["buffer pool"],
+        "fields": [
+            ("buffer_pool_percentage", "Buffer pool contribution percentage (numeric, e.g., 20)"),
+        ],
+    },
+    "leakage": {
+        "keywords": ["leakage"],
+        "fields": [
+            ("leakage_percentage", "Leakage percentage threshold (numeric)"),
+        ],
+    },
+    "permanence": {
+        "keywords": ["permanence"],
+        "fields": [
+            ("permanence_period_years", "Permanence period duration in years (integer)"),
+        ],
+    },
+}
+
+
+def _find_matching_config(requirement_text: str) -> dict | None:
+    """Find a matching structured field config based on requirement text keywords."""
+    text_lower = requirement_text.lower()
+    for config in STRUCTURED_FIELD_CONFIGS.values():
+        if any(kw in text_lower for kw in config["keywords"]):
+            return config
+    return None
+
+
+def _build_structured_guidance(config: dict | None, validation_type: str) -> str:
+    """Build structured field extraction guidance from config.
+
+    Enforces EXACT canonical field names to ensure consistency between
+    extraction (Stage D) and validation (Stage E).
+    """
+    if config is None:
+        if validation_type == "cross_document":
+            return """
+**STRUCTURED FIELD EXTRACTION:**
+For cross-document validation, extract key values using EXACT field names:
+- "owner_name": Full name of person/organization (NOT generic terms)
+- "area_hectares": Numeric area in hectares
+- "project_id": Project identifier string
+- "project_start_date": Date in YYYY-MM-DD format
+
+Use these exact field names in your structured_fields JSON.
+"""
+        elif validation_type == "structured_field":
+            return """
+**STRUCTURED FIELD EXTRACTION:**
+Extract specific values using EXACT canonical field names:
+- Dates: "project_start_date", "crediting_period_start", "crediting_period_end" (YYYY-MM-DD)
+- Periods: "crediting_period_years", "permanence_period_years" (integers)
+- Percentages: "buffer_pool_percentage", "leakage_percentage" (numbers 0-100)
+- IDs: "project_id" (string)
+
+Use these exact field names. Do NOT use synonyms like "project_identifier".
+"""
+        return ""
+
+    # Build example JSON to show exact field names
+    example_fields = {}
+    for name, desc in config["fields"]:
+        if "date" in name.lower():
+            example_fields[name] = "YYYY-MM-DD"
+        elif "percentage" in name.lower():
+            example_fields[name] = 20.0
+        elif "years" in name.lower():
+            example_fields[name] = 10
+        elif "hectares" in name.lower():
+            example_fields[name] = 100.5
+        elif "name" in name.lower():
+            example_fields[name] = "Example Name"
+        else:
+            example_fields[name] = "value"
+
+    import json
+    example_json = json.dumps(example_fields, indent=2)
+
+    field_list = "\n".join(f'- "{name}": {desc}' for name, desc in config["fields"])
+    warning = f"\n⚠️ CRITICAL: {config['warning']}" if config.get("warning") else ""
+
+    return f"""
+**STRUCTURED FIELD EXTRACTION:**
+
+Extract ONLY these fields using the EXACT field names shown:
+{field_list}
+{warning}
+
+**Required JSON format** - use these exact keys:
+```json
+{example_json}
+```
+
+⚠️ Do NOT use synonyms or variations. Use the exact field names above.
+For example, use "project_id" NOT "project_identifier" or "registry_id".
+"""
+
+
+def build_type_aware_prompt(
+    requirement: dict,
+    document_content: str,
+    document_name: str,
+    validation_type: str,
+) -> str:
+    """Build an LLM prompt tailored to the validation type.
+
+    For cross_document and structured_field requirements, includes instructions
+    to extract specific structured fields alongside evidence snippets. Uses
+    STRUCTURED_FIELD_CONFIGS to determine which fields to extract based on
+    requirement text keywords.
+
+    Args:
+        requirement: Requirement dictionary containing requirement_text,
+            accepted_evidence, category, and requirement_id.
+        document_content: Full markdown content of the document to analyze.
+        document_name: Name of the document for context in the prompt.
+        validation_type: Type of validation from checklist
+            (document_presence, cross_document, structured_field, manual).
+
+    Returns:
+        Formatted prompt string for LLM extraction, including base task
+        description, structured field guidance (if applicable), and output format.
+    """
+    requirement_text = requirement.get("requirement_text", "")
+    accepted_evidence = requirement.get("accepted_evidence", "")
+    category = requirement.get("category", "")
+
+    # Base prompt structure
+    base_prompt = f"""You are analyzing a carbon credit project document to find evidence for a specific requirement.
+
+**Requirement Category:** {category}
+
+**Requirement Text:**
+{requirement_text}
+
+**Accepted Evidence:**
+{accepted_evidence}
+
+**Document Name:** {document_name}
+
+**Document Content:**
+{document_content}
+
+**Task:**
+Extract ALL passages from the document that provide evidence for this requirement.
+"""
+
+    # Build structured guidance from config (if validation type requires it)
+    structured_guidance = ""
+    if validation_type in ("cross_document", "structured_field"):
+        config = _find_matching_config(requirement_text)
+        structured_guidance = _build_structured_guidance(config, validation_type)
+
+    # Output format based on whether we need structured fields
+    if structured_guidance:
+        output_format = """
+**Output Format:**
+```json
+[
+  {
+    "text": "The exact quote from the document (2-3 sentences)",
+    "page": 5,
+    "section": "2. Land Tenure",
+    "confidence": 0.95,
+    "reasoning": "Why this is relevant evidence",
+    "structured_fields": {
+      "owner_name": "Nicholas Denman",
+      "area_hectares": 100.5
+    }
+  }
+]
+```
+
+If no structured fields found in a snippet, omit the "structured_fields" key or set it to null.
+Extract only high-quality evidence (confidence > 0.6). Be precise and thorough."""
+    else:
+        output_format = """
+**Output Format:**
+```json
+[
+  {
+    "text": "The exact quote from the document (2-3 sentences)",
+    "page": 5,
+    "section": "2. Land Tenure",
+    "confidence": 0.95,
+    "reasoning": "Why this is relevant evidence"
+  }
+]
+```
+
+Extract only high-quality evidence (confidence > 0.6). Be precise and thorough."""
+
+    evidence_instructions = """
+For each piece of evidence, provide:
+1. **text**: The exact quote from the document (2-3 sentences with context)
+2. **page**: Page number (extract from markers like `![](_page_5_Picture_0.jpeg)` or section headers)
+3. **section**: The section header this appears under
+4. **confidence**: Your confidence that this provides evidence (0.0-1.0)
+5. **reasoning**: Brief explanation of why this is relevant evidence
+
+Return a JSON array of evidence snippets. If no relevant evidence found, return empty array.
+"""
+
+    return base_prompt + structured_guidance + evidence_instructions + output_format
+
+
 async def get_markdown_content(document: dict[str, Any], session_id: str) -> str | None:
     """Get markdown content for a document.
 
@@ -168,22 +410,25 @@ async def extract_evidence_with_llm(
     document_content: str,
     document_id: str,
     document_name: str,
+    validation_type: str = "document_presence",
 ) -> list[EvidenceSnippet]:
     """Use LLM to extract evidence for a requirement from a document.
 
     This replaces keyword matching with semantic understanding.
     Includes local caching to avoid redundant API calls during development.
+
+    For cross_document and structured_field validation types, also extracts
+    structured fields (owner_name, dates, etc.) for use in validation.
     """
     requirement_id = requirement.get("requirement_id", "")
     requirement_text = requirement.get("requirement_text", "")
     accepted_evidence = requirement.get("accepted_evidence", "")
-    category = requirement.get("category", "")
 
     # Truncate content if too long (200K chars max)
     if len(document_content) > 200000:
         document_content = document_content[:200000] + "\n\n[... document truncated ...]"
 
-    # Generate cache key
+    # Generate cache key (include validation_type for cache differentiation)
     active_model = settings.get_active_llm_model()
     cache_key = generate_cache_key(
         requirement_id=requirement_id,
@@ -194,6 +439,8 @@ async def extract_evidence_with_llm(
         model=active_model,
         temperature=settings.llm_temperature
     )
+    # Add validation_type suffix to differentiate cache entries
+    cache_key = f"{cache_key}_{validation_type[:4]}"
 
     # Try cache first (if enabled)
     if settings.llm_cache_enabled:
@@ -202,47 +449,13 @@ async def extract_evidence_with_llm(
             logger.info(f"📦 Cache hit: {requirement_id} + {document_name}")
             return cached_response
 
-    prompt = f"""You are analyzing a carbon credit project document to find evidence for a specific requirement.
-
-**Requirement Category:** {category}
-
-**Requirement Text:**
-{requirement_text}
-
-**Accepted Evidence:**
-{accepted_evidence}
-
-**Document Name:** {document_name}
-
-**Document Content:**
-{document_content}
-
-**Task:**
-Extract ALL passages from the document that provide evidence for this requirement.
-
-For each piece of evidence, provide:
-1. **text**: The exact quote from the document (2-3 sentences with context)
-2. **page**: Page number (extract from markers like `![](_page_5_Picture_0.jpeg)` or section headers)
-3. **section**: The section header this appears under
-4. **confidence**: Your confidence that this provides evidence (0.0-1.0)
-5. **reasoning**: Brief explanation of why this is relevant evidence
-
-Return a JSON array of evidence snippets. If no relevant evidence found, return empty array.
-
-**Output Format:**
-```json
-[
-  {{
-    "text": "The farm is owned by John Smith, as evidenced by Title Deed No. 12345...",
-    "page": 5,
-    "section": "2. Land Tenure",
-    "confidence": 0.95,
-    "reasoning": "Directly provides owner name and title deed number as required evidence"
-  }}
-]
-```
-
-Extract only high-quality evidence (confidence > 0.6). Be precise and thorough."""
+    # Build type-aware prompt
+    prompt = build_type_aware_prompt(
+        requirement=requirement,
+        document_content=document_content,
+        document_name=document_name,
+        validation_type=validation_type,
+    )
 
     # Cache miss - call API
     logger.info(f"🌐 API call: {requirement_id} + {document_name}")
@@ -286,6 +499,14 @@ Extract only high-quality evidence (confidence > 0.6). Be precise and thorough."
         # Convert to EvidenceSnippet objects
         snippets = []
         for item in evidence_array:
+            # Extract structured fields if present (for cross_document/structured_field types)
+            structured_fields = item.get("structured_fields")
+            if structured_fields and not isinstance(structured_fields, dict):
+                structured_fields = None  # Ensure it's a dict or None
+
+            # Determine extraction method based on presence of structured fields
+            extraction_method = "structured" if structured_fields else "semantic"
+
             snippet = EvidenceSnippet(
                 text=item["text"],
                 document_id=document_id,
@@ -293,7 +514,9 @@ Extract only high-quality evidence (confidence > 0.6). Be precise and thorough."
                 page=item.get("page"),
                 section=item.get("section"),
                 confidence=item["confidence"],
-                keywords_matched=[]  # Not using keywords anymore
+                keywords_matched=[],  # Not using keywords anymore
+                extraction_method=extraction_method,
+                structured_fields=structured_fields,
             )
             snippets.append(snippet)
 
@@ -466,9 +689,13 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
     semaphore = asyncio.Semaphore(5)  # Max 5 concurrent LLM calls
 
     async def extract_requirement_evidence(req: dict, index: int) -> RequirementEvidence:
-        """Extract evidence for one requirement using LLM."""
+        """Extract evidence for one requirement using LLM.
+
+        Uses type-aware extraction based on validation_type from checklist.
+        """
         async with semaphore:
             requirement_id = req["requirement_id"]
+            validation_type = req.get("validation_type", "document_presence")
 
             # Show progress
             if index % 5 == 0 or index == 1 or index == len(requirements):
@@ -484,6 +711,7 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
                     requirement_id=requirement_id,
                     requirement_text=req.get("requirement_text", ""),
                     category=req.get("category", ""),
+                    validation_type=validation_type,
                     status="missing",
                     confidence=0.0,
                     mapped_documents=[],
@@ -506,13 +734,14 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
 
                 doc = doc_metadata[doc_id]
 
-                # Use LLM to extract evidence
+                # Use type-aware LLM extraction based on validation_type
                 snippets = await extract_evidence_with_llm(
                     client=anthropic_client,
                     requirement=req,
                     document_content=content,
                     document_id=doc_id,
-                    document_name=doc["filename"]
+                    document_name=doc["filename"],
+                    validation_type=validation_type,
                 )
 
                 all_snippets.extend(snippets)
@@ -541,6 +770,7 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
                 requirement_id=requirement_id,
                 requirement_text=req.get("requirement_text", ""),
                 category=req.get("category", ""),
+                validation_type=validation_type,
                 status=status,
                 confidence=confidence,
                 mapped_documents=mapped_docs,
