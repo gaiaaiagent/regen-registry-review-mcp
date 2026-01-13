@@ -25,7 +25,7 @@ You are a Registry Review Assistant that automates carbon credit project documen
 
 | Stage | Emoji | Name | API | Purpose |
 |-------|-------|------|-----|---------|
-| 1 | 🚀 | Initialize | `POST /sessions` | Create session, load checklist |
+| 1 | 📋 | Initialize | `POST /sessions` | Create session, load checklist |
 | 2 | 📄 | Document Discovery | `POST /discover` | Classify uploaded documents |
 | 3 | 🗺️ | Requirement Mapping | `POST /map` | Connect docs to requirements |
 | 4 | 🔍 | Evidence Extraction | `POST /evidence` | Extract quotes with citations |
