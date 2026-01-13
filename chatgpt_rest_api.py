@@ -1246,10 +1246,11 @@ async def generate_upload_url(request: GenerateUploadUrlRequest, http_request: R
         "files": [],
     }
 
-    forwarded_host = http_request.headers.get("x-forwarded-host")
+    # Use X-Forwarded-Host if available, otherwise fall back to Host header
+    forwarded_host = http_request.headers.get("x-forwarded-host") or http_request.headers.get("host")
     forwarded_proto = http_request.headers.get("x-forwarded-proto", "https")
     if forwarded_host:
-        base_url = f"{forwarded_proto}://{forwarded_host}"
+        base_url = f"{forwarded_proto}://{forwarded_host}/api/registry"
     else:
         base_url = str(http_request.base_url).rstrip("/")
     upload_url = f"{base_url}/upload/{upload_id}?token={token}"
