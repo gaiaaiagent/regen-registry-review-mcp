@@ -11,7 +11,11 @@ import secrets
 import base64
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Optional, Any
+import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
@@ -198,6 +202,41 @@ class RevisionRequest(BaseModel):
 class ResolveRevisionRequest(BaseModel):
     resolution_notes: str = Field(..., description="Notes about how the revision was resolved")
     resolved_by: str = Field(default="user", description="Identifier of the resolver")
+
+
+# ============================================================================
+# Agent Chat Models
+# ============================================================================
+
+
+class AgentContext(BaseModel):
+    focused_requirement_id: Optional[str] = Field(None, description="Currently focused requirement ID")
+    visible_document_id: Optional[str] = Field(None, description="Currently visible document ID")
+    visible_page: Optional[int] = Field(None, description="Currently visible page number")
+
+
+class AgentChatRequest(BaseModel):
+    message: str = Field(..., description="User message to the agent")
+    context: Optional[AgentContext] = Field(None, description="Current workspace context")
+
+
+class AgentAction(BaseModel):
+    type: str = Field(..., description="Action type: navigate, extract, validate, etc.")
+    label: str = Field(..., description="Button label for UI")
+    params: dict = Field(default_factory=dict, description="Action parameters")
+
+
+class AgentSource(BaseModel):
+    document_id: str = Field(..., description="Document ID")
+    document_name: str = Field(..., description="Document filename")
+    page: Optional[int] = Field(None, description="Page number")
+    text: Optional[str] = Field(None, description="Relevant excerpt")
+
+
+class AgentChatResponse(BaseModel):
+    message: str = Field(..., description="Agent's text response")
+    actions: List[AgentAction] = Field(default_factory=list, description="Proposed actions as buttons")
+    sources: List[AgentSource] = Field(default_factory=list, description="Referenced documents/pages")
 
 
 # ============================================================================
@@ -978,6 +1017,246 @@ async def delete_session(session_id: str):
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Agent Chat Endpoint
+# ============================================================================
+
+
+def build_agent_tools_description() -> str:
+    """Build description of available tools for the agent."""
+    return """You have access to these tools for the registry review workspace:
+
+1. search_documents(query: str) - Search across all session documents for relevant content
+2. get_requirement_status(requirement_id: str) - Get current status and evidence for a requirement
+3. navigate_to_page(document_id: str, page: int) - Suggest navigation to a specific page
+4. summarize_gaps() - List all requirements that are missing evidence
+5. get_document_list() - Get list of all documents in the session
+6. explain_evidence(requirement_id: str) - Explain what evidence was found for a requirement
+
+When you want to suggest an action to the user, respond with a JSON block containing proposed actions.
+Actions will be shown as buttons the user can click to execute them."""
+
+
+def build_session_context(session_data: dict, evidence_data: dict | None, documents_data: dict | None) -> str:
+    """Build context string about the current session state."""
+    project_name = session_data.get("project_metadata", {}).get("project_name", "Unknown")
+    methodology = session_data.get("project_metadata", {}).get("methodology", "Unknown")
+    workflow = session_data.get("workflow_progress", {})
+
+    context_parts = [
+        f"Project: {project_name}",
+        f"Methodology: {methodology}",
+        f"Workflow Status: {get_derived_status(workflow)}",
+    ]
+
+    if documents_data:
+        docs = documents_data.get("documents", [])
+        context_parts.append(f"Documents: {len(docs)} files")
+        doc_names = [d.get("filename", "unknown") for d in docs[:5]]
+        context_parts.append(f"Document names: {', '.join(doc_names)}")
+
+    if evidence_data:
+        evidence_list = evidence_data.get("evidence", [])
+        covered = sum(1 for e in evidence_list if e.get("status") == "covered")
+        partial = sum(1 for e in evidence_list if e.get("status") == "partial")
+        missing = sum(1 for e in evidence_list if e.get("status") == "missing")
+        context_parts.append(f"Evidence: {covered} covered, {partial} partial, {missing} missing")
+
+    return "\n".join(context_parts)
+
+
+def build_focused_context(context: AgentContext | None, evidence_data: dict | None, documents_data: dict | None) -> str:
+    """Build context about what the user is currently looking at."""
+    if not context:
+        return "User context: Not specified"
+
+    parts = []
+    if context.focused_requirement_id:
+        parts.append(f"Focused requirement: {context.focused_requirement_id}")
+        if evidence_data:
+            for ev in evidence_data.get("evidence", []):
+                if ev.get("requirement_id") == context.focused_requirement_id:
+                    parts.append(f"  Status: {ev.get('status', 'unknown')}")
+                    parts.append(f"  Confidence: {ev.get('confidence', 0):.0%}")
+                    snippets = ev.get("evidence_snippets", [])
+                    if snippets:
+                        parts.append(f"  Evidence snippets: {len(snippets)}")
+                        for snip in snippets[:2]:
+                            parts.append(f"    - {snip.get('document_name', 'unknown')}, page {snip.get('page', '?')}")
+                    break
+
+    if context.visible_document_id:
+        parts.append(f"Viewing document: {context.visible_document_id}")
+        if documents_data:
+            for doc in documents_data.get("documents", []):
+                if doc.get("document_id") == context.visible_document_id:
+                    parts.append(f"  Filename: {doc.get('filename', 'unknown')}")
+                    break
+
+    if context.visible_page:
+        parts.append(f"Current page: {context.visible_page}")
+
+    return "\n".join(parts) if parts else "User context: General view"
+
+
+def parse_agent_response(response_text: str, evidence_data: dict | None, documents_data: dict | None) -> AgentChatResponse:
+    """Parse the agent's response and extract actions and sources."""
+    message = response_text
+    actions: List[AgentAction] = []
+    sources: List[AgentSource] = []
+
+    # Look for JSON action blocks in the response
+    import re
+    action_pattern = r'```json\s*(\{[^`]+\})\s*```'
+    matches = re.findall(action_pattern, response_text, re.DOTALL)
+
+    for match in matches:
+        try:
+            action_data = json.loads(match)
+            if "actions" in action_data:
+                for act in action_data["actions"]:
+                    actions.append(AgentAction(
+                        type=act.get("type", "unknown"),
+                        label=act.get("label", "Action"),
+                        params=act.get("params", {})
+                    ))
+            # Remove the JSON block from the message
+            message = message.replace(f"```json\n{match}\n```", "").strip()
+            message = message.replace(f"```json{match}```", "").strip()
+        except json.JSONDecodeError:
+            pass
+
+    # Extract document references from the response
+    if documents_data:
+        doc_map = {d.get("filename", "").lower(): d for d in documents_data.get("documents", [])}
+        for doc in documents_data.get("documents", []):
+            filename = doc.get("filename", "")
+            if filename.lower() in response_text.lower():
+                sources.append(AgentSource(
+                    document_id=doc.get("document_id", ""),
+                    document_name=filename,
+                    page=None,
+                    text=None
+                ))
+
+    # Extract page references
+    page_pattern = r'page\s+(\d+)'
+    page_matches = re.findall(page_pattern, response_text, re.IGNORECASE)
+    for page_num in page_matches:
+        if sources:
+            sources[0].page = int(page_num)
+            break
+
+    return AgentChatResponse(
+        message=message,
+        actions=actions,
+        sources=sources
+    )
+
+
+@app.post("/sessions/{session_id}/agent/chat", response_model=AgentChatResponse, summary="Chat with AI agent")
+async def agent_chat(session_id: str, request: AgentChatRequest):
+    """Conversational AI agent for the review workspace.
+
+    Receives user message plus context (focused requirement, visible document/page).
+    Calls Claude API with session-aware tools.
+    Returns response with proposed actions that the user can execute.
+
+    This is a human-in-the-loop design: the agent proposes actions, but the user
+    must confirm before any action is executed.
+    """
+    from anthropic import AsyncAnthropic
+
+    try:
+        state_manager = StateManager(session_id)
+        session_data = state_manager.read_json("session.json")
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+
+    # Load evidence and documents if available
+    evidence_data = None
+    documents_data = None
+
+    try:
+        evidence_data = state_manager.read_json("evidence.json")
+    except FileNotFoundError:
+        pass
+
+    try:
+        documents_data = state_manager.read_json("documents.json")
+    except FileNotFoundError:
+        pass
+
+    # Build system prompt with session context
+    session_context = build_session_context(session_data, evidence_data, documents_data)
+    focused_context = build_focused_context(request.context, evidence_data, documents_data)
+    tools_description = build_agent_tools_description()
+
+    system_prompt = f"""You are an AI assistant helping a carbon credit registry reviewer analyze project documents.
+
+CURRENT SESSION STATE:
+{session_context}
+
+USER'S CURRENT VIEW:
+{focused_context}
+
+AVAILABLE TOOLS:
+{tools_description}
+
+GUIDELINES:
+1. Be helpful and concise. Focus on what the user is asking about.
+2. Reference specific documents and page numbers when discussing evidence.
+3. When suggesting actions, include a JSON block with the action details.
+4. For navigation suggestions, use: {{"actions": [{{"type": "navigate", "label": "View in Document", "params": {{"document_id": "...", "page": N}}}}]}}
+5. For validation actions, use: {{"actions": [{{"type": "validate", "label": "Run Validation", "params": {{}}}}]}}
+6. For extraction actions, use: {{"actions": [{{"type": "extract", "label": "Extract Evidence", "params": {{"requirement_id": "..."}}}}]}}
+7. Keep responses focused and actionable for a professional reviewer.
+8. If asked about requirements, reference their IDs (e.g., REQ-001, REQ-002).
+9. When evidence is found, mention the confidence level and source document."""
+
+    # Build messages with evidence context if discussing specific requirements
+    user_message = request.message
+
+    if request.context and request.context.focused_requirement_id and evidence_data:
+        req_id = request.context.focused_requirement_id
+        for ev in evidence_data.get("evidence", []):
+            if ev.get("requirement_id") == req_id:
+                snippets = ev.get("evidence_snippets", [])
+                if snippets:
+                    evidence_context = f"\n\nEvidence for {req_id}:\n"
+                    for snip in snippets[:3]:
+                        evidence_context += f"- {snip.get('document_name', 'unknown')}, page {snip.get('page', '?')}: \"{snip.get('text', '')[:200]}...\"\n"
+                    user_message = f"{request.message}\n{evidence_context}"
+                break
+
+    # Call Claude API
+    try:
+        client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+
+        response = await client.messages.create(
+            model=settings.get_active_llm_model(),
+            max_tokens=2000,
+            system=system_prompt,
+            messages=[
+                {"role": "user", "content": user_message}
+            ]
+        )
+
+        response_text = response.content[0].text
+
+        # Parse the response to extract actions and sources
+        result = parse_agent_response(response_text, evidence_data, documents_data)
+        return result
+
+    except Exception as e:
+        logger.error(f"Agent chat error: {e}")
+        raise HTTPException(status_code=500, detail=f"Agent error: {str(e)}")
+
+
+# Import StateManager after sys.path is set up
+from registry_review_mcp.utils.state import StateManager
 
 
 @app.post("/sessions/{session_id}/upload", summary="Upload file to session")

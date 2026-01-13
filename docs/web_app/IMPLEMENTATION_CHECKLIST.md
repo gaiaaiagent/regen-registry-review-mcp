@@ -31,26 +31,28 @@ A phased checklist for building the Registry Review web application. Each phase 
 
 **Session Scope:** ~2 hours
 
+**Status:** COMPLETED (January 2026)
+
 ### Checklist
 
-- [ ] **1.1 Initialize project**
+- [x] **1.1 Initialize project**
   - Create new repo or folder for frontend
   - Copy Vite config from GAIA/packages/client
   - Install React 19, React Router 7, TypeScript
   - Verify `npm run dev` works
 
-- [ ] **1.2 Add styling**
+- [x] **1.2 Add styling**
   - Install Tailwind CSS 4
   - Install Radix UI primitives
   - Create basic layout component
 
-- [ ] **1.3 Integrate PDF viewer**
+- [x] **1.3 Integrate PDF viewer**
   - Install react-pdf-highlighter
   - Create PDFViewer component
   - Load a local test PDF
   - Verify text selection works
 
-- [ ] **1.4 Test highlight persistence**
+- [x] **1.4 Test highlight persistence**
   - Add highlight on text selection
   - Store highlights in local state
   - Reload page - verify highlights restore
@@ -58,10 +60,10 @@ A phased checklist for building the Registry Review web application. Each phase 
 
 ### Exit Criteria
 
-- [ ] PDFs render correctly (text selectable)
-- [ ] Highlights persist across page reload
-- [ ] No memory issues with 50+ page PDF
-- [ ] Scanned PDFs show warning (no embedded text)
+- [x] PDFs render correctly (text selectable)
+- [x] Highlights persist across page reload
+- [x] No memory issues with 50+ page PDF
+- [x] Scanned PDFs show warning (no embedded text)
 
 ### References
 
@@ -553,13 +555,13 @@ A phased checklist for building the Registry Review web application. Each phase 
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| 1. Project Setup & PDF | Not Started | |
-| 2. API Client & Auth | Not Started | |
-| 3. Dashboard & Sessions | Not Started | |
-| 4. Workspace Layout | Not Started | |
-| 5. Checklist Panel | Not Started | |
-| 6. Drag-and-Drop Evidence | Not Started | |
-| 7. AI Chat Panel | Not Started | |
+| 1. Project Setup & PDF | **COMPLETED** | Vite + React 19 + react-pdf-highlighter working |
+| 2. API Client & Auth | **COMPLETED** | openapi-fetch + React Query + Auth context (stubbed Google OAuth) |
+| 3. Dashboard & Sessions | **COMPLETED** | Session CRUD, methodology dropdown, status cards |
+| 4. Workspace Layout | **COMPLETED** | Three-panel resizable layout with react-resizable-panels |
+| 5. Checklist Panel | **COMPLETED** | Category accordions, requirement cards, evidence preview |
+| 6. Drag-and-Drop Evidence | **COMPLETED** | @dnd-kit integration, scratchpad, manual evidence linking |
+| 7. AI Chat Panel | **COMPLETED** | Agent endpoint, context-aware chat, action buttons |
 | 8. Cross-Validation | Not Started | |
 | 9. Google Drive | Not Started | |
 | 10. Proponent & Notifications | Not Started | |

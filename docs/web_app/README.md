@@ -4,8 +4,8 @@
 
 A purpose-built web application for carbon credit project verification, transforming the existing MCP-based workflow into a document-centric interface with an embedded AI assistant.
 
-**Status:** Planning
-**Version:** 1.4
+**Status:** MVP Development (Phases 1-7 Complete)
+**Version:** 1.5
 **Updated:** January 2026
 
 ---
@@ -165,12 +165,50 @@ The following are already built and will be reused:
 
 ---
 
+## Current Implementation
+
+The web application frontend is located in `/web_app/` with the following completed features:
+
+### Completed Phases (1-7)
+
+| Phase | Features |
+|-------|----------|
+| **1. Project Setup** | Vite + React 19 + TypeScript, Tailwind CSS 4, react-pdf-highlighter |
+| **2. API Client & Auth** | openapi-fetch typed client, React Query, Auth context (stubbed Google OAuth) |
+| **3. Dashboard** | Session list, create/delete sessions, methodology dropdown |
+| **4. Workspace Layout** | Three-panel resizable layout (Documents / Checklist / Chat) |
+| **5. Checklist Panel** | Category accordions, requirement cards, evidence preview, cross-panel navigation |
+| **6. Evidence Linking** | @dnd-kit drag-and-drop, scratchpad, manual evidence with toast notifications |
+| **7. AI Chat** | Agent endpoint, context-aware chat, action buttons with confirmation |
+
+### Running the Application
+
+```bash
+# Frontend (port 5173)
+cd web_app
+npm install
+npm run dev
+
+# Backend (port 8003)
+python chatgpt_rest_api.py
+```
+
+### Remaining Phases (8-12)
+
+- **8. Cross-Validation** - Fact sheets, stale badges, one-click refresh
+- **9. Google Drive** - Import documents from shared folders
+- **10. Proponent Flow** - Revision requests, responses, notifications
+- **11. Report Generation** - Markdown/JSON export
+- **12. Polish & Production** - Error handling, performance, deployment
+
+---
+
 ## Next Steps
 
-1. Review and approve this planning structure
-2. Create Vite + React project (aligned with GAIA stack)
-3. Begin Phase 1: PDF viewer proof-of-concept
-4. Test with 5+ real project PDFs before proceeding
+1. Complete Phase 8: Cross-Validation & Fact Sheets
+2. Implement real Google OAuth (requires backend endpoint)
+3. Test end-to-end with Botany Farm dataset
+4. Deploy to production server (202.61.196.119)
 
 ---
 
@@ -183,3 +221,4 @@ The following are already built and will be reused:
 | v1.2 | January 2026 | Architectural feedback: MVP scope, RBAC, data handling |
 | v1.3 | January 2026 | Restructured into separate frontend/backend docs; added AI agent |
 | v1.4 | January 2026 | Switch to Vite + React 19 (align with GAIA); add Google Drive + Mailjet |
+| v1.5 | January 2026 | Phases 1-7 implemented; added Current Implementation section |
