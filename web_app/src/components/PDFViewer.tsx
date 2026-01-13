@@ -31,10 +31,7 @@ import {
 } from 'lucide-react'
 
 import { GlobalWorkerOptions } from 'pdfjs-dist'
-GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url
-).toString()
+GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
 
 interface PDFViewerProps {
   url: string

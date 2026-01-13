@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import {
   Accordion,
   AccordionContent,
@@ -46,6 +47,7 @@ export function CategoryAccordion({
   onUnlinkEvidence,
 }: CategoryAccordionProps) {
   const { focusedRequirementId, setFocusedRequirementId } = useWorkspaceContext()
+  const requirementRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
   const sortedCategories = Object.entries(categories).sort(([a], [b]) =>
     a.localeCompare(b)
@@ -53,6 +55,25 @@ export function CategoryAccordion({
 
   const getEvidenceForRequirement = (requirementId: string) =>
     manualEvidence.filter((e) => e.requirementId === requirementId)
+
+  useEffect(() => {
+    if (!focusedRequirementId) return
+
+    for (const [category, requirements] of Object.entries(categories)) {
+      const hasRequirement = requirements.some(r => r.id === focusedRequirementId)
+      if (hasRequirement && !expandedCategories.includes(category)) {
+        onExpandedChange([...expandedCategories, category])
+        break
+      }
+    }
+
+    setTimeout(() => {
+      const element = requirementRefs.current.get(focusedRequirementId)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }, 100)
+  }, [focusedRequirementId, categories, expandedCategories, onExpandedChange])
 
   return (
     <Accordion
@@ -89,14 +110,24 @@ export function CategoryAccordion({
             <AccordionContent className="px-1 pt-1 pb-2">
               <div className="space-y-2">
                 {requirements.map((req) => (
-                  <RequirementCard
+                  <div
                     key={req.id}
-                    requirement={req}
-                    isSelected={focusedRequirementId === req.id}
-                    onSelect={() => setFocusedRequirementId(req.id)}
-                    manualEvidence={getEvidenceForRequirement(req.id)}
-                    onUnlinkEvidence={onUnlinkEvidence}
-                  />
+                    ref={(el) => {
+                      if (el) {
+                        requirementRefs.current.set(req.id, el)
+                      } else {
+                        requirementRefs.current.delete(req.id)
+                      }
+                    }}
+                  >
+                    <RequirementCard
+                      requirement={req}
+                      isSelected={focusedRequirementId === req.id}
+                      onSelect={() => setFocusedRequirementId(req.id)}
+                      manualEvidence={getEvidenceForRequirement(req.id)}
+                      onUnlinkEvidence={onUnlinkEvidence}
+                    />
+                  </div>
                 ))}
               </div>
             </AccordionContent>

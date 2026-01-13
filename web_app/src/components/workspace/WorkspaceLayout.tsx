@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import { Group, Panel, Separator } from 'react-resizable-panels'
 import { WorkspaceHeader } from './WorkspaceHeader'
 import { DocumentPanel } from './DocumentPanel'
-import { ChecklistPanel } from './ChecklistPanel'
+import { MiddlePanel } from './MiddlePanel'
 import { ChatPanel } from './ChatPanel'
 import { DragDropProvider } from './DragDropProvider'
 import { WorkspaceProvider, type DragData } from '@/contexts/WorkspaceContext'
@@ -102,7 +102,7 @@ function WorkspaceContent({
 
         <div className="flex-1 overflow-hidden">
           <Group orientation="horizontal" className="h-full">
-            <Panel defaultSize={40} minSize={25} maxSize={60}>
+            <Panel defaultSize={50} minSize={30} maxSize={70}>
               <DocumentPanel
                 documents={documents}
                 getDocumentUrl={getDocumentUrl}
@@ -112,13 +112,13 @@ function WorkspaceContent({
 
             <Separator className="w-1.5 bg-border hover:bg-primary/20 transition-colors cursor-col-resize" />
 
-            <Panel defaultSize={30} minSize={20} maxSize={45}>
-              <ChecklistPanel sessionId={sessionId} />
+            <Panel defaultSize={25} minSize={20} maxSize={45}>
+              <MiddlePanel sessionId={sessionId} />
             </Panel>
 
             <Separator className="w-1.5 bg-border hover:bg-primary/20 transition-colors cursor-col-resize" />
 
-            <Panel defaultSize={30} minSize={20} maxSize={45}>
+            <Panel defaultSize={25} minSize={20} maxSize={45}>
               <ChatPanel />
             </Panel>
           </Group>

@@ -35,7 +35,7 @@ export function DocumentPanel({ documents, getDocumentUrl, onClipText }: Documen
 
   return (
     <Group orientation="horizontal" className="h-full">
-      <Panel defaultSize={30} minSize={20} maxSize={50}>
+      <Panel defaultSize={20} minSize={15} maxSize={40}>
         <DocumentSidebar
           documents={documents}
           activeDocumentId={activeDocumentId}
@@ -45,7 +45,7 @@ export function DocumentPanel({ documents, getDocumentUrl, onClipText }: Documen
 
       <Separator className="w-1 bg-border hover:bg-primary/20 transition-colors" />
 
-      <Panel defaultSize={70} minSize={50}>
+      <Panel defaultSize={80} minSize={60}>
         {activeDocumentUrl ? (
           <PDFViewer
             url={activeDocumentUrl}
