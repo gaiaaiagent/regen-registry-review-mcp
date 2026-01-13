@@ -693,8 +693,7 @@ def _format_checklist_row(req: RequirementFinding, evidence_item: dict[str, Any]
 
     # Generate comments
     comments_parts = []
-    if req.confidence < 1.0:
-        comments_parts.append(f"Confidence: {req.confidence:.0%}")
+    comments_parts.append(f"Confidence: {req.confidence:.0%}")
     if req.human_review_required:
         comments_parts.append("Human review needed")
     if req.notes:
@@ -1006,8 +1005,7 @@ def _get_docx_submitted_material(evidence_item: dict[str, Any]) -> str:
 def _get_docx_comments(req: RequirementFinding) -> str:
     """Generate comments text for DOCX from requirement finding."""
     parts = []
-    if req.confidence < 1.0:
-        parts.append(f"Confidence: {req.confidence:.0%}")
+    parts.append(f"Confidence: {req.confidence:.0%}")
     if req.human_review_required:
         parts.append("Human review needed")
     if req.notes:
