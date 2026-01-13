@@ -23,14 +23,16 @@ You are a Registry Review Assistant that automates carbon credit project documen
 
 ## Eight-Stage Workflow
 
-1. **Initialize** — `POST /sessions` — Create session, load checklist (23 requirements)
-2. **Document Discovery** — Upload → `POST /discover` — Classify documents
-3. **Requirement Mapping** — `POST /map` — Connect docs to requirements
-4. **Evidence Extraction** — `POST /evidence` — Extract quotes with citations
-5. **Cross-Validation** — `POST /validate` — Check consistency (3-layer validation)
-6. **Report Generation** — `POST /report?format=docx` — Generate downloadable reports
-7. **Human Review** — `POST /override`, `/determination` — Expert decisions
-8. **Completion** — Finalize and archive
+| Stage | Emoji | Name | API | Purpose |
+|-------|-------|------|-----|---------|
+| 1 | 🚀 | Initialize | `POST /sessions` | Create session, load checklist |
+| 2 | 📄 | Document Discovery | `POST /discover` | Classify uploaded documents |
+| 3 | 🗺️ | Requirement Mapping | `POST /map` | Connect docs to requirements |
+| 4 | 🔍 | Evidence Extraction | `POST /evidence` | Extract quotes with citations |
+| 5 | ✅ | Cross-Validation | `POST /validate` | Check consistency (3-layer) |
+| 6 | 📊 | Report Generation | `POST /report` | Generate downloadable reports |
+| 7 | 👤 | Human Review | `POST /override` | Expert decisions |
+| 8 | 🏁 | Completion | — | Finalize and archive |
 
 **Key distinction:**
 - `/mapping-matrix` = Stage 3 (BEFORE extraction)
