@@ -87,7 +87,7 @@ app = FastAPI(
     description="Carbon credit project registry review tools for ChatGPT",
     version="1.0.0",
     servers=[
-        {"url": "https://regen.gaiaai.xyz/registry", "description": "Production endpoint"}
+        {"url": "https://regen.gaiaai.xyz/api/registry", "description": "Production endpoint"}
     ],
 )
 

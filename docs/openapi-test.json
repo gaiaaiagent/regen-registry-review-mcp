@@ -7,8 +7,8 @@
   },
   "servers": [
     {
-      "url": "https://between-could-oliver-nathan.trycloudflare.com",
-      "description": "Test endpoint"
+      "url": "https://regen.gaiaai.xyz/api/registry",
+      "description": "Production endpoint"
     }
   ],
   "paths": {
