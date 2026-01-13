@@ -687,10 +687,11 @@ async def generate_report(session_id: str, format: str = "markdown", request: Re
 
         # Add download URL for all file formats
         if request and format in ("markdown", "checklist", "docx"):
-            forwarded_host = request.headers.get("x-forwarded-host")
+            # Use X-Forwarded-Host if available, otherwise fall back to Host header
+            forwarded_host = request.headers.get("x-forwarded-host") or request.headers.get("host")
             forwarded_proto = request.headers.get("x-forwarded-proto", "https")
             if forwarded_host:
-                base_url = f"{forwarded_proto}://{forwarded_host}"
+                base_url = f"{forwarded_proto}://{forwarded_host}/api/registry"
             else:
                 base_url = str(request.base_url).rstrip("/")
 
