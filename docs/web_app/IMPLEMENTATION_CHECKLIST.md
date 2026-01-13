@@ -562,7 +562,7 @@ A phased checklist for building the Registry Review web application. Each phase 
 | 5. Checklist Panel | **COMPLETED** | Category accordions, requirement cards, evidence preview |
 | 6. Drag-and-Drop Evidence | **COMPLETED** | @dnd-kit integration, scratchpad, manual evidence linking |
 | 7. AI Chat Panel | **COMPLETED** | Agent endpoint, context-aware chat, action buttons |
-| 8. Cross-Validation | Not Started | |
+| 8. Cross-Validation | **COMPLETED** | Tabbed middle panel, fact sheets, stale detection, issue navigation |
 | 9. Google Drive | Not Started | |
 | 10. Proponent & Notifications | Not Started | |
 | 11. Report Generation | Not Started | |
