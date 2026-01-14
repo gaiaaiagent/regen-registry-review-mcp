@@ -226,7 +226,9 @@ export function useValidation(sessionId: string | undefined) {
         params: { path: { session_id: sessionId } },
       })
 
-      if (apiError) throw new Error('Failed to run validation')
+      if (apiError) {
+        throw new Error('Validation failed. Please ensure evidence has been extracted and try again.')
+      }
 
       const evidenceMatrixData = queryClient.getQueryData(['evidence-matrix', sessionId]) as { updated_at?: string } | undefined
       const evidenceUpdatedAt = evidenceMatrixData?.updated_at || new Date().toISOString()

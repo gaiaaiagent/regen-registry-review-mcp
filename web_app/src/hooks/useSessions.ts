@@ -52,7 +52,9 @@ export function useSessions() {
     queryKey: SESSIONS_KEY,
     queryFn: async (): Promise<SessionsResponse> => {
       const { data, error } = await api.GET('/sessions')
-      if (error) throw new Error('Failed to fetch sessions')
+      if (error) {
+        throw new Error('Unable to load sessions. Please check your connection and try again.')
+      }
       return data as SessionsResponse
     },
   })
@@ -69,7 +71,9 @@ export function useSession(sessionId: string | undefined) {
       const { data, error } = await api.GET('/sessions/{session_id}', {
         params: { path: { session_id: sessionId } },
       })
-      if (error) throw new Error('Failed to fetch session')
+      if (error) {
+        throw new Error('Unable to load session. It may have been deleted or you may not have access.')
+      }
       return data as Session
     },
     enabled: !!sessionId,
@@ -87,7 +91,9 @@ export function useCreateSession() {
       const { data, error } = await api.POST('/sessions', {
         body: request,
       })
-      if (error) throw new Error('Failed to create session')
+      if (error) {
+        throw new Error('Unable to create session. Please check your input and try again.')
+      }
       return data as SessionResponse
     },
     onSuccess: () => {

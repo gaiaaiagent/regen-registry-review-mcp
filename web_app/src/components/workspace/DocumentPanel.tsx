@@ -1,11 +1,22 @@
-import { useEffect } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 import { toast } from 'sonner'
 import { DocumentSidebar, type Document } from './DocumentSidebar'
-import { PDFViewer } from '@/components/PDFViewer'
 import { GDriveImportDialog } from '@/components/gdrive'
-import { FileText, HardDrive } from 'lucide-react'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { FileText, HardDrive, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useWorkspaceContext } from '@/contexts/WorkspaceContext'
+
+const LazyPDFViewer = lazy(() => import('@/components/PDFViewer').then(m => ({ default: m.PDFViewer })))
+
+function PDFViewerFallback() {
+  return (
+    <div className="h-full flex flex-col items-center justify-center bg-muted/10">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <span className="mt-2 text-muted-foreground">Loading PDF viewer...</span>
+    </div>
+  )
+}
 
 interface DocumentPanelProps {
   sessionId: string
@@ -72,14 +83,17 @@ export function DocumentPanel({ sessionId, documents, getDocumentUrl, onClipText
       {/* Main Content (PDF) */}
       <div className="flex-1 h-full min-w-0 bg-background relative">
         {activeDocumentUrl ? (
-          <PDFViewer
-            key={activeDocumentId}
-            url={activeDocumentUrl}
-            documentId={activeDocumentId!}
-            initialPage={targetPage ?? undefined}
-            onScrollHandlerReady={registerScrollHandler}
-            onClipText={handleClipText}
-          />
+          <ErrorBoundary componentName="PDF Viewer" key={activeDocumentId}>
+            <Suspense fallback={<PDFViewerFallback />}>
+              <LazyPDFViewer
+                url={activeDocumentUrl}
+                documentId={activeDocumentId!}
+                initialPage={targetPage ?? undefined}
+                onScrollHandlerReady={registerScrollHandler}
+                onClipText={handleClipText}
+              />
+            </Suspense>
+          </ErrorBoundary>
         ) : (
           <div className="h-full flex flex-col items-center justify-center text-muted-foreground bg-muted/20">
             <FileText className="h-16 w-16 mb-4 opacity-30" />

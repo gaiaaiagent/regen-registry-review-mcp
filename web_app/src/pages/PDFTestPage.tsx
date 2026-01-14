@@ -1,9 +1,9 @@
-import { useState } from 'react'
-import { PDFViewer } from '@/components/PDFViewer'
-import { Button } from '@/components/ui/button'
+import { useState, lazy, Suspense } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { FileText, Check } from 'lucide-react'
+import { FileText, Check, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+
+const LazyPDFViewer = lazy(() => import('@/components/PDFViewer').then(m => ({ default: m.PDFViewer })))
 
 // Test PDFs available in the examples directory
 const TEST_PDFS = [
@@ -134,11 +134,17 @@ export function PDFTestPage() {
         </div>
 
         <div className="flex-1 overflow-hidden">
-          <PDFViewer
-            key={selectedPDF.id}
-            url={selectedPDF.path}
-            documentId={selectedPDF.id}
-          />
+          <Suspense fallback={
+            <div className="h-full flex items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          }>
+            <LazyPDFViewer
+              key={selectedPDF.id}
+              url={selectedPDF.path}
+              documentId={selectedPDF.id}
+            />
+          </Suspense>
         </div>
       </div>
     </div>

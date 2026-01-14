@@ -1,11 +1,22 @@
-import { useState, useEffect, useCallback } from 'react'
-import { ClipboardCheck, ShieldCheck, MessageSquare, FileText } from 'lucide-react'
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
+import { ClipboardCheck, ShieldCheck, MessageSquare, FileText, Loader2 } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ChecklistPanel } from './ChecklistPanel'
 import { ValidationPanel } from './ValidationPanel'
 import { ChatPanel } from './ChatPanel'
-import { ReportPanel } from './ReportPanel'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { useWorkspaceContext } from '@/contexts/WorkspaceContext'
+
+const LazyReportPanel = lazy(() => import('./ReportPanel').then(m => ({ default: m.ReportPanel })))
+
+function ReportPanelFallback() {
+  return (
+    <div className="flex items-center justify-center h-full">
+      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <span className="ml-2 text-muted-foreground">Loading report panel...</span>
+    </div>
+  )
+}
 
 interface ToolsPanelProps {
   sessionId: string
@@ -54,22 +65,32 @@ export function ToolsPanel({ sessionId }: ToolsPanelProps) {
         </div>
 
         <TabsContent value="checklist" className="flex-1 m-0 overflow-hidden">
-          <ChecklistPanel sessionId={sessionId} />
+          <ErrorBoundary componentName="Checklist">
+            <ChecklistPanel sessionId={sessionId} />
+          </ErrorBoundary>
         </TabsContent>
 
         <TabsContent value="validation" className="flex-1 m-0 overflow-hidden">
-          <ValidationPanel
-            sessionId={sessionId}
-            onSwitchToChecklist={switchToChecklist}
-          />
+          <ErrorBoundary componentName="Validation">
+            <ValidationPanel
+              sessionId={sessionId}
+              onSwitchToChecklist={switchToChecklist}
+            />
+          </ErrorBoundary>
         </TabsContent>
 
         <TabsContent value="chat" className="flex-1 m-0 overflow-hidden">
-          <ChatPanel sessionId={sessionId} />
+          <ErrorBoundary componentName="AI Chat">
+            <ChatPanel sessionId={sessionId} />
+          </ErrorBoundary>
         </TabsContent>
 
         <TabsContent value="report" className="flex-1 m-0 overflow-hidden">
-          <ReportPanel sessionId={sessionId} />
+          <ErrorBoundary componentName="Report">
+            <Suspense fallback={<ReportPanelFallback />}>
+              <LazyReportPanel sessionId={sessionId} />
+            </Suspense>
+          </ErrorBoundary>
         </TabsContent>
       </Tabs>
     </div>

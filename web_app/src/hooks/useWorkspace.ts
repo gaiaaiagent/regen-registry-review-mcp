@@ -114,7 +114,9 @@ export function useEvidenceMatrix(sessionId: string | undefined) {
       const { data, error } = await api.GET('/sessions/{session_id}/evidence-matrix', {
         params: { path: { session_id: sessionId } },
       })
-      if (error) throw new Error('Failed to fetch evidence matrix')
+      if (error) {
+        throw new Error('Unable to load requirements. Evidence extraction may not have run yet.')
+      }
       return data as EvidenceMatrixResponse
     },
     enabled: !!sessionId,

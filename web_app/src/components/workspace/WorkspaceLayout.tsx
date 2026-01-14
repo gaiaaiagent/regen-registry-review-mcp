@@ -7,6 +7,7 @@ import { DocumentPanel } from './DocumentPanel'
 import { ToolsPanel } from './MiddlePanel'
 import { ChatPanel } from './ChatPanel'
 import { DragDropProvider } from './DragDropProvider'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { WorkspaceProvider, type DragData } from '@/contexts/WorkspaceContext'
 import { useManualEvidence } from '@/hooks/useManualEvidence'
 import type { Document } from './DocumentSidebar'
@@ -136,8 +137,10 @@ export function WorkspaceLayout(props: WorkspaceLayoutProps) {
   const initialDocumentId = props.documents.length > 0 ? props.documents[0].id : null
 
   return (
-    <WorkspaceProvider initialDocumentId={initialDocumentId}>
-      <WorkspaceContent {...props} />
-    </WorkspaceProvider>
+    <ErrorBoundary componentName="Workspace">
+      <WorkspaceProvider initialDocumentId={initialDocumentId}>
+        <WorkspaceContent {...props} />
+      </WorkspaceProvider>
+    </ErrorBoundary>
   )
 }
