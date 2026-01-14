@@ -8,11 +8,14 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 
 export function LoginPage() {
-  const { user, isLoading, signIn, signInAsProponent } = useAuth()
+  const { user, isLoading, signIn, signInAsProponent, error: authError } = useAuth()
   const [signingIn, setSigningIn] = useState(false)
+  const [localError, setLocalError] = useState<string | null>(null)
   const [proponentEmail, setProponentEmail] = useState('proponent@example.com')
   const [proponentPassword, setProponentPassword] = useState('demo123')
   const location = useLocation()
+
+  const error = localError || authError
 
   // Get the intended destination from router state, default to home
   const from = (location.state as { from?: string })?.from || '/'
@@ -27,11 +30,12 @@ export function LoginPage() {
 
   async function handleGoogleSignIn() {
     setSigningIn(true)
+    setLocalError(null)
     try {
       await signIn()
-    } catch {
-      // Error is handled by AuthContext
-    } finally {
+      // Note: signIn redirects to Google, so we won't reach here
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : 'Sign in failed')
       setSigningIn(false)
     }
   }
@@ -67,6 +71,13 @@ export function LoginPage() {
             Carbon credit project verification workspace
           </p>
         </div>
+
+        {/* Error Display */}
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center">
+            <p className="text-sm text-red-600">{error}</p>
+          </div>
+        )}
 
         {/* Sign In Card */}
         <div className="rounded-lg border bg-card p-6 shadow-sm">
@@ -159,9 +170,9 @@ export function LoginPage() {
           </Tabs>
         </div>
 
-        {/* Development Notice */}
+        {/* Notice */}
         <p className="text-center text-xs text-muted-foreground">
-          Development mode: Sign in uses mock authentication
+          Reviewers: Sign in with your @regen.network Google account
         </p>
       </div>
     </div>

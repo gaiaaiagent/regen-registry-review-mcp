@@ -9,6 +9,7 @@ import { Dashboard } from '@/pages/Dashboard'
 import { PDFTestPage } from '@/pages/PDFTestPage'
 import { SessionWorkspace } from '@/pages/SessionWorkspace'
 import { LoginPage } from '@/pages/LoginPage'
+import { AuthCallback } from '@/pages/AuthCallback'
 import { ProponentDashboard } from '@/pages/ProponentDashboard'
 import { ProponentProjectView } from '@/pages/ProponentProjectView'
 import { Toaster } from '@/components/ui/toaster'
@@ -31,6 +32,7 @@ function App() {
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
 
             {/* Reviewer routes (requires reviewer role) */}
             <Route

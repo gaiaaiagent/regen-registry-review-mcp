@@ -20,11 +20,13 @@ logger = logging.getLogger(__name__)
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from fastapi import FastAPI, HTTPException, File, UploadFile, Query, Request
+from fastapi import FastAPI, HTTPException, File, UploadFile, Query, Request, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from pydantic import BaseModel, Field
 import uvicorn
+import httpx
+import os
 
 from registry_review_mcp.tools import (
     session_tools,
@@ -106,6 +108,208 @@ app.add_middleware(
 
 # In-memory storage for pending uploads (use Redis/database in production)
 pending_uploads: dict[str, dict] = {}
+
+
+# ============================================================================
+# OAuth Configuration
+# ============================================================================
+
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+ALLOWED_DOMAINS = [
+    d.strip() for d in os.environ.get("REGISTRY_REVIEW_ALLOWED_DOMAINS", "regen.network").split(",")
+    if d.strip()
+]
+FRONTEND_URL = os.environ.get("REGISTRY_REVIEW_FRONTEND_URL", "http://localhost:5173")
+
+# In-memory session storage (use Redis/database in production)
+# Maps session_token -> user_info
+active_sessions: dict[str, dict] = {}
+
+
+# ============================================================================
+# Auth Models
+# ============================================================================
+
+
+class UserInfo(BaseModel):
+    email: str
+    name: str
+    picture: Optional[str] = None
+    role: str = "reviewer"
+
+
+class AuthStatusResponse(BaseModel):
+    authenticated: bool
+    user: Optional[UserInfo] = None
+
+
+# ============================================================================
+# Auth Dependency
+# ============================================================================
+
+
+async def get_current_user(authorization: Optional[str] = Header(None)) -> Optional[UserInfo]:
+    """Extract and validate the session token from Authorization header.
+
+    Returns None if not authenticated (allows endpoints to work without auth).
+    Raises HTTPException 401 if token is invalid.
+    """
+    if not authorization:
+        return None
+
+    if not authorization.startswith("Bearer "):
+        return None
+
+    token = authorization[7:]  # Strip "Bearer "
+    user_data = active_sessions.get(token)
+
+    if not user_data:
+        # Token exists but not in active sessions
+        raise HTTPException(status_code=401, detail="Session expired or invalid")
+
+    return UserInfo(**user_data)
+
+
+async def require_auth(user: Optional[UserInfo] = Depends(get_current_user)) -> UserInfo:
+    """Require authentication for an endpoint."""
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return user
+
+
+# ============================================================================
+# Auth Endpoints
+# ============================================================================
+
+
+@app.get("/auth/google/login", summary="Start Google OAuth flow")
+async def google_login(redirect_uri: Optional[str] = None):
+    """Returns the Google OAuth authorization URL.
+
+    The frontend should redirect the user to this URL to begin authentication.
+    After successful authentication, Google will redirect back to /auth/google/callback.
+    """
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(
+            status_code=500,
+            detail="Google OAuth not configured. Set GOOGLE_CLIENT_ID in environment."
+        )
+
+    callback_url = f"{FRONTEND_URL}/auth/callback"
+
+    # Build Google OAuth URL
+    params = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "redirect_uri": callback_url,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "offline",
+        "prompt": "select_account",
+    }
+
+    if redirect_uri:
+        # Store where to redirect after auth (for deep linking)
+        params["state"] = redirect_uri
+
+    query = "&".join(f"{k}={v}" for k, v in params.items())
+    google_auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{query}"
+
+    return {"auth_url": google_auth_url}
+
+
+@app.get("/auth/google/callback", summary="Handle Google OAuth callback")
+async def google_callback(code: str, state: Optional[str] = None):
+    """Exchange the authorization code for tokens and create a session.
+
+    This endpoint is called by the frontend after receiving the OAuth callback from Google.
+    """
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        raise HTTPException(status_code=500, detail="Google OAuth not configured")
+
+    callback_url = f"{FRONTEND_URL}/auth/callback"
+
+    # Exchange code for tokens
+    async with httpx.AsyncClient() as client:
+        token_response = await client.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "code": code,
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+                "redirect_uri": callback_url,
+                "grant_type": "authorization_code",
+            },
+        )
+
+        if token_response.status_code != 200:
+            logger.error(f"Token exchange failed: {token_response.text}")
+            raise HTTPException(status_code=400, detail="Failed to exchange authorization code")
+
+        tokens = token_response.json()
+        access_token = tokens.get("access_token")
+
+        if not access_token:
+            raise HTTPException(status_code=400, detail="No access token received")
+
+        # Get user info from Google
+        userinfo_response = await client.get(
+            "https://www.googleapis.com/oauth2/v2/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+        if userinfo_response.status_code != 200:
+            raise HTTPException(status_code=400, detail="Failed to get user info")
+
+        userinfo = userinfo_response.json()
+
+    email = userinfo.get("email", "")
+
+    # Validate email domain
+    if ALLOWED_DOMAINS:
+        domain = email.split("@")[-1] if "@" in email else ""
+        if domain not in ALLOWED_DOMAINS:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Email domain '{domain}' not allowed. Allowed: {', '.join(ALLOWED_DOMAINS)}"
+            )
+
+    # Create session
+    session_token = secrets.token_urlsafe(32)
+    user_data = {
+        "email": email,
+        "name": userinfo.get("name", email.split("@")[0]),
+        "picture": userinfo.get("picture"),
+        "role": "reviewer",  # Default role; could be looked up from a database
+    }
+
+    active_sessions[session_token] = user_data
+    logger.info(f"User authenticated: {email}")
+
+    return {
+        "token": session_token,
+        "user": user_data,
+        "redirect_to": state,  # Where the frontend should redirect after storing token
+    }
+
+
+@app.get("/auth/me", summary="Get current user info")
+async def get_me(user: Optional[UserInfo] = Depends(get_current_user)):
+    """Returns the current user's information if authenticated."""
+    if not user:
+        return AuthStatusResponse(authenticated=False, user=None)
+    return AuthStatusResponse(authenticated=True, user=user)
+
+
+@app.post("/auth/logout", summary="Sign out")
+async def logout(authorization: Optional[str] = Header(None)):
+    """Invalidate the current session token."""
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization[7:]
+        if token in active_sessions:
+            del active_sessions[token]
+            logger.info("User logged out")
+    return {"success": True}
 
 
 # ============================================================================

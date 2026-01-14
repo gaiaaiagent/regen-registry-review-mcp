@@ -26,6 +26,7 @@ interface AuthContextValue {
   signIn: () => Promise<void>
   signInAsProponent: (email: string, password: string) => Promise<void>
   signOut: () => void
+  handleOAuthCallback: (code: string) => Promise<string | undefined>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -33,27 +34,10 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 const STORAGE_KEY_USER = 'auth_user'
 const STORAGE_KEY_TOKEN = 'auth_token'
 
-/**
- * Stub implementation for development.
- * In production, this would call a backend endpoint that verifies
- * the Google ID token and returns a session token.
- */
-async function stubGoogleSignIn(): Promise<{ user: User; token: string }> {
-  // Simulate network delay
-  await new Promise((resolve) => setTimeout(resolve, 500))
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8003'
 
-  // For development, create a mock user with @regen.network email
-  const mockUser: User = {
-    email: 'developer@regen.network',
-    name: 'Development User',
-    picture: undefined,
-    role: 'reviewer',
-  }
-
-  // Mock token - in production this would come from the backend
-  const mockToken = 'dev-token-' + Date.now()
-
-  return { user: mockUser, token: mockToken }
+export function getAuthToken(): string | null {
+  return localStorage.getItem(STORAGE_KEY_TOKEN)
 }
 
 /**
@@ -69,7 +53,6 @@ async function stubProponentSignIn(
   email: string,
   password: string
 ): Promise<{ user: User; token: string }> {
-  // Simulate network delay
   await new Promise((resolve) => setTimeout(resolve, 500))
 
   const proponent = MOCK_PROPONENTS.find(
@@ -96,21 +79,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Load persisted user on mount
+  // Load persisted user on mount and validate session
   useEffect(() => {
-    try {
-      const storedUser = localStorage.getItem(STORAGE_KEY_USER)
-      const storedToken = localStorage.getItem(STORAGE_KEY_TOKEN)
-      if (storedUser && storedToken) {
-        setUser(JSON.parse(storedUser))
+    async function validateSession() {
+      try {
+        const storedUser = localStorage.getItem(STORAGE_KEY_USER)
+        const storedToken = localStorage.getItem(STORAGE_KEY_TOKEN)
+
+        if (storedUser && storedToken) {
+          // Validate token with backend
+          const response = await fetch(`${API_BASE}/auth/me`, {
+            headers: {
+              Authorization: `Bearer ${storedToken}`,
+            },
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+            if (data.authenticated && data.user) {
+              setUser(data.user)
+            } else {
+              // Token invalid, clear storage
+              localStorage.removeItem(STORAGE_KEY_USER)
+              localStorage.removeItem(STORAGE_KEY_TOKEN)
+            }
+          } else if (response.status === 401) {
+            // Session expired
+            localStorage.removeItem(STORAGE_KEY_USER)
+            localStorage.removeItem(STORAGE_KEY_TOKEN)
+          } else {
+            // API error, use cached user (offline mode)
+            setUser(JSON.parse(storedUser))
+          }
+        }
+      } catch {
+        // Network error - use cached user if available
+        const storedUser = localStorage.getItem(STORAGE_KEY_USER)
+        if (storedUser) {
+          try {
+            setUser(JSON.parse(storedUser))
+          } catch {
+            localStorage.removeItem(STORAGE_KEY_USER)
+            localStorage.removeItem(STORAGE_KEY_TOKEN)
+          }
+        }
+      } finally {
+        setIsLoading(false)
       }
-    } catch {
-      // Invalid stored data, clear it
-      localStorage.removeItem(STORAGE_KEY_USER)
-      localStorage.removeItem(STORAGE_KEY_TOKEN)
-    } finally {
-      setIsLoading(false)
     }
+
+    validateSession()
   }, [])
 
   // Listen for unauthorized events from API client
@@ -133,19 +151,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null)
 
     try {
-      const { user: newUser, token } = await stubGoogleSignIn()
+      // Get the Google OAuth URL from the backend
+      const response = await fetch(`${API_BASE}/auth/google/login`)
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || 'Failed to start authentication')
+      }
+
+      const { auth_url } = await response.json()
+
+      // Redirect to Google OAuth
+      window.location.href = auth_url
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Sign in failed'
+      setError(message)
+      setIsLoading(false)
+      throw err
+    }
+  }, [])
+
+  const handleOAuthCallback = useCallback(async (code: string): Promise<string | undefined> => {
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      // Exchange the code for a session token
+      const response = await fetch(`${API_BASE}/auth/google/callback?code=${encodeURIComponent(code)}`)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || 'Authentication failed')
+      }
+
+      const { token, user: userData, redirect_to } = await response.json()
 
       // Validate email domain
-      if (!newUser.email.endsWith('@regen.network')) {
+      if (!userData.email.endsWith('@regen.network')) {
         throw new Error('Only @regen.network emails are allowed')
       }
 
-      // Persist auth state
+      // Store auth state
+      const newUser: User = {
+        email: userData.email,
+        name: userData.name,
+        picture: userData.picture,
+        role: userData.role as UserRole,
+      }
+
       localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(newUser))
       localStorage.setItem(STORAGE_KEY_TOKEN, token)
       setUser(newUser)
+
+      return redirect_to
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Sign in failed'
+      const message = err instanceof Error ? err.message : 'Authentication failed'
       setError(message)
       throw err
     } finally {
@@ -173,7 +232,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const signOut = useCallback(() => {
+  const signOut = useCallback(async () => {
+    const token = localStorage.getItem(STORAGE_KEY_TOKEN)
+
+    // Call backend to invalidate session
+    if (token) {
+      try {
+        await fetch(`${API_BASE}/auth/logout`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+      } catch {
+        // Ignore errors - we're signing out anyway
+      }
+    }
+
     setUser(null)
     setError(null)
     localStorage.removeItem(STORAGE_KEY_USER)
@@ -188,6 +263,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signIn,
     signInAsProponent,
     signOut,
+    handleOAuthCallback,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
