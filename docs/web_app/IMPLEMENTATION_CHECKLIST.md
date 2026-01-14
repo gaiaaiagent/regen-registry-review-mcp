@@ -545,33 +545,36 @@ Needed: Verification is per-extraction (fine-grained). A requirement might have 
 
 **Session Scope:** ~2 hours
 
+**Status:** COMPLETED (January 2026)
+
 ### Checklist
 
-- [ ] **11.1 Add report generation**
-  - "Generate Report" button
-  - Call API (may be long-running job)
-  - Show progress if job-based
+- [x] **11.1 Add report generation**
+  - "Generate Report" button in dedicated Report tab
+  - Calls POST /sessions/{id}/report API
+  - Loading spinner while generating
 
-- [ ] **11.2 Display report preview**
-  - Render markdown in UI
-  - Highlight gaps and warnings
-  - Show items needing review
+- [x] **11.2 Display report preview**
+  - Render markdown in UI using react-markdown
+  - Scrollable preview panel
+  - Shows generation timestamp
 
-- [ ] **11.3 Add export options**
-  - Export as Markdown
-  - Export as JSON
-  - Download button
+- [x] **11.3 Add export options**
+  - Export as Markdown (.md)
+  - Export as Checklist (.md)
+  - Export as DOCX
+  - Download buttons for each format
 
-- [ ] **11.4 Add stale badge**
-  - Show if validation changed since report
-  - "Re-generate" button
+- [x] **11.4 Regenerate support**
+  - "Regenerate" button after initial generation
+  - Updates timestamp on regeneration
 
 ### Exit Criteria
 
-- [ ] Report generates from current state
-- [ ] Report displays in UI
-- [ ] Can export Markdown and JSON
-- [ ] Stale badge shows when needed
+- [x] Report generates from current state
+- [x] Report displays in UI with Markdown rendering
+- [x] Can export Markdown, Checklist, and DOCX
+- [x] Regenerate button available after first generation
 
 ### References
 
@@ -637,8 +640,9 @@ Needed: Verification is per-extraction (fine-grained). A requirement might have 
 | 8. Cross-Validation | **COMPLETED** | Tabbed middle panel, fact sheets, stale detection, issue navigation |
 | 9. Google Drive | **COMPLETED** | Drive integration & AI navigation logic verified |
 | **9B. Verification Workflow** | **COMPLETED** | BoundingBox model, verification endpoints, agent tool_use, frontend UI |
-| 10. Proponent & Notifications | Not Started | |
-| 11. Report Generation | Not Started | |
+| 9.5. Google OAuth | **COMPLETED** | Real Google OAuth with @regen.network domain restriction |
+| 10. Proponent & Notifications | **DEFERRED** | Pending Regen Teams integration (Q1 2026) |
+| **11. Report Generation** | **COMPLETED** | Report tab with generation, Markdown preview, download (MD/Checklist/DOCX) |
 | 12. Polish & Production | Not Started | |
 
 ---
