@@ -312,6 +312,47 @@ async def logout(authorization: Optional[str] = Header(None)):
     return {"success": True}
 
 
+class TestLoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+# Test users for development (NOT for production)
+TEST_USERS = {
+    "reviewer": {"password": "test123", "role": "reviewer", "email": "reviewer@regen.network"},
+    "proponent": {"password": "test123", "role": "proponent", "email": "proponent@example.com"},
+}
+
+
+@app.post("/auth/test-login", summary="Test login (development only)")
+async def test_login(request: TestLoginRequest):
+    """Development-only endpoint for testing without Google OAuth.
+
+    Test users:
+    - username: reviewer, password: test123 (reviewer role)
+    - username: proponent, password: test123 (proponent role)
+    """
+    user = TEST_USERS.get(request.username)
+    if not user or user["password"] != request.password:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+
+    session_token = secrets.token_urlsafe(32)
+    user_data = {
+        "email": user["email"],
+        "name": request.username.title(),
+        "picture": None,
+        "role": user["role"],
+    }
+
+    active_sessions[session_token] = user_data
+    logger.info(f"Test user authenticated: {request.username}")
+
+    return {
+        "token": session_token,
+        "user": user_data,
+    }
+
+
 # ============================================================================
 # Request/Response Models
 # ============================================================================
@@ -1763,6 +1804,62 @@ def get_agent_tools() -> list[dict]:
     ]
 
 
+def get_methodology_knowledge(methodology: str) -> str:
+    """Return methodology-specific knowledge for the system prompt."""
+    if "soil" in methodology.lower() or "soc" in methodology.lower():
+        return """**Soil Organic Carbon (SOC) Methodology v1.2.2**
+
+This methodology quantifies carbon sequestration in regenerative cropping and managed grassland ecosystems. Key requirement categories:
+
+- **Project Identification**: Project ID, proponent details, methodology version - establishes the project in the registry
+- **Land Eligibility**: Legal tenure proof, geographic boundaries, land use history - confirms rightful claims
+- **Baseline Establishment**: Pre-project soil carbon measurements, sampling protocols, lab analysis - the "before" snapshot
+- **Monitoring**: Periodic soil sampling, carbon stock changes, GHG emissions tracking - ongoing verification
+- **Quantification**: Net carbon removal calculations, buffer pool contributions, leakage assessment - the actual credits
+- **Verification**: Third-party audits, data quality checks, uncertainty analysis - credibility assurance
+
+**Common issues to watch for:**
+- Date misalignment between sampling dates and imagery dates (should be within ±4 months)
+- Inconsistent project IDs across documents
+- Missing land tenure documentation (deeds, leases)
+- Sampling depth discrepancies (typically 0-30cm standard)
+- Buffer pool percentage not explicitly stated (usually 20%)"""
+    else:
+        return f"Methodology: {methodology or 'Not specified'}. This review verifies that project documentation meets all checklist requirements."
+
+
+def get_workflow_guidance(workflow_progress: dict) -> str:
+    """Return guidance based on current workflow stage."""
+    completed = workflow_progress.get("completed_stages", []) if workflow_progress else []
+
+    stages = [
+        ("initialize", "Session Created", "Documents need to be uploaded"),
+        ("document_discovery", "Documents Discovered", "Ready for requirement mapping"),
+        ("requirement_mapping", "Requirements Mapped", "Ready for evidence extraction"),
+        ("evidence_extraction", "Evidence Extracted", "Ready for validation checks"),
+        ("cross_validation", "Validation Complete", "Ready for report generation"),
+        ("report_generation", "Report Generated", "Ready for human review"),
+        ("human_review", "Human Review", "Final determination pending"),
+        ("completion", "Complete", "Review finalized"),
+    ]
+
+    current_stage = "initialize"
+    next_action = "Upload project documents to begin"
+
+    for i, (stage_key, stage_name, action) in enumerate(stages):
+        if stage_key in completed:
+            current_stage = stage_name
+            if i + 1 < len(stages):
+                next_action = stages[i + 1][2]
+            else:
+                next_action = "Review complete"
+
+    if not completed:
+        return f"Stage: Just started. {next_action}."
+
+    return f"Stage: {current_stage}. Next: {next_action}."
+
+
 def build_session_context(session_data: dict, evidence_data: dict | None, documents_data: dict | None) -> str:
     """Build context string about the current session state."""
     project_name = session_data.get("project_metadata", {}).get("project_name", "Unknown")
@@ -1862,25 +1959,52 @@ async def agent_chat(session_id: str, request: AgentChatRequest):
     session_context = build_session_context(session_data, evidence_data, documents_data)
     focused_context = build_focused_context(request.context, evidence_data, documents_data)
 
-    system_prompt = f"""You are an AI assistant helping a carbon credit registry reviewer analyze project documents.
+    # Get methodology-specific guidance
+    methodology = session_data.get("project_metadata", {}).get("methodology", "")
+    methodology_knowledge = get_methodology_knowledge(methodology)
+    workflow_guidance = get_workflow_guidance(session_data.get("workflow_progress", {}))
 
-CURRENT SESSION STATE:
+    system_prompt = f"""You are an expert carbon credit registry review assistant embedded in a web application. You help reviewers verify that soil carbon projects meet all methodology requirements.
+
+## WHAT YOU'RE HELPING WITH
+
+The reviewer is using Regen Network's Registry Review Tool to verify compliance of a carbon credit project. Your role is to:
+- Answer questions about methodology requirements
+- Explain what evidence is needed and why
+- Help interpret extracted evidence
+- Guide them through unclear areas
+- Flag potential issues or inconsistencies
+
+## METHODOLOGY CONTEXT
+{methodology_knowledge}
+
+## CURRENT SESSION
 {session_context}
 
-USER'S CURRENT VIEW:
+## WORKFLOW STATUS
+{workflow_guidance}
+
+## USER'S CURRENT VIEW
 {focused_context}
 
-GUIDELINES:
-1. Be helpful and concise. Focus on what the user is asking about.
-2. Reference specific documents and page numbers when discussing evidence.
-3. Use the available tools to suggest actions - they will appear as buttons the user can click.
-4. Keep responses focused and actionable for a professional reviewer.
-5. If asked about requirements, reference their IDs (e.g., REQ-001, REQ-002).
-6. When evidence is found, mention the confidence level and source document.
-7. Use navigate_to_citation when pointing the user to specific evidence locations.
-8. Use suggest_verification when recommending the user verify evidence quality.
-9. Use search_evidence when the user wants to find specific information across evidence.
-10. Use get_requirement_status when discussing specific requirement compliance."""
+## HOW TO RESPOND
+
+1. **Be conversational but precise.** The user is viewing a web app with panels - they can see the checklist, documents, and validation results. Don't repeat what's visible; add insight.
+
+2. **Cite evidence by document and page.** When discussing findings, reference "Project Plan, page 7" or similar. Use the navigate_to_citation tool to help them jump there.
+
+3. **Explain the "why".** If a requirement is missing, explain what it means and why it matters for project credibility.
+
+4. **Flag issues clearly.** Use indicators like:
+   - ⚠️ for warnings that need attention
+   - ✅ for confirmed evidence
+   - ❌ for gaps requiring documentation
+
+5. **Be proactive about next steps.** If they're viewing a partial requirement, suggest what evidence would make it complete.
+
+6. **Distinguish data from interpretation.** Quote evidence directly when available. Label your analysis as interpretation.
+
+7. **Keep responses focused.** A few clear sentences are better than walls of text. They're working, not reading a report."""
 
     # Build messages with evidence context if discussing specific requirements
     user_message = request.message
@@ -2423,9 +2547,22 @@ class GDriveImportRequest(BaseModel):
 
 
 def get_gdrive_access_token() -> str:
-    """Get Google Drive access token using gcloud CLI with service account impersonation."""
+    """Get Google Drive access token using ADC or gcloud CLI impersonation."""
     import subprocess
 
+    # Try Application Default Credentials first (production)
+    if os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
+        try:
+            from google.auth import default
+            from google.auth.transport.requests import Request
+
+            creds, _ = default(scopes=["https://www.googleapis.com/auth/drive.readonly"])
+            creds.refresh(Request())
+            return creds.token
+        except Exception as e:
+            logger.warning(f"ADC auth failed, falling back to gcloud: {e}")
+
+    # Fall back to gcloud CLI with service account impersonation (local dev)
     try:
         result = subprocess.run(
             [
@@ -2460,7 +2597,10 @@ def gdrive_api_request(endpoint: str, params: dict | None = None) -> dict:
     import requests
 
     token = get_gdrive_access_token()
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "x-goog-user-project": "koi-sensor",  # Required for ADC quota billing
+    }
     url = f"https://www.googleapis.com/drive/v3/{endpoint}"
 
     response = requests.get(url, headers=headers, params=params, timeout=30)
@@ -2641,6 +2781,321 @@ async def import_gdrive_files(session_id: str, request: GDriveImportRequest):
         raise
     except Exception as e:
         logger.error(f"Error importing files from Google Drive: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Google Drive Project Discovery (Phase 10)
+# ============================================================================
+
+# Configurable parent folder ID for project submissions
+# Set via environment variable or use default
+GDRIVE_PROJECTS_FOLDER_ID = os.environ.get("GDRIVE_PROJECTS_FOLDER_ID", "")
+
+
+class ProjectManifest(BaseModel):
+    """Schema for project_manifest.json in Google Drive folders."""
+    project_name: str = Field(..., description="Name of the project")
+    methodology: str = Field(..., description="Methodology identifier")
+    project_id: str | None = Field(None, description="Registry project ID")
+    proponent: dict | None = Field(None, description="Proponent contact info")
+    submitted_at: str | None = Field(None, description="Submission date ISO format")
+
+
+class DiscoveredProject(BaseModel):
+    """A project discovered from Google Drive."""
+    folder_id: str = Field(..., description="Google Drive folder ID")
+    folder_name: str = Field(..., description="Folder name")
+    manifest: ProjectManifest = Field(..., description="Project manifest data")
+    pdf_count: int = Field(..., description="Number of PDF files in folder")
+    existing_session_id: str | None = Field(None, description="Existing session ID if already imported")
+
+
+class GDriveProjectsResponse(BaseModel):
+    """Response for project discovery endpoint."""
+    projects: list[DiscoveredProject] = Field(default_factory=list)
+    count: int = Field(0, description="Total discovered projects")
+    parent_folder_id: str = Field(..., description="Parent folder being scanned")
+
+
+class CreateSessionFromProjectResponse(BaseModel):
+    """Response for one-click session creation from Drive project."""
+    success: bool
+    session_id: str
+    project_name: str
+    methodology: str
+    imported_count: int
+    discovery_summary: dict
+
+
+def get_existing_session_for_project(project_id: str | None, project_name: str) -> str | None:
+    """Check if a session already exists for this project.
+
+    Returns the session_id if found, None otherwise.
+    """
+    try:
+        import asyncio
+        sessions = asyncio.get_event_loop().run_until_complete(session_tools.list_sessions())
+        for session in sessions:
+            # Match by project_id if available, otherwise by project_name
+            if project_id and session.get("project_id") == project_id:
+                return session.get("session_id")
+            if session.get("project_name") == project_name:
+                return session.get("session_id")
+    except Exception as e:
+        logger.warning(f"Error checking existing sessions: {e}")
+    return None
+
+
+def gdrive_download_file_content(file_id: str) -> bytes:
+    """Download file content from Google Drive."""
+    import requests
+    token = get_gdrive_access_token()
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "x-goog-user-project": "koi-sensor",
+    }
+    download_url = f"https://www.googleapis.com/drive/v3/files/{file_id}"
+    download_params = {"alt": "media"}
+    response = requests.get(download_url, headers=headers, params=download_params, timeout=60)
+    if response.status_code != 200:
+        raise HTTPException(
+            status_code=response.status_code,
+            detail=f"Failed to download file: {response.text}",
+        )
+    return response.content
+
+
+@app.get("/gdrive/projects", response_model=GDriveProjectsResponse, summary="Discover projects from Google Drive")
+async def discover_gdrive_projects(parent_folder_id: str | None = Query(None, description="Parent folder ID to scan. Uses GDRIVE_PROJECTS_FOLDER_ID env var if not provided.")):
+    """Scan a parent folder for project subfolders containing project_manifest.json.
+
+    Each valid project folder should contain:
+    - project_manifest.json with project metadata
+    - One or more PDF documents
+
+    Returns a list of discovered projects with their metadata and import status.
+    """
+    folder_id = parent_folder_id or GDRIVE_PROJECTS_FOLDER_ID
+    if not folder_id:
+        raise HTTPException(
+            status_code=400,
+            detail="No parent folder ID provided. Set GDRIVE_PROJECTS_FOLDER_ID env var or pass parent_folder_id parameter.",
+        )
+
+    try:
+        # List all subfolders in the parent folder
+        folder_params = {
+            "q": f"'{folder_id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false",
+            "fields": "files(id,name)",
+            "pageSize": 100,
+            "orderBy": "name",
+        }
+        folders_result = gdrive_api_request("files", folder_params)
+        subfolders = folders_result.get("files", [])
+
+        discovered_projects: list[DiscoveredProject] = []
+
+        for subfolder in subfolders:
+            subfolder_id = subfolder["id"]
+            subfolder_name = subfolder["name"]
+
+            try:
+                # Check for project_manifest.json in this folder
+                manifest_params = {
+                    "q": f"'{subfolder_id}' in parents and name='project_manifest.json' and trashed=false",
+                    "fields": "files(id,name)",
+                    "pageSize": 1,
+                }
+                manifest_result = gdrive_api_request("files", manifest_params)
+                manifest_files = manifest_result.get("files", [])
+
+                if not manifest_files:
+                    # No manifest, skip this folder
+                    continue
+
+                # Download and parse manifest
+                manifest_file_id = manifest_files[0]["id"]
+                manifest_content = gdrive_download_file_content(manifest_file_id)
+                manifest_data = json.loads(manifest_content.decode("utf-8"))
+                manifest = ProjectManifest(**manifest_data)
+
+                # Count PDFs in folder
+                pdf_params = {
+                    "q": f"'{subfolder_id}' in parents and mimeType='application/pdf' and trashed=false",
+                    "fields": "files(id)",
+                    "pageSize": 100,
+                }
+                pdf_result = gdrive_api_request("files", pdf_params)
+                pdf_count = len(pdf_result.get("files", []))
+
+                # Check for existing session
+                existing_session_id = get_existing_session_for_project(
+                    manifest.project_id,
+                    manifest.project_name,
+                )
+
+                discovered_projects.append(DiscoveredProject(
+                    folder_id=subfolder_id,
+                    folder_name=subfolder_name,
+                    manifest=manifest,
+                    pdf_count=pdf_count,
+                    existing_session_id=existing_session_id,
+                ))
+
+            except json.JSONDecodeError as e:
+                logger.warning(f"Invalid manifest JSON in folder {subfolder_name}: {e}")
+                continue
+            except Exception as e:
+                logger.warning(f"Error processing folder {subfolder_name}: {e}")
+                continue
+
+        return GDriveProjectsResponse(
+            projects=discovered_projects,
+            count=len(discovered_projects),
+            parent_folder_id=folder_id,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error discovering projects from Google Drive: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/gdrive/projects/{folder_id}/create-session", response_model=CreateSessionFromProjectResponse, summary="Create session from Google Drive project")
+async def create_session_from_gdrive_project(folder_id: str):
+    """One-click session creation from a Google Drive project folder.
+
+    This endpoint:
+    1. Reads the project_manifest.json from the folder
+    2. Creates a new review session with the manifest metadata
+    3. Imports all PDF files from the folder
+    4. Runs document discovery
+
+    Returns the new session ID and import summary.
+    """
+    import requests
+
+    try:
+        # First, check for and read the manifest
+        manifest_params = {
+            "q": f"'{folder_id}' in parents and name='project_manifest.json' and trashed=false",
+            "fields": "files(id,name)",
+            "pageSize": 1,
+        }
+        manifest_result = gdrive_api_request("files", manifest_params)
+        manifest_files = manifest_result.get("files", [])
+
+        if not manifest_files:
+            raise HTTPException(
+                status_code=400,
+                detail="No project_manifest.json found in folder",
+            )
+
+        # Download and parse manifest
+        manifest_file_id = manifest_files[0]["id"]
+        manifest_content = gdrive_download_file_content(manifest_file_id)
+        manifest_data = json.loads(manifest_content.decode("utf-8"))
+        manifest = ProjectManifest(**manifest_data)
+
+        # Check if session already exists
+        existing_session_id = get_existing_session_for_project(
+            manifest.project_id,
+            manifest.project_name,
+        )
+        if existing_session_id:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Session already exists for this project: {existing_session_id}",
+            )
+
+        # Create the session
+        session_result = await session_tools.create_session(
+            project_name=manifest.project_name,
+            methodology=manifest.methodology,
+            project_id=manifest.project_id,
+        )
+        session_id = session_result["session_id"]
+
+        # Get all PDF files in the folder
+        pdf_params = {
+            "q": f"'{folder_id}' in parents and mimeType='application/pdf' and trashed=false",
+            "fields": "files(id,name,size)",
+            "pageSize": 100,
+            "orderBy": "name",
+        }
+        pdf_result = gdrive_api_request("files", pdf_params)
+        pdf_files = pdf_result.get("files", [])
+
+        if not pdf_files:
+            raise HTTPException(
+                status_code=400,
+                detail="No PDF files found in folder",
+            )
+
+        # Download and import all PDFs
+        token = get_gdrive_access_token()
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "x-goog-user-project": "koi-sensor",
+        }
+
+        imported_files = []
+        for pdf_file in pdf_files:
+            file_id = pdf_file["id"]
+            filename = pdf_file.get("name", f"{file_id}.pdf")
+
+            try:
+                # Download file content
+                download_url = f"https://www.googleapis.com/drive/v3/files/{file_id}"
+                download_params = {"alt": "media"}
+                download_response = requests.get(
+                    download_url, headers=headers, params=download_params, timeout=120
+                )
+                if download_response.status_code != 200:
+                    logger.warning(f"Failed to download {filename}: {download_response.status_code}")
+                    continue
+
+                content_b64 = base64.b64encode(download_response.content).decode("utf-8")
+                imported_files.append({
+                    "filename": filename,
+                    "content_base64": content_b64,
+                })
+            except Exception as e:
+                logger.warning(f"Error downloading {filename}: {e}")
+                continue
+
+        if not imported_files:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to download any PDF files",
+            )
+
+        # Add files to session
+        await upload_tools.upload_additional_files(session_id, imported_files)
+
+        # Run document discovery
+        discovery_result = await document_tools.discover_documents(session_id)
+
+        return CreateSessionFromProjectResponse(
+            success=True,
+            session_id=session_id,
+            project_name=manifest.project_name,
+            methodology=manifest.methodology,
+            imported_count=len(imported_files),
+            discovery_summary={
+                "documents_found": discovery_result.get("documents_found", 0),
+                "classification_summary": discovery_result.get("classification_summary", {}),
+            },
+        )
+
+    except HTTPException:
+        raise
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid manifest JSON: {e}")
+    except Exception as e:
+        logger.error(f"Error creating session from Google Drive project: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

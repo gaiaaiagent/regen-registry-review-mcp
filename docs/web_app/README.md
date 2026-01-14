@@ -4,10 +4,10 @@
 
 A purpose-built web application for carbon credit project verification, transforming the existing MCP-based workflow into a document-centric interface with an embedded AI assistant.
 
-**Status:** MVP Development (Phases 1-9 Complete, Deployed to Production)
-**Version:** 1.7
+**Status:** MVP Development (Phases 1-12 Complete, Deployed to Production)
+**Version:** 1.9
 **Updated:** January 2026
-**Live URL:** https://registry.regen.gaiaai.xyz/
+**Live URL:** https://regen.gaiaai.xyz/registry-review/
 
 ---
 
@@ -155,6 +155,94 @@ The following are already built and will be reused:
 - **Reviewer/Admin:** allowlist (e.g., `@regen.network`) + role assignment
 - **Proponent:** invited per project/session, strict least-privilege view
 
+### Google OAuth Configuration
+
+The application uses Google OAuth 2.0 for authentication. Configuration requires:
+
+**Environment Variables:**
+```bash
+# Backend (.env)
+GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-xxx
+REGISTRY_REVIEW_FRONTEND_URL=https://regen.gaiaai.xyz/registry-review
+
+# Frontend (.env.production)
+VITE_API_URL=https://regen.gaiaai.xyz/api/registry
+```
+
+**Google Cloud Console Setup:**
+1. Go to [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
+2. Create OAuth 2.0 Client ID → **Web application** type
+3. Add Authorized redirect URI: `https://regen.gaiaai.xyz/registry-review/auth/callback`
+4. Copy Client ID and Client Secret to `.env`
+
+**Auth Flow:**
+```
+1. User clicks "Sign in with Google"
+2. Frontend calls GET /auth/google/login
+3. Backend returns Google OAuth URL with redirect_uri
+4. User authenticates with Google
+5. Google redirects to /registry-review/auth/callback?code=xxx
+6. Frontend calls GET /auth/google/callback?code=xxx
+7. Backend exchanges code for tokens, creates session
+8. Frontend stores JWT token, user is authenticated
+```
+
+**Domain Restriction:**
+The backend enforces `@regen.network` email domain for reviewers. This is checked in `AuthContext.tsx`:
+```typescript
+if (!userData.email.endsWith('@regen.network')) {
+  throw new Error('Only @regen.network emails are allowed')
+}
+```
+
+### Development Test Login
+
+For local development and testing without Google OAuth, use the test login endpoint:
+
+| Username | Password | Role |
+|----------|----------|------|
+| `reviewer` | `test123` | Reviewer (full access) |
+| `proponent` | `test123` | Proponent (limited view) |
+
+The login page includes a "Test Login" button for reviewers. Proponents can enter credentials directly in the Proponent tab.
+
+---
+
+## Known Workflow Gaps
+
+### Session Creation: Proponent vs Reviewer
+
+**Current State:** Reviewers manually create sessions (entering project name, methodology) and upload documents.
+
+**Actual Registry Workflow:** Per the [Regen Registry Handbook](https://handbook.regen.network/project-development/project-registration), the **proponent initiates** project submission:
+
+| Role | Responsibility |
+|------|----------------|
+| **Proponent** | Submits project plan, selects methodology, uploads documents |
+| **Reviewer** | Receives submission, validates against checklist, requests clarifications |
+
+**Why the gap exists:** Phase 10 (Proponent Flow) was deferred. The reviewer is currently "wearing both hats."
+
+**Future solutions:**
+1. **Phase 10 implementation** - Proponent portal for submissions
+2. **Regen Teams integration** (Q1 2026) - Native organization workspaces with submission workflow
+3. **Google Drive auto-import** - Each project has a folder; documents auto-populate when session is created
+
+### Document Auto-Import
+
+**Current State:** Test PDFs appear for all sessions (demo data). Production would require manual upload.
+
+**Ideal Flow:**
+```
+1. Proponent uploads docs to Google Drive folder (e.g., /Projects/Botany-Farm/)
+2. Proponent submits project → folder URL included
+3. System auto-imports all PDFs from folder
+4. Reviewer sees documents pre-populated, ready for review
+```
+
+This would eliminate manual document handling entirely.
+
 ---
 
 ## Resolved Questions
@@ -208,13 +296,21 @@ python chatgpt_rest_api.py
 
 ## Production Deployment
 
-The application is deployed at **https://registry.regen.gaiaai.xyz/**
+The application is deployed at **https://regen.gaiaai.xyz/registry-review/**
 
 ### Architecture
 - **Server:** `202.61.196.119`
-- **Backend:** FastAPI service (`registry-review-api.service`) on port 8003
+- **Backend:** FastAPI service (`registry-review-api.service`) on port 8020
 - **Frontend:** Static files in `/opt/projects/registry-review/web_app/dist/`
 - **Proxy:** nginx (Docker) with SSL from Let's Encrypt wildcard cert
+- **Base Path:** `/registry-review/` (configured in `vite.config.ts` and React Router)
+
+### URL Structure
+| URL | Purpose |
+|-----|---------|
+| `https://regen.gaiaai.xyz/registry-review/` | Frontend SPA |
+| `https://regen.gaiaai.xyz/api/registry/` | Backend API |
+| `https://registry.regen.gaiaai.xyz/` | Redirects to main URL |
 
 ### Server Commands
 ```bash
@@ -226,7 +322,36 @@ journalctl -u registry-review-api -f
 
 # Restart
 sudo systemctl restart registry-review-api
+
+# Restart nginx (for config changes)
+docker restart nginx
 ```
+
+### Deployment Steps
+```bash
+# 1. Build frontend with production env
+cd web_app
+npm run build
+
+# 2. Deploy to server
+rsync -avz dist/ darren@202.61.196.119:/opt/projects/registry-review/web_app/dist/
+
+# 3. Deploy backend changes
+rsync -avz --exclude='.venv' --exclude='__pycache__' --exclude='.git' \
+  /path/to/regen-registry-review-mcp/ \
+  darren@202.61.196.119:/opt/projects/registry-review/
+
+# 4. Restart backend
+ssh darren@202.61.196.119 "sudo systemctl restart registry-review-api"
+```
+
+### Important Configuration Files
+| File | Location | Purpose |
+|------|----------|---------|
+| `.env` | `/opt/projects/registry-review/.env` | Backend env vars (API keys, OAuth) |
+| `nginx-ssl.conf` | `/opt/projects/GAIA/config/nginx-ssl.conf` | Nginx routing config |
+| `registry-review-api.service` | `/etc/systemd/system/` | Systemd service definition |
+| `.env.production` | `web_app/.env.production` | Frontend build-time env vars |
 
 ---
 
@@ -250,4 +375,5 @@ sudo systemctl restart registry-review-api
 | v1.5 | January 2026 | Phases 1-7 implemented; added Current Implementation section |
 | v1.6 | January 2026 | Added Phase 9B: Verification Workflow ("DocuSign with AI" pattern) |
 | v1.7 | January 2026 | Phases 8-9 complete (PDF highlighting, verification); deployed to production |
-| v1.8 | January 2026 | Google OAuth implemented with koi-sensor OAuth client |
+| v1.8 | January 2026 | Google OAuth implemented with KOI MCP Web Client |
+| v1.9 | January 2026 | Phase 11-12 complete; moved to `/registry-review/` base path; comprehensive auth docs |

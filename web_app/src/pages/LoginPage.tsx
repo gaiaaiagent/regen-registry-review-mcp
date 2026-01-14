@@ -11,8 +11,8 @@ export function LoginPage() {
   const { user, isLoading, signIn, signInAsProponent, error: authError } = useAuth()
   const [signingIn, setSigningIn] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
-  const [proponentEmail, setProponentEmail] = useState('proponent@example.com')
-  const [proponentPassword, setProponentPassword] = useState('demo123')
+  const [proponentEmail, setProponentEmail] = useState('proponent')
+  const [proponentPassword, setProponentPassword] = useState('test123')
   const location = useLocation()
 
   const error = localError || authError
@@ -118,6 +118,24 @@ export function LoginPage() {
                   </>
                 )}
               </Button>
+
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">Or for testing</span>
+                </div>
+              </div>
+
+              <Button
+                variant="outline"
+                onClick={() => signInAsProponent('reviewer', 'test123')}
+                disabled={isButtonDisabled}
+                className="w-full"
+              >
+                Test Login (reviewer / test123)
+              </Button>
             </TabsContent>
 
             <TabsContent value="proponent" className="space-y-4 pt-2">
@@ -164,7 +182,7 @@ export function LoginPage() {
               </form>
               
               <p className="text-xs text-center text-muted-foreground mt-2">
-                Demo: use 'proponent@example.com' / 'demo123'
+                Test: use 'proponent' / 'test123'
               </p>
             </TabsContent>
           </Tabs>

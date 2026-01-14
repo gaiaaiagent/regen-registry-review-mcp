@@ -78,3 +78,25 @@ This runs fast tests only (configured in `pytest.ini`). You'll see "X deselected
 ### Rule
 
 Only run `pytest` with no marker overrides. If you see all tests collected with none deselected, you're running expensive tests. See `docs/TESTING_GUIDE.md` for details.
+
+## Production Deployment
+
+**Live URL:** https://regen.gaiaai.xyz/registry-review/
+
+**Quick Deploy:**
+```bash
+# Frontend
+cd web_app && npm run build
+rsync -avz dist/ darren@202.61.196.119:/opt/projects/registry-review/web_app/dist/
+
+# Backend
+rsync -avz --exclude='.venv' --exclude='__pycache__' --exclude='.git' . darren@202.61.196.119:/opt/projects/registry-review/
+ssh darren@202.61.196.119 "sudo systemctl restart registry-review-api"
+```
+
+**Key Config Files:**
+- Backend env: `/opt/projects/registry-review/.env` (Google OAuth, API keys)
+- Frontend env: `web_app/.env.production` (API URL)
+- Nginx: `/opt/projects/GAIA/config/nginx-ssl.conf`
+
+**Auth:** Google OAuth with `@regen.network` domain restriction. See `docs/web_app/README.md` for full auth documentation.

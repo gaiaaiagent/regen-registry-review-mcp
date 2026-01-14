@@ -33,7 +33,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <NotificationProvider>
-          <BrowserRouter>
+          <BrowserRouter basename="/registry-review">
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />

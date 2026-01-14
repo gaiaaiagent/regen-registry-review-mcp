@@ -5,12 +5,9 @@
 ### **Regen Network Development, PBC**
 
 Version: 4
-
 Document ID:
-
 Last updated: 9 August 2023
 [registry@regen.network](mailto:support-registry@regen.network)
-
 [https://www.regen.network/](https://www.regen.network/)
 
 
@@ -152,7 +149,7 @@ Appendix .......................................................................
 
 ### 1.1. General Information
 
-|ProjectName|Botany Farm Partnership (4997Botany22)|
+|Project Name|Botany Farm Partnership (4997Botany22)|
 |---|---|
 |Version of Document|2|
 |Date Submitted|31/03/2025|
@@ -163,11 +160,9 @@ Appendix .......................................................................
 ### 1.2. Summary Description of the Project
 
 _Provide a summary description of the project to indicate the nature of the project and_
-
 _its implementation, including the following:_
 
-
-       Project Methods Summary: The project involves changes in farming
+       - Project Methods Summary: The project involves changes in farming
 methods to reverse soil degradation, prevent water run-off, increase soil
 organic carbon stocks (SOCS), improve soil and business resilience and
 improve water quality. These changes are also being implemented to
@@ -176,9 +171,9 @@ reduce reliance on inorganic fertilisers and pesticides. Increases in SOCS
 are expected to improve soil workability, soil structure, drainage and water
 retention thereby reducing cultivation costs and improving crop yields.
 
-       Location of the project: Northamptonshire, United Kingdom.
+       - Location of the project: Northamptonshire, United Kingdom.
 
-       Expected GHG removals: GHG removals will be achieved through the
+       - Expected GHG removals: GHG removals will be achieved through the
 implementation of Regenerative Farming techniques to increase SOCS
 and reduce production GHG emissions. The project expects to achieve a
 net GHG removal per annum of 5-10 tCO2e per ha until soil saturation is
@@ -208,9 +203,9 @@ and healthy soil microbiome.
 reduced whole farm use of inorganic fertiliser, particularly nitrogen fertiliser
 and increased use of renewable energy sources.
 
-  Building SOCS by implementing changes to crop rotations.
+  - Building SOCS by implementing changes to crop rotations.
 
-  Retaining SOC by reducing cultivations. Direct drilling or minimum
+  - Retaining SOC by reducing cultivations. Direct drilling or minimum
 inversion tillage will be implemented to retain SOC in the soil. Deeper
 cultivations and ploughing will only be used strategically to relieve soil
 compaction and waterlogging and to incorporate crop residues and
@@ -218,7 +213,7 @@ green and livestock manures, where absolutely necessary. All
 cultivations will be undertaken with the objective of increasing and then
 maintaining SOCS levels.
 
-  Where appropriate, the inclusion of grass, clover and mixed species
+  - Where appropriate, the inclusion of grass, clover and mixed species
 leys in the rotation to increase SOCS through retained root and canopy
 growth, reduce reliance on inorganic fertilisers and pesticides and
 provide grazing for livestock.
@@ -231,12 +226,12 @@ winter crops preceded by a catch crop.
   - Implementing a diverse crop rotation to encourage an increase in soil
 biodiversity and reverse the buildup of soil-borne diseases and weeds.
 
-  Where appropriate to the farming system, implementing suitable
+  - Where appropriate to the farming system, implementing suitable
 livestock enterprises to utilise grass leys and cover crops, provide
 organic fertiliser and increase SOCS by high density, time-controlled
 grazing and residue grazing techniques.
 
-Prior Conditions: The farm was historically managed under an all arable,
+- Prior Conditions: The farm was historically managed under an all arable,
 cropland, winter cropping regime using deep, inversion cultivation and
 intensive secondary cultivations. Only two or three crops were being grown
 each year. High levels of herbicides were being used in an attempt to
@@ -286,16 +281,12 @@ _of the document._
 
 _Describe and justify how the project meets the eligibility criteria outlined in the Credit_
 _Class and Methodology. This could include a description of geographic applicability, land_
-
 _eligibility criteria and prior land use, project activity, etc… Note that some eligibility_
-
 _criteria are listed as their own sections below._
-
 This project falls within the croplands, grasslands, pasturelands and shrublands
 ecosystem type classification, as defined in the RND Taxonomy. There has been
 no change of ecosystem type within the 5 years prior to project registration as
 evidenced by the 5-year historic management information appended to this
-
 document.
 
 Project activity falls within regenerative crop management and managed grazing
@@ -328,10 +319,9 @@ This project includes a single location and forms part of an aggregated project.
 
 #### 1.6.1. Project Proponent
 
-
 _Provide the contact information of the project proponent._
 
-|OrganisationName|EcometricLtd|
+|Organisation Name|Ecometric Ltd|
 |---|---|
 |Contact Person|David Wright|
 |Title|Project Proponent, Project Developer, Project<br>Monitor|
@@ -345,11 +335,10 @@ _Provide the contact information of the project proponent._
 
 _Provide evidence of ownership of the land, including:_
 
-
-      _Documentation and or attestation of land tenure or ownership._
+      - _Documentation and or attestation of land tenure or ownership._
 The Project Area is 100% owned by the Project Owner, Nick Denman.
 
-      _Indicate the intended distribution of credits issued to the project._
+      - _Indicate the intended distribution of credits issued to the project._
 Issued Credits will be 100% owned by the Project Owner, Nick Denman.
 
 ### 1.8. Project Start Date
@@ -373,16 +362,13 @@ without causing crop damage.
 
 _Indicate the crediting period, specifying the day, month, and year for the start and end_
 _dates and the total number of years._
-
 01/01/2022 to 31/12/2031.
 
 ### 1.10. Permanence Period
 
 
 _Indicate the permanence period per the requirements stipulated in the Credit Class,_
-
 _specifying the day, month, and year for the start and end dates and the total number of_
-
 _years. If this section is not applicable, delete this text._
 The Credit Class requires a 10-year permanence period, checked by a year-10
 monitoring round to identify reversals. The permanence period for this project is
@@ -390,15 +376,12 @@ monitoring round to identify reversals. The permanence period for this project i
 
 ### 1.11. Project Location
 
-
 _Indicate the project location and attach a GIS file specifying the geographic boundary_
-
 _of the project, delineating the project area boundary within a regional context. Project_
 _Proponents implementing an aggregated project must include location information for_
-
 _all enrolled sites._
 
-|Country|England United Kingdom<br>, .|
+|Country|England, United Kingdom.|
 |---|---|
 |Region / State / Province|Northamptonshire.|
 |City / Town / Community|Ravensthorpe.|
@@ -414,18 +397,14 @@ _all enrolled sites._
 
 Gross Project Area
 
-
 _Indicate the gross project area (including all structures) in hectares)._
 
 
 Habitat
 
-
 _Specify vegetative habitat for project areas including protected, endangered or other_
 _species of particular value, major vegetation community types and/or major ecological_
-
 _communities._
-
 Cropland encompasses a variety of cereals, including spring wheat, winter barley,
 and winter wheat, along with both spring and winter linseed. Additionally, it
 includes grassland and areas managed under Countryside Stewardship.
@@ -435,7 +414,6 @@ predominantly made up of blackthorn and hawthorn.
 
 
 Environmental Conditions of Project Area
-
 
 _Describe the climatic conditions of the project, including the hydrology and topography._
 The project is in the temperate Koppen-Geiger Climate Classification CFB with an
@@ -454,9 +432,7 @@ sea level.
 
 Major Environmental Threats
 
-
 _Indicate the major environmental threats to the project area in the last few years,_
-
 _including droughts, fires, floods, pests, etc…_
 Flood risk for the project area is categorised as medium for Surface Water and
 very low for Rivers and the sea by the UK Government Lead Local Flood
@@ -469,7 +445,6 @@ Authorities: [Your long term flood risk assessment - Check your long term flood 
 
 _Describe how the project activity or activities applied will achieve ecological outcomes_
 _including (if applicable) the net GHG emission reductions or removals. For all activities_
-
 _listed, include information on the planning and implementation of the activity including_
 _descriptions of how the different project stakeholders are involved._
 The project involves changes in farming methods to reverse soil degradation and
@@ -504,14 +479,13 @@ numbers.
 Change strategy and implementation will be planned during quarterly Farm
 Management Meetings involving the following participants:
 
-
   - Owner
 
   - Land Agent
 
   - Agronomist
 
-  Project Developer: Annual contribution of Project Monitoring and
+  - Project Developer: Annual contribution of Project Monitoring and
 Management data by ecometric.
 [Technology — Ecometric](https://www.ecometric.co.uk/technology)
 
@@ -525,15 +499,14 @@ evidence-based change to maximise sequestration and minimise reversal risk.
 
 Key changes:
 
-
-  Building SOCS by implementing changes to crop rotations. This will be
+  - Building SOCS by implementing changes to crop rotations. This will be
 monitored In Accordance With (IAW) the approved methodology. Soil
 sampling will be carried out by approved 3rd party contractors and certified
 laboratories IAW the approved methodology. Monitoring reports will be
 presented annually to the Farm Management Team by ecometric to assist
 in data interpretation and support strategic decision-making.
 
-  Retaining SOC by reducing cultivations. Direct drilling or zero inversion
+  - Retaining SOC by reducing cultivations. Direct drilling or zero inversion
 tillage will be implemented to retain SOC in the soil. Deeper cultivations
 and ploughing will only be used strategically to relieve soil compaction and
 waterlogging and to incorporate crop residues and green and livestock
@@ -550,7 +523,7 @@ manures, where absolutely necessary. All cultivations will be undertaken
 with the objective of increasing and then maintaining SOCS levels. The
 cultivation strategy will be set by the farm management team.
 
-       The inclusion of grass, clover, and mixed species leys in the rotation to
+       - The inclusion of grass, clover, and mixed species leys in the rotation to
 increase SOCS through retained root and canopy growth, reduce reliance
 on inorganic fertilisers and pesticides and maintain livestock enterprises.
 The rotation strategy will be set and implemented by the Farm
@@ -565,7 +538,6 @@ and implemented by the Farm Management Team.
        - Implementing a diverse crop rotation to encourage an increase in soil
 biodiversity and reverse the buildup of soil-borne diseases and weeds. The
 rotation strategy will be set and implemented by the Farm Management
-
 Team.
 
        - Implementing suitable livestock enterprises to utilise grass leys and cover
@@ -578,7 +550,6 @@ strategy will be set and implemented by the Farm Management Team.
 
 _Describe the conditions prior to implementation of the project and demonstrate the_
 _project has not been implemented to generate GHG emissions then subsequently_
-
 _destroyed._
 The farm was historically managed under an all arable, winter cropping regime
 using deep, inversion cultivation and intensive secondary cultivations. Only two or
@@ -613,7 +584,6 @@ positive business, environmental and climate outcomes.
 
 
 _Identify and demonstrate project compliance with any relevant local and national laws,_
-
 _statutes, and other regulatory frameworks._
 The Project will continue to comply with laws and rules laid down, published and
 periodically updated by the Department for Environment, Food & Rural Affairs
@@ -627,14 +597,11 @@ activities are provided in Appendix A.
 
 _Indicate whether the project has been registered, or is seeking registration under any_
 _other GHG programs, biodiversity programs, or any other payment for ecosystem service_
-
 _crediting or certification programs. Where the project has been registered or attempted_
 _registration under any other GHG or ecological crediting program, provide the_
-
 _registration number and details and information of any rejections of the project_
 _application on other registries._
 This project has not been registered in any other GHG or environmental crediting
-
 programs.
 
 ### 1.16. Additional Information Relevant to the Project
@@ -642,20 +609,16 @@ programs.
 
 Personal / Commercially Sensitive Information
 
-
 _Indicate whether any commercially sensitive information should be excluded from the_
-
 _public version of this project plan. This information is restricted to the following Project_
-
 _Plan items:_
 
-
-       _Entity name and contact information (for project actors other than the Project_
+       - _Entity name and contact information (for project actors other than the Project_
 _Proponent, Monitor, and Verifier)._
 
-       _Underlying documents proving attestation of land tenure._
+       - _Underlying documents proving attestation of land tenure._
 
-       _Underlying contractual agreements between project actors._
+       - _Underlying contractual agreements between project actors._
 
 
 10
@@ -665,10 +628,10 @@ _Proponent, Monitor, and Verifier)._
 
 --- Page 14 ---
 
-Entity name and contact information (for project actors other than the
+- Entity name and contact information (for project actors other than the
 Project Proponent, Monitor, and Verifier).
 
-Underlying documents proving attestation of land tenure.
+- Underlying documents proving attestation of land tenure.
 
 - Underlying contractual agreements between project actors.
 
@@ -681,15 +644,12 @@ Underlying documents proving attestation of land tenure.
 --- Page 15 ---
 
 ## 2. Safeguards
-
 ### 2.1. No Net Harm
 
 _Detail any potential negative socio-economic and environmental impacts of the project_
 _and the steps taken to mitigate them. Include risks of project implementation to local_
-
 _stakeholders, how risks are mitigated and plans to protect local stakeholder property_
 _rights. Include a process for conflict resolution between project proponent and local_
-
 _stakeholders, such as grievance redress._
 
 The Project has been assessed for potential impacts on local employment to
@@ -719,7 +679,6 @@ _Describe how local stakeholders, such as landowners or indigenous communities, 
 _identified and consulted prior to the project implementation. Include methods for_
 _engagement such as meetings (including general dates), how local consultation_
 _outcomes were shared, how ongoing local stakeholder communication is handled and_
-
 _why local stakeholder input was included or not in project design._
 
 This carbon project originated from Landowner / Land Steward interest in the
@@ -748,7 +707,6 @@ emissions reduction, and sequestration outcomes.
 
 
 _Indicate if environmental impact assessments were undertaken and describe the process_
-
 _and findings._
 No negative environmental impacts were identified.
 
@@ -757,7 +715,6 @@ No negative environmental impacts were identified.
 
 _Detail if a community public consultation was undertaken prior to the project_
 _implementation and detail how comments were addressed, either in updates to the_
-
 _project or justified as irrelevant._
 
 The Private Ownership of the Project Area negated the need for Public
@@ -786,12 +743,10 @@ issue, to repair soil structure.
 --- Page 17 ---
 
 ## 3. Application of Credit Class and Methodology
-
 ### 3.1. Applicability of Credit Class and Methodology
 
 _Demonstrate and justify how the project activity(s) meet the applicability conditions of_
 _the Methodology, Credit Class, and tools (where applicable) applied to the project._
-
 _Address each applicability condition separately._
 
 
@@ -863,7 +818,7 @@ _other ecological indicators for the project._
 
 
 
-|BaselineGHG sources<br>,<br>sinks andreservoirs|Gasses(CO CH<br>2, 4,<br>NO )<br>2|Explanation|
+|Baseline GHG sources,<br>sinks and reservoirs|Gasses(CO, CH,<br>2 4<br>NO )<br>2|Explanation|
 |---|---|---|
 |Soil - Reservoir and Sink|CO2|Soil is the largest<br>terrestrial reservoir of<br>carbon in the form of<br>SOC (converted to CO2e <br>for equivalence to GHG<br>emissions). In this<br>regenerative agriculture<br>system, soil also serves<br>as a sink in absorbing<br>more CO2 than is emitted<br>by the crop (food and<br>fibre) production cycle.<br>This has been evidenced<br>by a climate-positive<br>SOC surplus.|
 |Above-ground Biomass -<br>Hedgerows and<br>Woodland as Reservoir<br>and Sink|CO2|Although not considered<br>in the calculation of the<br>Project area carbon<br>balance which is limited<br>to the evaluation of Soil,<br>hedgerows and<br>woodland within the<br>project area are<br>significant carbon sinks.<br>These areas are<br>however excluded from<br>the carbon balance<br>calculation by<br>geographic masking to<br>limit the evaluated area<br>to cropped field areas.|
@@ -887,7 +842,6 @@ _other ecological indicators for the project._
 
 _Identify and justify the baseline scenario in accordance with the procedures outlined in_
 _the Methodology. Explain and justify key assumptions and rationale for the application_
-
 _of the applied methodology and provide any relevant references._
 
 The Methodology Baseline is defined as the total carbon stocks calculated at the
@@ -933,7 +887,6 @@ GHG Emissions: -121.90 tCO2e.
 
 _Demonstrate the additionality of the project in accordance with the Credit Class and_
 _Methodology and any relevant tools taking into account that project activities must not_
-
 _be mandated by any law, statute, or other regulatory framework._
 
 The Credit Class specified additionality tests have all been met:
@@ -967,9 +920,7 @@ to ensure that tradable surpluses are climate positive.
 
 _Describe and justify any deviations from the Credit Class, Methodology, or Regen_
 _Registry Program Guide, and indicate that the deviation will not negatively impact the_
-
 _conservativeness of the quantification of GHG emission reduction or removals._
-
 None .
 
 
@@ -981,13 +932,10 @@ None .
 --- Page 22 ---
 
 ## 4. Quantification of GHG Emission Reduction and Removals
-
 ### 4.1. Baseline Emissions
 
 _Describe the process for the quantification of baseline emissions and/or removals in_
-
 _accordance with the Methodology. Include all relevant equations and explain and justify_
-
 _all relevant choices with respect to the selection of emission factors and default values._
 
 Farm enterprise Baseline GHG emissions were calculated using the IPCC
@@ -997,7 +945,6 @@ calculators listed in Appendix A, as reported in Paragraph 3.3
 
 
 _Describe the quantification approach for emissions and removals according to Approved_
-
 _Methodology and Credit Class, including equations and justifications of choices made._
 
 Farm enterprise GHG emissions will be calculated for each monitoring period using
@@ -1012,7 +959,6 @@ from total SOCS change over the same monitoring interval [tCO2e].
 
 _Describe the procedure and quantification of leakage emissions in accordance with the_
 _approved Methodology and Credit Class, including all equations and justification of_
-
 _choices made._
 
 Project Activity Leakage is considered to be de minimis in this project. Yield
@@ -1044,7 +990,7 @@ _including leakage. Include relevant explanations for each._
 
 
 
-|Year|Estimated<br>baseline<br>emissions<br>(tCO 2e)|Estimated<br>project<br>removals<br>(tCO 2e)|Estimated<br>leakage<br>emissions<br>(tCO 2e)|Estimatednet<br>GHG<br>emissions<br>reductionsor<br>removals<br>(tCO 2e)|
+|Year|Estimated<br>baseline<br>emissions<br>(tCO e)<br>2|Estimated<br>project<br>removals<br>(tCO e)<br>2|Estimated<br>leakage<br>emissions<br>(tCO e)<br>2|Estimated net<br>GHG<br>emissions<br>reductions or<br>removals<br>(tCO e)<br>2|
 |---|---|---|---|---|
 |2022|246|616|De Minimis|370|
 
@@ -1068,7 +1014,6 @@ equivalent soil type).
 _Indicate the contributions this project will allocate to buffer pools stipulated in the_
 _Credit Class and indicate whether the project offsets face any risk of reversal by_
 _identifying any risks that may substantially affect the project’s GHG emission reductions_
-
 _or removals._
 
 SOCS will be annually monitored during the 10-year Project Term to allow further
@@ -1114,13 +1059,12 @@ credit vintage monitoring report.
 If the reversal exceeds the buffer, then additional compensation will be achieved
 by:
 
-
-  Renewing the project and utilising further issuances to compensate the
+  - Renewing the project and utilising further issuances to compensate the
 remaining reversal or,
 
   - Using any non-transacted credits to compensate or,
 
-  Purchase of credits to compensate.
+  - Purchase of credits to compensate.
 
 
 21
@@ -1131,12 +1075,10 @@ remaining reversal or,
 --- Page 25 ---
 
 ## 5. Monitoring
-
 ### 5.1. Data and Parameters Available at Registration
 
 _Indicate the data and parameters available at registration, and remain fixed throughout_
 _the project crediting period. Copy and paste the table as necessary for each_
-
 _data/parameter._
 
 
@@ -1181,7 +1123,7 @@ _period. Copy and paste the table as necessary for each data/parameter._
 
 
 
-|DataIndicator|Soil Organic Carbon Stock (SOCS)|
+|Data Indicator|Soil Organic Carbon Stock (SOCS)|
 |---|---|
 |Data unit|tCO2e|
 |Description|GHG Emissions / SOCS change|
@@ -1197,14 +1139,10 @@ _period. Copy and paste the table as necessary for each data/parameter._
 
 
 _Describe the process and scheduling for obtaining, recording, and analysing monitored_
-
 _data and parameters set out in 5.2. Include details on the methods used for measuring,_
 _recording, storing, aggregating, and creating monitoring reports, including monitoring_
-
 _equipment where applicable. Additionally, describe the personnel responsible for_
-
 _carrying out monitoring activities, the policies for oversight and accountability of_
-
 _monitoring activities, and the procedures for internal auditing and quality assurance._
 
 Monitoring and Reporting will be undertaken by Ecometric as Project Monitor and
@@ -1329,7 +1267,6 @@ responses will be SOCS values reported by the laboratory.
 The sampling plan will allocate a laboratory SOCS value to each CGS stratum,
 representing an average SOCS for the stratum. The average SOCS value will then
 be allocated to each core location within the relevant stratum. A QGIS tool will be
-
 used to extract spectral values at each core location for all bands used in the
 analysis. The predictors and responses will be correlated by location to create the
 AI training dataset.
@@ -1418,7 +1355,7 @@ following three tools to farm enterprise activities:
 |Within the Project Area.|Col2|
 |---|---|
 |Rule|Link (if available)|
-|**Keeping livestock in England,**<br>**Scotland and Wales**|Keeping cattle, bison and buffalo in England<br>and Wales- GOV.UK (www.gov.uk).<br>Keeping sheep and goats in England-<br>GOV.UK (www.gov.uk)<br>Keeping pigs in England- GOV.UK<br>(www.gov.uk)|
+|**Keeping livestock in England, **<br>**Scotland and Wales**|Keeping cattle, bison and buffalo in England<br>and Wales - GOV.UK (www.gov.uk). <br>Keeping sheep and goats in England -<br>GOV.UK (www.gov.uk) <br>Keeping pigs in England - GOV.UK<br>(www.gov.uk)|
 |**Protecting animal health and**<br>**welfare**|Protecting the public from cattle kept on land.<br>Protecting animal welfare on farm and in<br>transport.<br>Producing safe-to-eat food for humans or<br>animals.<br>Reporting notifiable diseases in animals.<br>Bovine TB: testing cattle.|
 
 
@@ -1429,7 +1366,7 @@ following three tools to farm enterprise activities:
 
 --- Page 31 ---
 
-|Col1|Being responsible for theuse of animal<br>medicines onthefarm<br>.|
+|Col1|Being responsible for the use of animal<br>medicines on the farm.|
 |---|---|
 |**Protecting the environment if you**<br>**keep livestock**|Pigs and poultry intensive farming:<br>environmental permits.<br>Making sure animal activities do not damage<br>soil.<br>Storing organic manures in nitrate vulnerable<br>zone.<br>Storing slurry, silage and agricultural fuel oil<br>safely.<br>Fallen stock and safe disposal of dead<br>animals.<br>Manage farming and horticultural activities to<br>prevent soil erosion and water pollution.|
 |**Managing land that you own or**<br>**occupy**|Public rights of way: landowner<br>responsibilities.<br>Open access land: management, rights and<br>responsibilities.<br>Sites of special scientific interest: managing<br>sites you own or occupy.<br>Heather and grass burning: rules and when<br>you need a licence.<br>Changing or improving rural land: check if<br>there is a need to apply for an Environmental<br>Impact Assessment.|
@@ -1442,7 +1379,7 @@ following three tools to farm enterprise activities:
 
 --- Page 32 ---
 
-|Using pest control products|Register asa professional user of plant<br>protection products<br>.<br>Use transport or store pesticides safely<br>, .<br>Code of practicefor using plant protection<br>products: what you legally havetodo<br>.|
+|Using pest control products|Register as a professional user of plant<br>protection products.<br>Use, transport or store pesticides safely.<br>Code of practice for using plant protection<br>products: what you legally have to do.|
 |---|---|
 |**Applying products to your land**|Plan your use of fertiliser or manure to reduce<br>water pollution.<br>Adhere to Nitrate vulnerable zones: rules<br>when you use fertilisers or store manure.<br>Using sewage sludge on your land.<br>Waste exemption: spread waste to benefit<br>your land.<br>Burning crop residues: restrictions and rules<br>for farmers and land managers.|
 |**Produce plant varieties and seeds**|Plant breeder’s rights: national listing of plant<br>varieties, seed certification and farm-saved<br>seed|
@@ -1456,7 +1393,7 @@ following three tools to farm enterprise activities:
 
 --- Page 33 ---
 
-|Col1|Getting permission before you work on<br>scheduled monuments<br>.|
+|Col1|Getting permission before you work on<br>scheduled monuments.|
 |---|---|
 |**Managing Trees and Woodland**|Tree planting and woodland creation:<br>overview.<br>Tree felling overview.<br>Tree pests and diseases.<br>Planning woodland projects: check if you<br>need to apply for an Environmental Impact<br>Assessment.|
 |**Managing water**|What you can do around watercourses and<br>what permissions you need.<br>https://www.gov.uk/guidance/owning-a-<br>watercourse#get-permission.<br>Maintaining watercourses and understanding<br>permissions you need to work around them.<br>Checking if you need a licence to abstract<br>water.|
@@ -1470,30 +1407,30 @@ following three tools to farm enterprise activities:
 
 --- Page 34 ---
 
-|Col1|Sheep dip: groundwater protection code<br>.|
+|Col1|Sheep dip: groundwater protection code.|
 |---|---|
 |**Importing, exporting, or distributing**<br>**animals and food**|What you must know if you import or export<br>live animals or animal products.<br>Importing live animals or animal products.<br>Exporting live animals or animal products.<br>Exporting or moving animal feed or pet food.<br>Exporting or moving food, drink and<br>agricultural products.|
-|**Health and Safety**|Complying with all current health and safety<br>legislation.<br>Farm health and safety- GOV.UK<br>(www.gov.uk).|
+|**Health and Safety**|Complying with all current health and safety<br>legislation.<br>Farm health and safety - GOV.UK<br>(www.gov.uk).|
 
 ### Sustainable Development Goals
 
 
-  Goal 2: Zero Hunger, promoting sustainable food security and production, reducing
+  - Goal 2: Zero Hunger, promoting sustainable food security and production, reducing
 water, and genetic resources.
 
-  Goal 3: Good health and well-being. Produce high-nutrient-based food, clean air,
+  - Goal 3: Good health and well-being. Produce high-nutrient-based food, clean air,
 positive work environment for employees.
 
-  Goal 4: Quality education. Promote benefits of sustainable food production to
+  - Goal 4: Quality education. Promote benefits of sustainable food production to
 broader the community and industry.
 
-  Goal 6: Clean water and sanitation. Promote and support health ecosystem
+  - Goal 6: Clean water and sanitation. Promote and support health ecosystem
 services.
 
-  Goal 8: Decent work and economic growth. Potential to grow through increased
+  - Goal 8: Decent work and economic growth. Potential to grow through increased
 employment, and diversified income providing great growth opportunities.
 
-  Goal 13: Climate action. Mitigate climate impacts by utilising BMP to maintain the
+  - Goal 13: Climate action. Mitigate climate impacts by utilising BMP to maintain the
 security of on-farm assets. Promote carbon farming activities as a solution to
 addressing and mitigating climate impacts.
 

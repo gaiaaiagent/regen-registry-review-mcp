@@ -41,37 +41,34 @@ export function getAuthToken(): string | null {
 }
 
 /**
- * Mock proponent sign-in for development.
- * In production, this would verify credentials against a backend.
+ * Test login for development - calls backend test-login endpoint.
+ * Test users: reviewer/test123, proponent/test123
  */
-const MOCK_PROPONENTS = [
-  { email: 'proponent@example.com', password: 'demo123', name: 'Demo Proponent' },
-  { email: 'test@carbonproject.org', password: 'demo123', name: 'Carbon Project Manager' },
-]
-
-async function stubProponentSignIn(
-  email: string,
+async function testLogin(
+  username: string,
   password: string
 ): Promise<{ user: User; token: string }> {
-  await new Promise((resolve) => setTimeout(resolve, 500))
+  const response = await fetch(`${API_BASE}/auth/test-login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  })
 
-  const proponent = MOCK_PROPONENTS.find(
-    (p) => p.email === email && p.password === password
-  )
-
-  if (!proponent) {
-    throw new Error('Invalid email or password')
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Login failed' }))
+    throw new Error(error.detail || 'Invalid credentials')
   }
 
-  const user: User = {
-    email: proponent.email,
-    name: proponent.name,
-    picture: undefined,
-    role: 'proponent',
+  const data = await response.json()
+  return {
+    user: {
+      email: data.user.email,
+      name: data.user.name,
+      picture: data.user.picture,
+      role: data.user.role,
+    },
+    token: data.token,
   }
-
-  const token = 'proponent-token-' + Date.now()
-  return { user, token }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -217,7 +214,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null)
 
     try {
-      const { user: newUser, token } = await stubProponentSignIn(email, password)
+      // Use test login endpoint - pass username (without domain) and password
+      const username = email.includes('@') ? email.split('@')[0] : email
+      const { user: newUser, token } = await testLogin(username, password)
 
       // Persist auth state
       localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(newUser))

@@ -1,7 +1,6 @@
 --- Page 1 ---
 
 # **Soil Organic Carbon Project Report**
-
 ## Monitoring Report
 
 ### **2023** **BOTANY FARM PARTNERSHIP**
@@ -18,12 +17,12 @@ Project Location
 
 # **Executive Summary**
 
-|Carbon Balance (tCO 2e)1|Col2|
+|Carbon Balance (tCO e)1<br>2|Col2|
 |---|---|
 |**SOC Sequestered**|728.42|
 |**GHG Emissions**|121.90|
 |**Leakage**|9.90|
-|**Balance2**|596.62|
+|**Balance2 **|596.62|
 
 
 |Credit Statement|Col2|
@@ -83,63 +82,43 @@ ii
 #### **Contents**
 
 Project Information .............................................................................................................. 1
-
 Results ............................................................................................................................... 2
-
 Carbon Balance .................................................................................................................. 4
-
 
 GHG Emissions ................................................................................................................. 4
 
-
 Sampling Method ........................................................................................................... A-1
-
 
 Laboratory Analysis ........................................................................................................ A-1
 
-
 SOCS Calculation .......................................................................................................... A-1
-
 
 AI Processing ................................................................................................................. A-2
 
-
 Accuracy ........................................................................................................................ A-2
-
 
 Greenhouse Gas Emissions Monitoring .......................................................................... A-2
 
-
 Monitored Impact Information .......................................................................................... A-2
-
 Carbon Balance ............................................................................................................... A-2
 
 Accredited Ecometric Methodology: ............................................................................... B-1
 
-
 Accredited Ecometric Credit Class: ................................................................................ B-1
-
 
 GHG Emissions Calculation ........................................................................................... B-1
 
-
 Regen Network ............................................................................................................... B-1
-
 
 Regen Registry ........................................................................................................... B-1
 
-
 Regen Marketplace ..................................................................................................... B-1
-
 
 Regen Ledger ............................................................................................................. B-1
 
-
 Ecometric Roles and Responsibilities ......................................................................... B-1
 
-
 Definitions - Regen Registry ....................................................................................... B-1
-
 
 Verifier ........................................................................................................................ B-1
 
@@ -154,19 +133,16 @@ iii
 ### List of Tables
 
 Table 1: SOC Results ........................................................................................................... 2
-
 Table 2: Carbon Balance ...................................................................................................... 4
 Table 3: Emissions Report Files ............................................................................................ 4
 
 ### List of Figures
-
 
 Figure 1 - Project SOCS ........................................................................................................ii
 Figure 2 - Monitoring Period Net SOCS Change ....................................................................ii
 Figure 3 - SOC Results Map ................................................................................................. 3
 
 ### List of Terms
-
 
 **Soil Organic Carbon**
 Soil Organic Carbon (SOC) is the organic carbon component of the total carbon content of
@@ -200,18 +176,18 @@ between the sampled (SOCS(S)) and AI (SOCS(AI)) as a percentage:
 
 
 
-𝑛
-
-
-
 
 [1]
 
-𝑛 [∑] ~~[|]~~ [𝑆𝑂𝐶𝑆(𝑆)] 𝑆𝑂𝐶𝑆(𝑆) [𝑡] [−𝑆𝑂𝐶𝑆(𝐴𝐼)] 𝑡 [𝑡]
+𝑛 [∑] ~~[|]~~ [𝑆𝑂𝐶𝑆(𝑆)] 𝑆𝑂𝐶𝑆(𝑆) [𝑡] [−𝑆𝑂𝐶𝑆(𝐴𝐼)][𝑡]
 
 
 
-|
+𝑀𝐴𝑃𝐸= [1]
+
+
+
+𝑛
 
 
 
@@ -222,7 +198,7 @@ iv
 
 
 
-𝑀𝐴𝑃𝐸= [1]
+|
 
 
 
@@ -265,10 +241,10 @@ _Table 1: SOC Results_
 
 
 
-|ProjectAreaAI SOC|Col2|Col3|Col4|Col5|Col6|MAPE|4 98<br>.|
+|Project Area AI SOC|Col2|Col3|Col4|Col5|Col6|MAPE|4.98|
 |---|---|---|---|---|---|---|---|
 |**Field**|**Crop**|**Area**|**Gross**<br>**Mean**|**Net**<br>**Mean**|**Gross**<br>**Total**|**Net**<br>**Total**|**Stone**<br>**Content**|
-|**Field**|**Type **|**[ha]**|**[t/ha]**|**[t/ha]**|**[t]**|**[t]**|**[%]**|
+|**Field**|**Type**|**[ha]**|** [t/ha]**|**[t/ha]**|**[t]**|**[t]**|**[%]**|
 |14 Acre|Winter Wheat|5.29|75.61|71.84|399.97|380.05|0.00%|
 |20 Acre|Winter Barley|7.83|62.93|59.79|492.41|467.89|0.00%|
 |26 Acre|Winter Wheat|10.36|79.31|75.36|821.84|780.92|0.00%|
@@ -367,7 +343,8 @@ _Table 3: Emissions Report Files_
 
 
 
-4 1 credit = 1 tCO2e
+4
+1 credit = 1 tCO2e
 
 Page | 4
 
@@ -408,7 +385,6 @@ the impact of different block sizes and core densities on the SOC results and as
 uncertainty. The updated 2023 sample design represents the optimal combination of block
 size and core density to balance financial cost with statistical confidence.
 
-
 **Laboratory Analysis**
 
 
@@ -421,7 +397,6 @@ is permitted to display a Royal Crown Mark.
 
 To give a complete audit of the carbon contained within the soil sampled, the following analysis
 and calculations were conducted:
-
 
   - Soil Organic Carbon Stock (t/ha).
 
@@ -445,7 +420,6 @@ and calculations were conducted:
 
 The carbon analysis was carried out using DUMAS method.
 
-
 **SOCS Calculation**
 
 
@@ -463,7 +437,6 @@ Page | A-1
 --- Page 11 ---
 
 Changes in depth, BD or SOC will result in a change in SOC stock.
-
 
 **AI Processing**
 
@@ -492,7 +465,6 @@ training cycle for validation and testing. The AI-estimated SOCS values (t/ha) w
 as the georeferenced map. The MAPE was calculated from the difference between the
 sampled and AI SOCS results.
 
-
 **Accuracy**
 
 
@@ -501,7 +473,6 @@ SOCS and all laboratory reported SOCS values, reported as Mean Absolute Percenta
 (MAPE). Although this is a comparison rather than an error it is applied as a deduction as a
 potential source of overestimation. Net SOCS was calculated by subtracting the MAPE from
 Gross SOCS, a conservative assumption of error.
-
 
 **Greenhouse Gas Emissions Monitoring**
 
@@ -513,9 +484,7 @@ are responsible for independent GHG emissions data gathering directly from the f
 management team and carry out all emissions calculator data entry to ensure consistency and
 accuracy. This calculation process appropriately accounts for all Scope 1, 2 and 3 GHG
 sources emitted during the cropping season coinciding with the monitoring interval.
-
 #### **Monitored Impact Information**
-
 
   - Data Unit: tonnes Carbon Dioxide equivalent (tCO2e).
 
@@ -554,14 +523,12 @@ Page | A-2
 
 [Soil Organic Carbon Estimation in Regenerative Cropping & Managed Grassland Ecosystems](https://registry.regen.network/v/methodology-library/published-methodologies/soil-organic-carbon-estimation-in-regenerative-cropping-and-managed-grassland-ecosystems)
 
-[Regen Registry](https://registry.regen.network/v/methodology-library/published-methodologies/soil-organic-carbon-estimation-in-regenerative-cropping-and-managed-grassland-ecosystems)
-
+[- Regen Registry](https://registry.regen.network/v/methodology-library/published-methodologies/soil-organic-carbon-estimation-in-regenerative-cropping-and-managed-grassland-ecosystems)
 
 **Accredited Ecometric Credit Class:**
 
 
-                                               [GHG Benefits in Managed Crop and Grassland Systems Credit Class](https://registry.regen.network/v/regen-registry-credit-classes/regen-registry-credit-classes-1/ghg-benefits-in-managed-crop-and-grassland-systems-credit-class) Regen Registry
-
+[GHG Benefits in Managed Crop and Grassland Systems Credit Class - Regen Registry](https://registry.regen.network/v/regen-registry-credit-classes/regen-registry-credit-classes-1/ghg-benefits-in-managed-crop-and-grassland-systems-credit-class)
 
 **GHG Emissions Calculation**
 
@@ -573,7 +540,6 @@ suitable among three tools related to farm enterprise activities:
 [Cool Farm Tool | An online greenhouse gas, water, and biodiversity calculator](https://coolfarmtool.org/)
 [Farm carbon calculator | Home | Agrecalc](https://www.agrecalc.com/)
 
-
 **Regen Network**
 
 
@@ -581,7 +547,6 @@ A digital platform based on blockchain technology to originate and invest in hig
 carbon and biodiversity credits from ecological regeneration projects. Ecometric completed
 the Regen Network 12-month methodology review process in February 2023 to be accepted
 onto the Regen Library.
-
 
 **Regen Registry**
 
@@ -591,13 +556,11 @@ credits from nature-based solutions. Regen Registry also creates and governs the
 requirements for quantification, monitoring, reporting, verification, project registration,
 administration and issuance of credits and governance of the registry standards.
 
-
 **Regen Marketplace**
 
 
 [Regen Marketplace](https://app.regen.network/projects/1) is a storefront for creating, bundling and selling ecocredits for Regen
 Network projects, operating in the voluntary carbon and ecosystem service market.
-
 
 **Regen Ledger**
 
@@ -605,7 +568,6 @@ Network projects, operating in the voluntary carbon and ecosystem service market
 [Regen Ledger](https://docs.regen.network/) is a proof-of-stake blockchain ledger that immutably stores all data about
 projects, ecocredits and claims as a publicly verifiable, transparent, auditable record of assets
 stored on the platform.
-
 
 **Ecometric Roles and Responsibilities**
 
@@ -619,7 +581,6 @@ Proponent as defined in the Regen Registry Handbook:
 
 Ecometric will operate according to the Program Rules and Requirements as defined in the
 Regen Registry Program Guide.
-
 
 **Verifier**
 
