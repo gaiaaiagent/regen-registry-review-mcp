@@ -1,15 +1,16 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ClipboardCheck, ShieldCheck } from 'lucide-react'
+import { ClipboardCheck, ShieldCheck, MessageSquare } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ChecklistPanel } from './ChecklistPanel'
 import { ValidationPanel } from './ValidationPanel'
+import { ChatPanel } from './ChatPanel'
 import { useWorkspaceContext } from '@/contexts/WorkspaceContext'
 
-interface MiddlePanelProps {
+interface ToolsPanelProps {
   sessionId: string
 }
 
-export function MiddlePanel({ sessionId }: MiddlePanelProps) {
+export function ToolsPanel({ sessionId }: ToolsPanelProps) {
   const [activeTab, setActiveTab] = useState<string>('checklist')
   const { focusedRequirementId } = useWorkspaceContext()
 
@@ -31,7 +32,7 @@ export function MiddlePanel({ sessionId }: MiddlePanelProps) {
         className="h-full flex flex-col"
       >
         <div className="px-2 pt-2 border-b bg-muted/30">
-          <TabsList className="w-full grid grid-cols-2">
+          <TabsList className="w-full grid grid-cols-3">
             <TabsTrigger value="checklist" className="flex items-center gap-1.5">
               <ClipboardCheck className="h-3.5 w-3.5" />
               <span className="text-xs">Checklist</span>
@@ -39,6 +40,10 @@ export function MiddlePanel({ sessionId }: MiddlePanelProps) {
             <TabsTrigger value="validation" className="flex items-center gap-1.5">
               <ShieldCheck className="h-3.5 w-3.5" />
               <span className="text-xs">Validation</span>
+            </TabsTrigger>
+            <TabsTrigger value="chat" className="flex items-center gap-1.5">
+              <MessageSquare className="h-3.5 w-3.5" />
+              <span className="text-xs">AI Chat</span>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -52,6 +57,10 @@ export function MiddlePanel({ sessionId }: MiddlePanelProps) {
             sessionId={sessionId}
             onSwitchToChecklist={switchToChecklist}
           />
+        </TabsContent>
+
+        <TabsContent value="chat" className="flex-1 m-0 overflow-hidden">
+          <ChatPanel sessionId={sessionId} />
         </TabsContent>
       </Tabs>
     </div>

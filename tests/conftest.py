@@ -18,7 +18,8 @@ _PYTEST_RUNNING = "pytest" in sys.modules or "py.test" in sys.modules
 
 if _PYTEST_RUNNING:
     # Create isolated test directory BEFORE any settings imports
-    _TEST_ROOT = tempfile.mkdtemp(prefix="pytest-registry-")
+    # Use /tmp explicitly for macOS compatibility (tempfile uses /var/folders by default)
+    _TEST_ROOT = tempfile.mkdtemp(prefix="pytest-registry-", dir="/tmp")
     os.environ["XDG_DATA_HOME"] = os.path.join(_TEST_ROOT, "data")
     os.environ["XDG_CACHE_HOME"] = os.path.join(_TEST_ROOT, "cache")
 

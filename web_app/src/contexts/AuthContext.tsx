@@ -9,10 +9,13 @@ import {
 } from 'react'
 import { AUTH_UNAUTHORIZED_EVENT } from '@/lib/api'
 
-interface User {
+export type UserRole = 'reviewer' | 'proponent'
+
+export interface User {
   email: string
   name: string
   picture?: string
+  role: UserRole
 }
 
 interface AuthContextValue {
@@ -21,6 +24,7 @@ interface AuthContextValue {
   isLoading: boolean
   error: string | null
   signIn: () => Promise<void>
+  signInAsProponent: (email: string, password: string) => Promise<void>
   signOut: () => void
 }
 
@@ -43,12 +47,48 @@ async function stubGoogleSignIn(): Promise<{ user: User; token: string }> {
     email: 'developer@regen.network',
     name: 'Development User',
     picture: undefined,
+    role: 'reviewer',
   }
 
   // Mock token - in production this would come from the backend
   const mockToken = 'dev-token-' + Date.now()
 
   return { user: mockUser, token: mockToken }
+}
+
+/**
+ * Mock proponent sign-in for development.
+ * In production, this would verify credentials against a backend.
+ */
+const MOCK_PROPONENTS = [
+  { email: 'proponent@example.com', password: 'demo123', name: 'Demo Proponent' },
+  { email: 'test@carbonproject.org', password: 'demo123', name: 'Carbon Project Manager' },
+]
+
+async function stubProponentSignIn(
+  email: string,
+  password: string
+): Promise<{ user: User; token: string }> {
+  // Simulate network delay
+  await new Promise((resolve) => setTimeout(resolve, 500))
+
+  const proponent = MOCK_PROPONENTS.find(
+    (p) => p.email === email && p.password === password
+  )
+
+  if (!proponent) {
+    throw new Error('Invalid email or password')
+  }
+
+  const user: User = {
+    email: proponent.email,
+    name: proponent.name,
+    picture: undefined,
+    role: 'proponent',
+  }
+
+  const token = 'proponent-token-' + Date.now()
+  return { user, token }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -113,6 +153,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const signInAsProponent = useCallback(async (email: string, password: string) => {
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const { user: newUser, token } = await stubProponentSignIn(email, password)
+
+      // Persist auth state
+      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(newUser))
+      localStorage.setItem(STORAGE_KEY_TOKEN, token)
+      setUser(newUser)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Sign in failed'
+      setError(message)
+      throw err
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
   const signOut = useCallback(() => {
     setUser(null)
     setError(null)
@@ -126,6 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading,
     error,
     signIn,
+    signInAsProponent,
     signOut,
   }
 

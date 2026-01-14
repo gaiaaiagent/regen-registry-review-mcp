@@ -17,6 +17,7 @@ interface CategoryAccordionProps {
   onExpandedChange: (categories: string[]) => void
   manualEvidence?: ManualEvidence[]
   onUnlinkEvidence?: (evidenceId: string) => void
+  sessionId?: string
 }
 
 function getCategoryProgress(requirements: Requirement[]): {
@@ -45,6 +46,7 @@ export function CategoryAccordion({
   onExpandedChange,
   manualEvidence = [],
   onUnlinkEvidence,
+  sessionId,
 }: CategoryAccordionProps) {
   const { focusedRequirementId, setFocusedRequirementId } = useWorkspaceContext()
   const requirementRefs = useRef<Map<string, HTMLDivElement>>(new Map())
@@ -126,6 +128,7 @@ export function CategoryAccordion({
                       onSelect={() => setFocusedRequirementId(req.id)}
                       manualEvidence={getEvidenceForRequirement(req.id)}
                       onUnlinkEvidence={onUnlinkEvidence}
+                      sessionId={sessionId}
                     />
                   </div>
                 ))}

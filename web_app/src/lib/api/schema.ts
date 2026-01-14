@@ -354,11 +354,83 @@ export interface paths {
          *     - Items flagged for human review
          *
          *     Args:
-         *         format: Output format - "markdown" or "json" (default: markdown)
+         *         format: Output format - "markdown", "json", or "checklist" (default: markdown)
+         *                 "checklist" generates a populated registry submission form
          *
          *     Returns report generation result with path to saved file.
+         *     For checklist format, includes download_url for direct file download.
          */
         post: operations["generate_report_sessions__session_id__report_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/report/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download report
+         * @description Download the review report as Markdown.
+         *
+         *     Returns the report.md file for direct download.
+         *     Generate the report first with POST /sessions/{session_id}/report?format=markdown
+         */
+        get: operations["download_report_sessions__session_id__report_download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/checklist/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download checklist
+         * @description Download the populated registry checklist.
+         *
+         *     Returns the checklist.md file for direct download.
+         *     Generate the checklist first with POST /sessions/{session_id}/report?format=checklist
+         */
+        get: operations["download_checklist_sessions__session_id__checklist_download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/checklist/download-docx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download DOCX checklist
+         * @description Download the populated registry checklist as a Word document.
+         *
+         *     Returns the checklist.docx file for direct download.
+         *     Generate the checklist first with POST /sessions/{session_id}/report?format=docx
+         *     System-generated text appears in blue.
+         */
+        get: operations["download_checklist_docx_sessions__session_id__checklist_download_docx_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -585,6 +657,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sessions/{session_id}/verify-extraction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify extraction
+         * @description Record human verification of a specific evidence extraction.
+         *
+         *     Unlike requirement-level overrides, this allows verifying individual
+         *     evidence snippets. Each snippet can be verified, rejected, or flagged.
+         */
+        post: operations["verify_extraction_sessions__session_id__verify_extraction_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/verification-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get verification status
+         * @description Get verification status for all or specific requirements.
+         *
+         *     Returns summary of how many snippets are verified/rejected/pending.
+         */
+        get: operations["get_verification_status_sessions__session_id__verification_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/resolve-coordinates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resolve PDF coordinates
+         * @description Resolve PDF bounding box coordinates for evidence snippets.
+         *
+         *     Finds the exact location in the PDF where evidence text appears,
+         *     enabling precise highlighting in the viewer.
+         *
+         *     Args:
+         *         session_id: Session identifier
+         *         snippet_id: Optional specific snippet to resolve
+         *         requirement_id: Optional requirement to resolve all snippets for
+         */
+        post: operations["resolve_coordinates_sessions__session_id__resolve_coordinates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/agent/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Chat with AI agent
+         * @description Conversational AI agent for the review workspace.
+         *
+         *     Receives user message plus context (focused requirement, visible document/page).
+         *     Calls Claude API with session-aware tools.
+         *     Returns response with proposed actions that the user can execute.
+         *
+         *     This is a human-in-the-loop design: the agent proposes actions, but the user
+         *     must confirm before any action is executed.
+         */
+        post: operations["agent_chat_sessions__session_id__agent_chat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sessions/{session_id}/upload": {
         parameters: {
             query?: never;
@@ -754,6 +926,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/gdrive/folders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List accessible Google Drive folders
+         * @description List folders accessible to the service account.
+         *
+         *     Returns top-level folders that the service account has access to.
+         *     These are typically folders explicitly shared with the service account.
+         */
+        get: operations["list_gdrive_folders_gdrive_folders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/gdrive/folders/{folder_id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List files in a Google Drive folder
+         * @description List files in a specific Google Drive folder.
+         *
+         *     Returns PDF files and subfolders within the specified folder.
+         *     Only PDF files are returned as they are the supported document type.
+         */
+        get: operations["list_gdrive_folder_files_gdrive_folders__folder_id__files_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/import/gdrive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import files from Google Drive
+         * @description Import files from Google Drive to a session.
+         *
+         *     Downloads selected files from Google Drive and adds them to the session.
+         *     After import, runs document discovery to process the new files.
+         */
+        post: operations["import_gdrive_files_sessions__session_id__import_gdrive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -783,6 +1024,95 @@ export interface components {
              */
             reviewer: string;
         };
+        /** AgentAction */
+        AgentAction: {
+            /**
+             * Type
+             * @description Action type: navigate, extract, validate, etc.
+             */
+            type: string;
+            /**
+             * Label
+             * @description Button label for UI
+             */
+            label: string;
+            /**
+             * Params
+             * @description Action parameters
+             */
+            params?: {
+                [key: string]: unknown;
+            };
+        };
+        /** AgentChatRequest */
+        AgentChatRequest: {
+            /**
+             * Message
+             * @description User message to the agent
+             */
+            message: string;
+            /** @description Current workspace context */
+            context?: components["schemas"]["AgentContext"] | null;
+        };
+        /** AgentChatResponse */
+        AgentChatResponse: {
+            /**
+             * Message
+             * @description Agent's text response
+             */
+            message: string;
+            /**
+             * Actions
+             * @description Proposed actions as buttons
+             */
+            actions?: components["schemas"]["AgentAction"][];
+            /**
+             * Sources
+             * @description Referenced documents/pages
+             */
+            sources?: components["schemas"]["AgentSource"][];
+        };
+        /** AgentContext */
+        AgentContext: {
+            /**
+             * Focused Requirement Id
+             * @description Currently focused requirement ID
+             */
+            focused_requirement_id?: string | null;
+            /**
+             * Visible Document Id
+             * @description Currently visible document ID
+             */
+            visible_document_id?: string | null;
+            /**
+             * Visible Page
+             * @description Currently visible page number
+             */
+            visible_page?: number | null;
+        };
+        /** AgentSource */
+        AgentSource: {
+            /**
+             * Document Id
+             * @description Document ID
+             */
+            document_id: string;
+            /**
+             * Document Name
+             * @description Document filename
+             */
+            document_name: string;
+            /**
+             * Page
+             * @description Page number
+             */
+            page?: number | null;
+            /**
+             * Text
+             * @description Relevant excerpt
+             */
+            text?: string | null;
+        };
         /** Body_handle_file_upload_upload__upload_id__post */
         Body_handle_file_upload_upload__upload_id__post: {
             /** Files */
@@ -806,6 +1136,19 @@ export interface components {
              * @description Optional project ID (e.g., C06-4997)
              */
             project_id?: string | null;
+        };
+        /** GDriveImportRequest */
+        GDriveImportRequest: {
+            /**
+             * Folder Id
+             * @description Google Drive folder ID to import from
+             */
+            folder_id: string;
+            /**
+             * File Ids
+             * @description List of file IDs to import
+             */
+            file_ids: string[];
         };
         /** GenerateUploadUrlRequest */
         GenerateUploadUrlRequest: {
@@ -986,6 +1329,35 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** VerifyExtractionRequest */
+        VerifyExtractionRequest: {
+            /**
+             * Snippet Id
+             * @description ID of the evidence snippet to verify
+             */
+            snippet_id: string;
+            /**
+             * Requirement Id
+             * @description Requirement ID this snippet belongs to
+             */
+            requirement_id: string;
+            /**
+             * Status
+             * @description Verification status: verified, rejected, partial, needs_context
+             */
+            status: string;
+            /**
+             * Notes
+             * @description Reviewer notes
+             */
+            notes?: string | null;
+            /**
+             * Reviewer
+             * @description Reviewer identifier
+             * @default user
+             */
+            reviewer: string;
         };
     };
     responses: never;
@@ -1463,6 +1835,99 @@ export interface operations {
             };
         };
     };
+    download_report_sessions__session_id__report_download_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_checklist_sessions__session_id__checklist_download_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_checklist_docx_sessions__session_id__checklist_download_docx_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_review_status_sessions__session_id__review_status_get: {
         parameters: {
             query?: {
@@ -1869,6 +2334,143 @@ export interface operations {
             };
         };
     };
+    verify_extraction_sessions__session_id__verify_extraction_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyExtractionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_verification_status_sessions__session_id__verification_status_get: {
+        parameters: {
+            query?: {
+                requirement_id?: string | null;
+            };
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_coordinates_sessions__session_id__resolve_coordinates_post: {
+        parameters: {
+            query?: {
+                snippet_id?: string | null;
+                requirement_id?: string | null;
+            };
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    agent_chat_sessions__session_id__agent_chat_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentChatRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentChatResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     upload_file_sessions__session_id__upload_post: {
         parameters: {
             query?: never;
@@ -2114,6 +2716,92 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_gdrive_folders_gdrive_folders_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    list_gdrive_folder_files_gdrive_folders__folder_id__files_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                folder_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_gdrive_files_sessions__session_id__import_gdrive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GDriveImportRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

@@ -15,7 +15,11 @@ import {
   FileText,
   ExternalLink,
   Link2Off,
+  Check,
+  X,
+  Loader2,
 } from 'lucide-react'
+import { useVerifySnippet } from '@/hooks/useVerification'
 import { cn } from '@/lib/utils'
 
 interface RequirementCardProps {
@@ -24,6 +28,8 @@ interface RequirementCardProps {
   onSelect?: () => void
   manualEvidence?: ManualEvidence[]
   onUnlinkEvidence?: (evidenceId: string) => void
+  sessionId?: string
+  verificationStatus?: Record<string, string>
 }
 
 const STATUS_CONFIG = {
@@ -59,9 +65,12 @@ export function RequirementCard({
   onSelect,
   manualEvidence = [],
   onUnlinkEvidence,
+  sessionId,
+  verificationStatus,
 }: RequirementCardProps) {
   const [isExpanded, setIsExpanded] = useState(false)
-  const { scrollToEvidence, isDragging } = useWorkspaceContext()
+  const { scrollToEvidence, isDragging, highlightFromCoordinates } = useWorkspaceContext()
+  const verifySnippet = useVerifySnippet(sessionId ?? null)
 
   const { isOver, setNodeRef } = useDroppable({
     id: `requirement-${requirement.id}`,
@@ -72,8 +81,16 @@ export function RequirementCard({
   const evidenceCount = (requirement.evidence?.length ?? 0) + manualEvidence.length
   const hasEvidence = evidenceCount > 0
 
-  const handleEvidenceClick = (documentId: string, pageNumber: number) => {
+  const handleEvidenceClick = (documentId: string, pageNumber: number, boundingBox?: { x0: number; y0: number; x1: number; y1: number }) => {
+    console.log('RequirementCard: Evidence clicked', { documentId, pageNumber, boundingBox })
     scrollToEvidence(documentId, pageNumber)
+    if (boundingBox) {
+      highlightFromCoordinates({
+        documentId,
+        pageNumber,
+        boundingBox,
+      })
+    }
   }
 
   const confidencePercent = requirement.confidence
@@ -172,7 +189,7 @@ export function RequirementCard({
                               className="h-5 px-1.5 text-xs shrink-0"
                               onClick={(e) => {
                                 e.stopPropagation()
-                                handleEvidenceClick(ev.documentId, ev.pageNumber)
+                                handleEvidenceClick(ev.documentId, ev.pageNumber, ev.boundingBox)
                               }}
                             >
                               p.{ev.pageNumber}
@@ -184,7 +201,65 @@ export function RequirementCard({
                               Section: {ev.section}
                             </p>
                           )}
-                          <p className="mt-1 line-clamp-2">{ev.text}</p>
+                          <p
+                            className={cn(
+                              "mt-1 line-clamp-2",
+                              ev.boundingBox && "cursor-pointer hover:text-primary hover:underline"
+                            )}
+                            onClick={(e) => {
+                              if (ev.boundingBox) {
+                                e.stopPropagation()
+                                handleEvidenceClick(ev.documentId, ev.pageNumber, ev.boundingBox)
+                              }
+                            }}
+                            title={ev.boundingBox ? "Click to highlight in PDF" : undefined}
+                          >
+                            {ev.text}
+                          </p>
+                          <div className="flex items-center gap-1 mt-1 pt-1 border-t border-muted">
+                            <span className="text-[10px] text-muted-foreground mr-auto">
+                              {verificationStatus?.[ev.id] === 'verified' ? '✓ Verified' :
+                               verificationStatus?.[ev.id] === 'rejected' ? '✗ Rejected' : 'Verify:'}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={cn(
+                                'h-5 px-1.5 text-xs',
+                                verificationStatus?.[ev.id] === 'verified' && 'text-green-600 bg-green-50'
+                              )}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                verifySnippet.mutate({
+                                  snippetId: ev.id,
+                                  requirementId: requirement.id,
+                                  status: 'verified',
+                                })
+                              }}
+                              disabled={verifySnippet.isPending}
+                            >
+                              {verifySnippet.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={cn(
+                                'h-5 px-1.5 text-xs',
+                                verificationStatus?.[ev.id] === 'rejected' && 'text-red-600 bg-red-50'
+                              )}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                verifySnippet.mutate({
+                                  snippetId: ev.id,
+                                  requirementId: requirement.id,
+                                  status: 'rejected',
+                                })
+                              }}
+                              disabled={verifySnippet.isPending}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </div>
                       ))}
 

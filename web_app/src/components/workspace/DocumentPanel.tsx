@@ -1,23 +1,29 @@
 import { useEffect } from 'react'
-import { Group, Panel, Separator } from 'react-resizable-panels'
+import { toast } from 'sonner'
 import { DocumentSidebar, type Document } from './DocumentSidebar'
 import { PDFViewer } from '@/components/PDFViewer'
-import { FileText } from 'lucide-react'
+import { GDriveImportDialog } from '@/components/gdrive'
+import { FileText, HardDrive } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { useWorkspaceContext } from '@/contexts/WorkspaceContext'
 
 interface DocumentPanelProps {
+  sessionId: string
   documents: Document[]
   getDocumentUrl: (documentId: string) => string | null
   onClipText?: (text: string, documentId: string, pageNumber: number, boundingBox?: { x: number; y: number; width: number; height: number }) => void
+  onDocumentsImported?: () => void
 }
 
-export function DocumentPanel({ documents, getDocumentUrl, onClipText }: DocumentPanelProps) {
+export function DocumentPanel({ sessionId, documents, getDocumentUrl, onClipText, onDocumentsImported }: DocumentPanelProps) {
   const {
     activeDocumentId,
     setActiveDocumentId,
     targetPage,
     registerScrollHandler,
   } = useWorkspaceContext()
+
+  console.log('DocumentPanel: Render', { activeDocumentId, documentsCount: documents.length })
 
   useEffect(() => {
     if (activeDocumentId === null && documents.length > 0) {
@@ -26,6 +32,7 @@ export function DocumentPanel({ documents, getDocumentUrl, onClipText }: Documen
   }, [activeDocumentId, documents, setActiveDocumentId])
 
   const activeDocumentUrl = activeDocumentId ? getDocumentUrl(activeDocumentId) : null
+  console.log('DocumentPanel: Resolved URL', { activeDocumentId, activeDocumentUrl })
 
   const handleClipText = (text: string, pageNumber: number, boundingBox?: { x: number; y: number; width: number; height: number }) => {
     if (onClipText && activeDocumentId) {
@@ -33,21 +40,40 @@ export function DocumentPanel({ documents, getDocumentUrl, onClipText }: Documen
     }
   }
 
+  const handleImportComplete = (importedCount: number) => {
+    toast.success(`Imported ${importedCount} files from Google Drive`)
+    onDocumentsImported?.()
+  }
+
   return (
-    <Group orientation="horizontal" className="h-full">
-      <Panel defaultSize={20} minSize={15} maxSize={40}>
+    <div className="flex h-full w-full overflow-hidden">
+      {/* Fixed Sidebar */}
+      <div className="w-64 flex-shrink-0 border-r bg-muted/10 h-full overflow-hidden flex flex-col">
         <DocumentSidebar
           documents={documents}
           activeDocumentId={activeDocumentId}
           onSelectDocument={setActiveDocumentId}
         />
-      </Panel>
+        <div className="p-3 border-t bg-muted/20">
+          <GDriveImportDialog
+            sessionId={sessionId}
+            existingFilenames={new Set(documents.map(d => d.filename))}
+            onImportComplete={handleImportComplete}
+            trigger={
+              <Button variant="outline" size="sm" className="w-full">
+                <HardDrive className="h-4 w-4 mr-2" />
+                Import from Drive
+              </Button>
+            }
+          />
+        </div>
+      </div>
 
-      <Separator className="w-1 bg-border hover:bg-primary/20 transition-colors" />
-
-      <Panel defaultSize={80} minSize={60}>
+      {/* Main Content (PDF) */}
+      <div className="flex-1 h-full min-w-0 bg-background relative">
         {activeDocumentUrl ? (
           <PDFViewer
+            key={activeDocumentId}
             url={activeDocumentUrl}
             documentId={activeDocumentId!}
             initialPage={targetPage ?? undefined}
@@ -65,7 +91,7 @@ export function DocumentPanel({ documents, getDocumentUrl, onClipText }: Documen
             </p>
           </div>
         )}
-      </Panel>
-    </Group>
+      </div>
+    </div>
   )
 }

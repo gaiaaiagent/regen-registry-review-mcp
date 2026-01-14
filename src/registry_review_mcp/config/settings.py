@@ -96,7 +96,13 @@ class Settings(BaseSettings):
 
     # LLM Extraction (Phase 4.2)
     anthropic_api_key: str = Field(default="")
+    google_api_key: str = Field(default="")  # For Gemini models
+    openai_api_key: str = Field(default="")  # For OpenAI models
     llm_extraction_enabled: bool = Field(default=False)  # Conservative default
+
+    # LLM Provider selection (2025-01-13)
+    # Supports: anthropic, gemini, openai (via LiteLLM)
+    llm_provider: Literal["anthropic", "gemini", "openai"] = Field(default="anthropic")
 
     # Environment-aware model selection (2025-11-26)
     # Dev: Haiku 4.5 ($1/$5 per 1M tokens) - 5x cheaper for testing
@@ -105,6 +111,11 @@ class Settings(BaseSettings):
     llm_model: str = Field(default="")  # Auto-selected based on environment if empty
     llm_model_dev: str = Field(default="claude-haiku-4-5-20251001")  # Haiku 4.5
     llm_model_prod: str = Field(default="claude-sonnet-4-5-20250929")  # Sonnet 4.5
+
+    # Gemini model options
+    gemini_model: str = Field(default="gemini/gemini-3-flash-preview")  # Latest Gemini 3 Flash
+    # OpenAI model options
+    openai_model: str = Field(default="gpt-4o-mini")  # Cost-effective
 
     llm_max_tokens: int = Field(default=4000, ge=1, le=8000)
     llm_temperature: float = Field(default=0.0, ge=0.0, le=1.0)
@@ -175,21 +186,27 @@ class Settings(BaseSettings):
             dir_path.mkdir(parents=True, exist_ok=True)
 
     def get_active_llm_model(self) -> str:
-        """Get the active LLM model based on environment.
+        """Get the active LLM model based on provider and environment.
 
         Returns:
-            Model ID string for API calls
+            Model ID string for API calls (LiteLLM format)
 
         Logic:
             1. If llm_model is explicitly set, use it (override)
-            2. Otherwise, auto-select based on environment:
-               - development → Haiku 4.5 (5x cheaper)
-               - production → Sonnet 4.5 (higher quality)
+            2. Otherwise, select based on provider:
+               - anthropic: Haiku/Sonnet based on environment
+               - gemini: gemini_model setting
+               - openai: openai_model setting
         """
         if self.llm_model:
             return self.llm_model
 
-        return self.llm_model_dev if self.environment == "development" else self.llm_model_prod
+        if self.llm_provider == "gemini":
+            return self.gemini_model
+        elif self.llm_provider == "openai":
+            return self.openai_model
+        else:  # anthropic
+            return self.llm_model_dev if self.environment == "development" else self.llm_model_prod
 
     def get_checklist_path(self, methodology: str) -> Path:
         """Get the path to a checklist file."""

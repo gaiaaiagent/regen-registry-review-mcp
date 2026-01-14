@@ -27,12 +27,14 @@ const DEMO_PDF_MAP: Record<string, string> = {
 }
 
 interface SessionDocument {
-  id: string
+  document_id: string
   filename: string
-  doc_type?: string
-  page_count?: number
-  size_bytes?: number
-  file_path?: string
+  classification?: string
+  metadata?: {
+    page_count?: number
+    file_size_bytes?: number
+  }
+  filepath?: string
 }
 
 interface SessionWithDocuments {
@@ -60,33 +62,86 @@ export function SessionWorkspace() {
     refetch: () => void
   }
 
+  // Debug: Check what session data we actually have
+  if (session) {
+    console.log('SessionWorkspace: Loaded session data', { 
+      hasDocuments: !!session.documents, 
+      documentCount: session.documents?.length,
+      firstDoc: session.documents?.[0],
+      allIds: session.documents?.map(d => d.document_id)
+    })
+  }
+
   const sessionDocuments = session?.documents
 
   const documents = useMemo<Document[]>(() => {
     if (sessionDocuments && sessionDocuments.length > 0) {
       return sessionDocuments.map(doc => ({
-        id: doc.id,
+        id: doc.document_id,
         filename: doc.filename,
-        doc_type: doc.doc_type,
-        page_count: doc.page_count,
-        size_bytes: doc.size_bytes,
+        doc_type: doc.classification,
+        page_count: doc.metadata?.page_count,
+        size_bytes: doc.metadata?.file_size_bytes,
       }))
     }
     return DEMO_DOCUMENTS
   }, [sessionDocuments])
 
   const getDocumentUrl = useCallback((documentId: string): string | null => {
+    console.log('SessionWorkspace: getDocumentUrl called for', documentId)
+    
+    // 1. Try demo map first
     if (DEMO_PDF_MAP[documentId]) {
       return DEMO_PDF_MAP[documentId]
     }
 
+    // 2. Try finding in session documents
     if (sessionDocuments) {
-      const doc = sessionDocuments.find(d => d.id === documentId)
-      if (doc?.file_path) {
-        return `${API_BASE_URL}/files/${encodeURIComponent(doc.file_path)}`
+      console.log('SessionWorkspace: Searching session documents', sessionDocuments.length)
+      if (sessionDocuments.length > 0) {
+        console.log('SessionWorkspace: First doc structure:', sessionDocuments[0])
       }
+
+      // a. Try ID match
+      let doc = sessionDocuments.find(d => {
+        const match = d.document_id === documentId
+        if (match) console.log('SessionWorkspace: ID Match found!', d)
+        return match
+      })
+      
+      // b. Try filename match (if ID didn't work)
+      if (!doc) {
+        console.log('SessionWorkspace: No ID match, trying filename')
+        doc = sessionDocuments.find(d => {
+          const nameMatch = d.filename.toLowerCase() === documentId.toLowerCase() ||
+                            d.filename.toLowerCase().includes(documentId.toLowerCase())
+          if (nameMatch) console.log('SessionWorkspace: Filename match found!', d)
+          return nameMatch
+        })
+      }
+
+      if (doc?.filepath) {
+        // Use direct path concatenation to preserve slashes for the backend 'path' parameter
+        // The backend expects /files/ + absolute_path (e.g. /files//Users/...)
+        const url = `${API_BASE_URL}/files${doc.filepath.startsWith('/') ? '' : '/'}${doc.filepath}`
+        console.log('SessionWorkspace: Generated URL', url)
+        return url
+      } else if (doc) {
+        console.error('SessionWorkspace: Document found but no filepath!', doc)
+      }
+    } else {
+      console.warn('SessionWorkspace: sessionDocuments is undefined/empty')
     }
 
+    // 3. Fallback...
+
+    // 3. Fallback: If documentId looks like a filename, try to find it in DEMO_DOCUMENTS
+    const demoDoc = DEMO_DOCUMENTS.find(d => d.filename === documentId || d.id === documentId)
+    if (demoDoc && DEMO_PDF_MAP[demoDoc.id]) {
+      return DEMO_PDF_MAP[demoDoc.id]
+    }
+
+    console.warn('SessionWorkspace: Could not find URL for document', documentId)
     return null
   }, [sessionDocuments])
 

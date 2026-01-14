@@ -1,25 +1,46 @@
 import { useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
-import { FileText, Loader2 } from 'lucide-react'
+import { FileText, Loader2, UserCircle, Briefcase } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
 
 export function LoginPage() {
-  const { isAuthenticated, isLoading, error, signIn } = useAuth()
+  const { user, isLoading, signIn, signInAsProponent } = useAuth()
   const [signingIn, setSigningIn] = useState(false)
+  const [proponentEmail, setProponentEmail] = useState('proponent@example.com')
+  const [proponentPassword, setProponentPassword] = useState('demo123')
   const location = useLocation()
 
   // Get the intended destination from router state, default to home
   const from = (location.state as { from?: string })?.from || '/'
 
-  // If already authenticated, redirect to intended destination
-  if (isAuthenticated) {
-    return <Navigate to={from} replace />
+  // If already authenticated, redirect based on role
+  if (user) {
+    if (user.role === 'proponent') {
+      return <Navigate to="/proponent" replace />
+    }
+    return <Navigate to={from === '/login' ? '/' : from} replace />
   }
 
-  async function handleSignIn() {
+  async function handleGoogleSignIn() {
     setSigningIn(true)
     try {
       await signIn()
+    } catch {
+      // Error is handled by AuthContext
+    } finally {
+      setSigningIn(false)
+    }
+  }
+
+  async function handleProponentSignIn(e: React.FormEvent) {
+    e.preventDefault()
+    setSigningIn(true)
+    try {
+      await signInAsProponent(proponentEmail, proponentPassword)
     } catch {
       // Error is handled by AuthContext
     } finally {
@@ -48,39 +69,94 @@ export function LoginPage() {
         </div>
 
         {/* Sign In Card */}
-        <div className="rounded-lg border bg-card p-6 shadow-sm space-y-4">
-          <div className="text-center space-y-1">
-            <h2 className="text-lg font-medium">Sign in to continue</h2>
-            <p className="text-sm text-muted-foreground">
-              Access restricted to @regen.network emails
-            </p>
-          </div>
+        <div className="rounded-lg border bg-card p-6 shadow-sm">
+          <Tabs defaultValue="reviewer" className="space-y-4">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="reviewer">
+                <UserCircle className="h-4 w-4 mr-2" />
+                Reviewer
+              </TabsTrigger>
+              <TabsTrigger value="proponent">
+                <Briefcase className="h-4 w-4 mr-2" />
+                Proponent
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Error Message */}
-          {error && (
-            <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
-              {error}
-            </div>
-          )}
+            <TabsContent value="reviewer" className="space-y-4 pt-2">
+              <div className="text-center space-y-1">
+                <h2 className="text-sm font-medium">Internal Review Team</h2>
+                <p className="text-xs text-muted-foreground">
+                  Sign in with your @regen.network account
+                </p>
+              </div>
 
-          {/* Sign In Button */}
-          <button
-            onClick={handleSignIn}
-            disabled={isButtonDisabled}
-            className="w-full flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {signingIn ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Signing in...
-              </>
-            ) : (
-              <>
-                <GoogleIcon className="h-4 w-4" />
-                Sign in with Google
-              </>
-            )}
-          </button>
+              <Button
+                onClick={handleGoogleSignIn}
+                disabled={isButtonDisabled}
+                className="w-full flex items-center justify-center gap-2"
+              >
+                {signingIn ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  <>
+                    <GoogleIcon className="h-4 w-4" />
+                    Sign in with Google
+                  </>
+                )}
+              </Button>
+            </TabsContent>
+
+            <TabsContent value="proponent" className="space-y-4 pt-2">
+              <div className="text-center space-y-1">
+                <h2 className="text-sm font-medium">Project Proponent Portal</h2>
+                <p className="text-xs text-muted-foreground">
+                  View status and submit revisions
+                </p>
+              </div>
+
+              <form onSubmit={handleProponentSignIn} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={proponentEmail}
+                    onChange={(e) => setProponentEmail(e.target.value)}
+                    placeholder="name@company.com"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={proponentPassword}
+                    onChange={(e) => setProponentPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={isButtonDisabled}>
+                  {signingIn ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Signing in...
+                    </>
+                  ) : (
+                    'Sign In'
+                  )}
+                </Button>
+              </form>
+              
+              <p className="text-xs text-center text-muted-foreground mt-2">
+                Demo: use 'proponent@example.com' / 'demo123'
+              </p>
+            </TabsContent>
+          </Tabs>
         </div>
 
         {/* Development Notice */}

@@ -390,24 +390,30 @@ A phased checklist for building the Registry Review web application. Each phase 
 
 ### Checklist
 
-- [ ] **9.1 Add Drive scope to OAuth**
+- [x] **9.1 Add Drive scope to OAuth**
   - Request drive.readonly scope
   - Re-authenticate if needed
 
-- [ ] **9.2 Build folder picker**
+- [x] **9.2 Build folder picker**
   - Fetch folders from GET /gdrive/folders
   - Display folder tree
   - Click folder → list files
 
-- [ ] **9.3 Implement file import**
+- [x] **9.3 Implement file import**
   - Select files with checkboxes
   - Call POST /sessions/{id}/import/gdrive
   - Show import progress
 
-- [ ] **9.4 Trigger document discovery**
+- [x] **9.4 Trigger document discovery**
   - After import, run discovery
   - Show conversion status
   - Refresh document list
+
+- [x] **9.5 AI Guided Review & Navigation**
+  - Add "Show Source" button to Validation Fact Sheets
+  - Ensure clicking evidence jumps to PDF page and highlights text
+  - Verify AI Agent can programmatically drive PDF navigation
+  - Add "Approve/Reject" controls to Fact Sheet rows
 
 ### Exit Criteria
 
@@ -419,6 +425,72 @@ A phased checklist for building the Registry Review web application. Each phase 
 ### References
 
 - BACKEND_PLANNING.md → Google Drive Integration section
+
+---
+
+## Phase 9B: Verification Workflow ("DocuSign with AI")
+
+**Goal:** Enable click-to-verify pattern where AI surfaces evidence with precise citations, human confirms/rejects each extraction.
+
+**Session Scope:** ~4 hours
+
+**Vision:** Like DocuSign but with an AI assistant. The AI shows exactly where in the document it found each piece of evidence, the reviewer clicks to jump there, reads the source, then confirms (✓) or rejects (✗) the extraction.
+
+### Why This Matters
+
+Current state: Overrides are per-requirement (coarse-grained).
+Needed: Verification is per-extraction (fine-grained). A requirement might have 3 evidence snippets - the reviewer should verify each one independently.
+
+### Backend Enhancements
+
+- [x] **9B.1 Capture bounding boxes during extraction**
+  - Added `BoundingBox` model to evidence.py
+  - Created `pdf_coordinates.py` with `resolve_text_coordinates()` using PyMuPDF + fuzzy matching
+  - Added `bounding_box` field to evidence matrix response
+
+- [x] **9B.2 Add per-extraction verification status**
+  - New model: `SnippetVerification` in verification.py
+  - New endpoint: `POST /sessions/{id}/verify-extraction`
+  - New endpoint: `GET /sessions/{id}/verification-status`
+  - New endpoint: `POST /sessions/{id}/resolve-coordinates`
+  - Verification stored per-snippet in session verifications.json
+
+- [x] **9B.3 Enhance agent with tool calling**
+  - Replaced regex JSON parsing with Claude tool_use API
+  - Defined tools: `navigate_to_citation`, `suggest_verification`, `search_evidence`, `get_requirement_status`
+  - Agent returns structured tool calls directly
+
+### Frontend Enhancements
+
+- [x] **9B.4 Add verification UI to evidence cards**
+  - ✓/✗ buttons on each evidence snippet (RequirementCard.tsx)
+  - Visual state: pending (gray), verified (green), rejected (red)
+  - Click citation → jump to PDF page with highlight
+
+- [x] **9B.5 Verification progress indicator**
+  - Created VerificationProgress.tsx component
+  - Progress bar showing "X/Y verified"
+  - Integrated into ChecklistPanel
+
+- [x] **9B.6 PDF highlight from coordinates**
+  - Added ExternalHighlightOverlay component to PDFViewer
+  - Pulse animation when navigating to citation
+  - highlightFromCoordinates() in WorkspaceContext
+  - Auto-clear after 5 seconds
+
+### Exit Criteria
+
+- [x] Evidence extractions have bounding box coordinates
+- [x] Reviewer can verify/reject individual extractions
+- [x] Clicking citation jumps to correct PDF location with highlight
+- [x] Agent uses structured tool calls (not regex parsing)
+- [x] Verification progress is tracked and displayed
+
+### References
+
+- BACKEND_PLANNING.md → Evidence Anchoring section (HighlightCoords already defined)
+- chatgpt_rest_api.py → Agent chat endpoint (lines 1318-1415)
+- Existing models: AgentAction, AgentSource, AgentContext
 
 ---
 
@@ -563,7 +635,8 @@ A phased checklist for building the Registry Review web application. Each phase 
 | 6. Drag-and-Drop Evidence | **COMPLETED** | @dnd-kit integration, scratchpad, manual evidence linking |
 | 7. AI Chat Panel | **COMPLETED** | Agent endpoint, context-aware chat, action buttons |
 | 8. Cross-Validation | **COMPLETED** | Tabbed middle panel, fact sheets, stale detection, issue navigation |
-| 9. Google Drive | Not Started | |
+| 9. Google Drive | **COMPLETED** | Drive integration & AI navigation logic verified |
+| **9B. Verification Workflow** | **COMPLETED** | BoundingBox model, verification endpoints, agent tool_use, frontend UI |
 | 10. Proponent & Notifications | Not Started | |
 | 11. Report Generation | Not Started | |
 | 12. Polish & Production | Not Started | |

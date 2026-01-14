@@ -15,6 +15,13 @@ export interface Evidence {
   pageNumber: number
   text: string
   section?: string
+  boundingBox?: {
+    x0: number
+    y0: number
+    x1: number
+    y1: number
+    page: number
+  }
 }
 
 export interface Requirement {
@@ -43,6 +50,7 @@ interface WorkspaceContextType {
   focusedRequirementId: string | null
   setFocusedRequirementId: (id: string | null) => void
   targetPage: number | null
+  setTargetPage: (page: number | null) => void
   scrollToEvidence: (documentId: string, pageNumber: number) => void
   registerScrollHandler: (handler: (pageNumber: number) => void) => void
   isDragging: boolean
@@ -55,6 +63,8 @@ interface WorkspaceContextType {
   setScratchpadItems: React.Dispatch<React.SetStateAction<ScratchpadItem[]>>
   manualEvidence: ManualEvidence[]
   setManualEvidence: React.Dispatch<React.SetStateAction<ManualEvidence[]>>
+  externalHighlight: ExternalHighlight | null
+  highlightFromCoordinates: (highlight: ExternalHighlight | null) => void
 }
 
 export interface PendingSelection {
@@ -63,6 +73,18 @@ export interface PendingSelection {
   pageNumber: number
   boundingBox?: BoundingBox
   position: { x: number; y: number }
+}
+
+export interface ExternalHighlight {
+  documentId: string
+  pageNumber: number
+  boundingBox: {
+    x0: number  // normalized 0-1
+    y0: number
+    x1: number
+    y1: number
+  }
+  text?: string
 }
 
 const WorkspaceContext = createContext<WorkspaceContextType | null>(null)
@@ -81,6 +103,7 @@ export function WorkspaceProvider({ children, initialDocumentId = null }: Worksp
   const [pendingSelection, setPendingSelection] = useState<PendingSelection | null>(null)
   const [scratchpadItems, setScratchpadItems] = useState<ScratchpadItem[]>([])
   const [manualEvidence, setManualEvidence] = useState<ManualEvidence[]>([])
+  const [externalHighlight, setExternalHighlight] = useState<ExternalHighlight | null>(null)
   const scrollHandlerRef = useRef<((pageNumber: number) => void) | null>(null)
 
   const scrollToEvidence = useCallback((documentId: string, pageNumber: number) => {
@@ -100,12 +123,28 @@ export function WorkspaceProvider({ children, initialDocumentId = null }: Worksp
     }
   }, [targetPage])
 
+  const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const highlightFromCoordinates = useCallback((highlight: ExternalHighlight | null) => {
+    if (highlight) {
+      // Switch to the document if needed and scroll to the page
+      if (highlight.documentId !== activeDocumentId) {
+        setActiveDocumentId(highlight.documentId)
+        setTargetPage(highlight.pageNumber)
+      } else if (scrollHandlerRef.current) {
+        scrollHandlerRef.current(highlight.pageNumber)
+      }
+    }
+    setExternalHighlight(highlight)
+  }, [activeDocumentId])
+
   const value: WorkspaceContextType = {
     activeDocumentId,
     setActiveDocumentId,
     focusedRequirementId,
     setFocusedRequirementId,
     targetPage,
+    setTargetPage,
     scrollToEvidence,
     registerScrollHandler,
     isDragging,
@@ -118,6 +157,8 @@ export function WorkspaceProvider({ children, initialDocumentId = null }: Worksp
     setScratchpadItems,
     manualEvidence,
     setManualEvidence,
+    externalHighlight,
+    highlightFromCoordinates,
   }
 
   return (

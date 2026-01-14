@@ -129,6 +129,12 @@ async def load_session(session_id: str) -> dict[str, Any]:
     """
     state_manager = get_session_or_raise(session_id)
     session_data = state_manager.read_json("session.json")
+
+    # Load documents if they exist
+    if state_manager.exists("documents.json"):
+        docs_data = state_manager.read_json("documents.json")
+        session_data["documents"] = docs_data.get("documents", [])
+
     return session_data
 
 

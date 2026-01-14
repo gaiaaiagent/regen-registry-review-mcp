@@ -205,6 +205,28 @@ class ResolveRevisionRequest(BaseModel):
 
 
 # ============================================================================
+# Verification Models
+# ============================================================================
+
+
+class VerifyExtractionRequest(BaseModel):
+    snippet_id: str = Field(..., description="ID of the evidence snippet to verify")
+    requirement_id: str = Field(..., description="Requirement ID this snippet belongs to")
+    status: str = Field(..., description="Verification status: verified, rejected, partial, needs_context")
+    notes: str | None = Field(None, description="Reviewer notes")
+    reviewer: str = Field(default="user", description="Reviewer identifier")
+
+
+class VerificationSummary(BaseModel):
+    requirement_id: str
+    total_snippets: int
+    verified: int
+    rejected: int
+    pending: int
+    progress: float
+
+
+# ============================================================================
 # Agent Chat Models
 # ============================================================================
 
@@ -242,6 +264,28 @@ class AgentChatResponse(BaseModel):
 # ============================================================================
 # API Endpoints
 # ============================================================================
+
+
+@app.get("/files/{file_path:path}", summary="Serve local file")
+async def serve_file(file_path: str):
+    """Serve a local file by its absolute path.
+
+    WARNING: This is for local development/MVP only.
+    In production, files should be served from S3/blob storage.
+    """
+    from fastapi.responses import FileResponse
+    from urllib.parse import unquote
+    import os
+
+    # Decode URL-encoded path and ensure it's absolute
+    decoded_path = unquote(file_path)
+    if not decoded_path.startswith('/'):
+        decoded_path = '/' + decoded_path
+
+    if not os.path.exists(decoded_path):
+        raise HTTPException(status_code=404, detail=f"File not found: {decoded_path}")
+
+    return FileResponse(decoded_path)
 
 
 @app.get("/")
@@ -528,6 +572,13 @@ async def get_evidence_matrix(session_id: str):
         with open(evidence_path) as f:
             evidence_data = json.load(f)
 
+        # Load verifications if exists
+        verifications_path = state_manager.session_dir / "verifications.json"
+        verifications = {}
+        if verifications_path.exists():
+            with open(verifications_path) as f:
+                verifications = json.load(f)
+
         # Load checklist for validation_type mapping
         session_data = state_manager.read_json("session.json")
         methodology = session_data.get("project_metadata", {}).get(
@@ -568,6 +619,11 @@ async def get_evidence_matrix(session_id: str):
             snippets = req_evidence.get("evidence_snippets", [])
             best_snippet = snippets[0] if snippets else None
 
+            # Get verification status for this requirement's snippets
+            req_verifications = verifications.get("verifications", {}).get(req_id, [])
+            verified_count = sum(1 for v in req_verifications if v.get("status") == "verified")
+            pending_count = len(snippets) - len(req_verifications)
+
             matrix.append(
                 {
                     "requirement_id": req_id,
@@ -580,6 +636,12 @@ async def get_evidence_matrix(session_id: str):
                     "source_document": (
                         best_snippet.get("document_name", "") if best_snippet else ""
                     ),
+                    "document_id": (
+                        best_snippet.get("document_id", "") if best_snippet else ""
+                    ),
+                    "snippet_id": (
+                        best_snippet.get("snippet_id", "") if best_snippet else ""
+                    ),
                     "page": best_snippet.get("page") if best_snippet else None,
                     "section": best_snippet.get("section", "") if best_snippet else "",
                     "extracted_value": (
@@ -588,7 +650,12 @@ async def get_evidence_matrix(session_id: str):
                     "evidence_text": (
                         best_snippet.get("text", "")[:300] if best_snippet else ""
                     ),
+                    "bounding_box": (
+                        best_snippet.get("bounding_box") if best_snippet else None
+                    ),
                     "evidence_count": len(snippets),
+                    "verified_count": verified_count,
+                    "pending_verification": pending_count,
                     "human_review_required": not is_auto,
                 }
             )
@@ -604,6 +671,9 @@ async def get_evidence_matrix(session_id: str):
                 "partial": sum(1 for r in matrix if r["status"] == "partial"),
                 "missing": sum(1 for r in matrix if r["status"] == "missing"),
                 "coverage": evidence_data.get("overall_coverage", 0.0),
+                "total_snippets": sum(r["evidence_count"] for r in matrix),
+                "verified_snippets": sum(r["verified_count"] for r in matrix),
+                "pending_verification": sum(r["pending_verification"] for r in matrix),
             },
             "columns": [
                 "requirement_id",
@@ -611,13 +681,19 @@ async def get_evidence_matrix(session_id: str):
                 "status",
                 "confidence",
                 "source_document",
+                "document_id",
+                "snippet_id",
                 "page",
                 "section",
                 "extracted_value",
+                "bounding_box",
+                "evidence_count",
+                "verified_count",
+                "pending_verification",
                 "validation_type",
                 "human_review_required",
             ],
-            "display_hint": "ALWAYS render as table with ALL columns: ID | Category | Status | Confidence | Source | Page | Section | Value | Type | Review. The 'extracted_value' column contains the specific answer for the registry checklist.",
+            "display_hint": "ALWAYS render as table with ALL columns: ID | Category | Status | Confidence | Source | Page | Section | Value | Type | Review. The 'extracted_value' column contains the specific answer for the registry checklist. Use snippet_id to link to verification.",
         }
     except HTTPException:
         raise
@@ -1163,6 +1239,228 @@ async def get_audit_log(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============================================================================
+# Per-Extraction Verification Endpoints (Phase 9B)
+# ============================================================================
+
+
+@app.post("/sessions/{session_id}/verify-extraction", summary="Verify extraction")
+async def verify_extraction(session_id: str, request: VerifyExtractionRequest):
+    """Record human verification of a specific evidence extraction.
+
+    Unlike requirement-level overrides, this allows verifying individual
+    evidence snippets. Each snippet can be verified, rejected, or flagged.
+    """
+    from datetime import datetime
+    import json
+
+    try:
+        state_manager = StateManager(session_id)
+
+        # Load or create verifications file
+        verifications_path = state_manager.session_dir / "verifications.json"
+        if verifications_path.exists():
+            with open(verifications_path) as f:
+                verifications = json.load(f)
+        else:
+            verifications = {
+                "session_id": session_id,
+                "verifications": {},
+                "created_at": datetime.now().isoformat(),
+            }
+
+        # Add/update verification
+        req_id = request.requirement_id
+        if req_id not in verifications["verifications"]:
+            verifications["verifications"][req_id] = []
+
+        # Check if snippet already has verification
+        existing = None
+        for i, v in enumerate(verifications["verifications"][req_id]):
+            if v["snippet_id"] == request.snippet_id:
+                existing = i
+                break
+
+        verification_record = {
+            "snippet_id": request.snippet_id,
+            "requirement_id": req_id,
+            "status": request.status,
+            "verified_by": request.reviewer,
+            "verified_at": datetime.now().isoformat(),
+            "reviewer_notes": request.notes,
+        }
+
+        if existing is not None:
+            verification_record["previous_status"] = verifications["verifications"][req_id][existing].get("status")
+            verifications["verifications"][req_id][existing] = verification_record
+        else:
+            verifications["verifications"][req_id].append(verification_record)
+
+        verifications["updated_at"] = datetime.now().isoformat()
+
+        # Save
+        with open(verifications_path, "w") as f:
+            json.dump(verifications, f, indent=2)
+
+        return {
+            "success": True,
+            "verification": verification_record,
+        }
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/sessions/{session_id}/verification-status", summary="Get verification status")
+async def get_verification_status(session_id: str, requirement_id: str | None = None):
+    """Get verification status for all or specific requirements.
+
+    Returns summary of how many snippets are verified/rejected/pending.
+    """
+    import json
+
+    try:
+        state_manager = StateManager(session_id)
+
+        # Load evidence to get snippet counts
+        evidence_path = state_manager.session_dir / "evidence.json"
+        if not evidence_path.exists():
+            raise HTTPException(status_code=400, detail="Evidence not yet extracted")
+
+        with open(evidence_path) as f:
+            evidence_data = json.load(f)
+
+        # Load verifications
+        verifications_path = state_manager.session_dir / "verifications.json"
+        verifications = {"verifications": {}}
+        if verifications_path.exists():
+            with open(verifications_path) as f:
+                verifications = json.load(f)
+
+        # Build summary per requirement
+        summaries = []
+        for req in evidence_data.get("evidence", []):
+            req_id = req.get("requirement_id")
+
+            if requirement_id and req_id != requirement_id:
+                continue
+
+            snippets = req.get("evidence_snippets", [])
+            total = len(snippets)
+
+            # Count verifications
+            req_verifications = verifications.get("verifications", {}).get(req_id, [])
+            verified = sum(1 for v in req_verifications if v.get("status") == "verified")
+            rejected = sum(1 for v in req_verifications if v.get("status") == "rejected")
+            pending = total - len(req_verifications)
+
+            summaries.append({
+                "requirement_id": req_id,
+                "total_snippets": total,
+                "verified": verified,
+                "rejected": rejected,
+                "pending": pending,
+                "progress": (len(req_verifications) / total) if total > 0 else 1.0,
+            })
+
+        # Overall stats
+        total_snippets = sum(s["total_snippets"] for s in summaries)
+        total_verified = sum(s["verified"] for s in summaries)
+        total_rejected = sum(s["rejected"] for s in summaries)
+        total_pending = sum(s["pending"] for s in summaries)
+
+        return {
+            "session_id": session_id,
+            "summaries": summaries,
+            "overall": {
+                "total_snippets": total_snippets,
+                "verified": total_verified,
+                "rejected": total_rejected,
+                "pending": total_pending,
+                "progress": ((total_snippets - total_pending) / total_snippets) if total_snippets > 0 else 1.0,
+            }
+        }
+    except HTTPException:
+        raise
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/sessions/{session_id}/resolve-coordinates", summary="Resolve PDF coordinates")
+async def resolve_coordinates(
+    session_id: str,
+    snippet_id: str | None = None,
+    requirement_id: str | None = None
+):
+    """Resolve PDF bounding box coordinates for evidence snippets.
+
+    Finds the exact location in the PDF where evidence text appears,
+    enabling precise highlighting in the viewer.
+
+    Args:
+        session_id: Session identifier
+        snippet_id: Optional specific snippet to resolve
+        requirement_id: Optional requirement to resolve all snippets for
+    """
+    import json
+    from registry_review_mcp.extractors.pdf_coordinates import resolve_snippet_coordinates
+
+    try:
+        state_manager = StateManager(session_id)
+
+        # Load evidence
+        evidence_path = state_manager.session_dir / "evidence.json"
+        if not evidence_path.exists():
+            raise HTTPException(status_code=400, detail="Evidence not yet extracted")
+
+        with open(evidence_path) as f:
+            evidence_data = json.load(f)
+
+        resolved = []
+        for req in evidence_data.get("evidence", []):
+            req_id = req.get("requirement_id")
+            if requirement_id and req_id != requirement_id:
+                continue
+
+            for snippet in req.get("evidence_snippets", []):
+                snip_id = snippet.get("snippet_id")
+                if snippet_id and snip_id != snippet_id:
+                    continue
+
+                # Resolve coordinates
+                bbox = resolve_snippet_coordinates(
+                    session_dir=state_manager.session_dir,
+                    snippet_text=snippet.get("text", ""),
+                    document_id=snippet.get("document_id", ""),
+                    page=snippet.get("page"),
+                )
+
+                resolved.append({
+                    "snippet_id": snip_id,
+                    "requirement_id": req_id,
+                    "document_id": snippet.get("document_id"),
+                    "page": snippet.get("page"),
+                    "bounding_box": bbox.model_dump() if bbox else None,
+                    "text_preview": snippet.get("text", "")[:100],
+                })
+
+        return {
+            "session_id": session_id,
+            "resolved_count": sum(1 for r in resolved if r["bounding_box"]),
+            "total_count": len(resolved),
+            "coordinates": resolved,
+        }
+    except HTTPException:
+        raise
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.delete("/sessions/{session_id}", summary="Delete session")
 async def delete_session(session_id: str):
     """Delete a review session and all its data.
@@ -1183,19 +1481,82 @@ async def delete_session(session_id: str):
 # ============================================================================
 
 
-def build_agent_tools_description() -> str:
-    """Build description of available tools for the agent."""
-    return """You have access to these tools for the registry review workspace:
-
-1. search_documents(query: str) - Search across all session documents for relevant content
-2. get_requirement_status(requirement_id: str) - Get current status and evidence for a requirement
-3. navigate_to_page(document_id: str, page: int) - Suggest navigation to a specific page
-4. summarize_gaps() - List all requirements that are missing evidence
-5. get_document_list() - Get list of all documents in the session
-6. explain_evidence(requirement_id: str) - Explain what evidence was found for a requirement
-
-When you want to suggest an action to the user, respond with a JSON block containing proposed actions.
-Actions will be shown as buttons the user can click to execute them."""
+def get_agent_tools() -> list[dict]:
+    """Define tools for the agent using Claude's native tool format."""
+    return [
+        {
+            "name": "navigate_to_citation",
+            "description": "Navigate the document viewer to show a specific page with evidence. Use this when pointing the user to where evidence was found.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "document_id": {
+                        "type": "string",
+                        "description": "Document ID to navigate to"
+                    },
+                    "page": {
+                        "type": "integer",
+                        "description": "Page number (1-indexed)"
+                    },
+                    "highlight_text": {
+                        "type": "string",
+                        "description": "Text to highlight on the page"
+                    }
+                },
+                "required": ["document_id", "page"]
+            }
+        },
+        {
+            "name": "suggest_verification",
+            "description": "Suggest the user verify a specific evidence snippet. Use this when discussing evidence quality.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "snippet_id": {
+                        "type": "string",
+                        "description": "Evidence snippet ID to verify"
+                    },
+                    "requirement_id": {
+                        "type": "string",
+                        "description": "Requirement the snippet belongs to"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Why this snippet should be verified"
+                    }
+                },
+                "required": ["snippet_id", "requirement_id"]
+            }
+        },
+        {
+            "name": "search_evidence",
+            "description": "Search across extracted evidence for specific information.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Search query"
+                    }
+                },
+                "required": ["query"]
+            }
+        },
+        {
+            "name": "get_requirement_status",
+            "description": "Get the current status and evidence for a specific requirement.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "requirement_id": {
+                        "type": "string",
+                        "description": "Requirement ID (e.g., REQ-001)"
+                    }
+                },
+                "required": ["requirement_id"]
+            }
+        }
+    ]
 
 
 def build_session_context(session_data: dict, evidence_data: dict | None, documents_data: dict | None) -> str:
@@ -1260,61 +1621,6 @@ def build_focused_context(context: AgentContext | None, evidence_data: dict | No
     return "\n".join(parts) if parts else "User context: General view"
 
 
-def parse_agent_response(response_text: str, evidence_data: dict | None, documents_data: dict | None) -> AgentChatResponse:
-    """Parse the agent's response and extract actions and sources."""
-    message = response_text
-    actions: List[AgentAction] = []
-    sources: List[AgentSource] = []
-
-    # Look for JSON action blocks in the response
-    import re
-    action_pattern = r'```json\s*(\{[^`]+\})\s*```'
-    matches = re.findall(action_pattern, response_text, re.DOTALL)
-
-    for match in matches:
-        try:
-            action_data = json.loads(match)
-            if "actions" in action_data:
-                for act in action_data["actions"]:
-                    actions.append(AgentAction(
-                        type=act.get("type", "unknown"),
-                        label=act.get("label", "Action"),
-                        params=act.get("params", {})
-                    ))
-            # Remove the JSON block from the message
-            message = message.replace(f"```json\n{match}\n```", "").strip()
-            message = message.replace(f"```json{match}```", "").strip()
-        except json.JSONDecodeError:
-            pass
-
-    # Extract document references from the response
-    if documents_data:
-        doc_map = {d.get("filename", "").lower(): d for d in documents_data.get("documents", [])}
-        for doc in documents_data.get("documents", []):
-            filename = doc.get("filename", "")
-            if filename.lower() in response_text.lower():
-                sources.append(AgentSource(
-                    document_id=doc.get("document_id", ""),
-                    document_name=filename,
-                    page=None,
-                    text=None
-                ))
-
-    # Extract page references
-    page_pattern = r'page\s+(\d+)'
-    page_matches = re.findall(page_pattern, response_text, re.IGNORECASE)
-    for page_num in page_matches:
-        if sources:
-            sources[0].page = int(page_num)
-            break
-
-    return AgentChatResponse(
-        message=message,
-        actions=actions,
-        sources=sources
-    )
-
-
 @app.post("/sessions/{session_id}/agent/chat", response_model=AgentChatResponse, summary="Chat with AI agent")
 async def agent_chat(session_id: str, request: AgentChatRequest):
     """Conversational AI agent for the review workspace.
@@ -1351,7 +1657,6 @@ async def agent_chat(session_id: str, request: AgentChatRequest):
     # Build system prompt with session context
     session_context = build_session_context(session_data, evidence_data, documents_data)
     focused_context = build_focused_context(request.context, evidence_data, documents_data)
-    tools_description = build_agent_tools_description()
 
     system_prompt = f"""You are an AI assistant helping a carbon credit registry reviewer analyze project documents.
 
@@ -1361,19 +1666,17 @@ CURRENT SESSION STATE:
 USER'S CURRENT VIEW:
 {focused_context}
 
-AVAILABLE TOOLS:
-{tools_description}
-
 GUIDELINES:
 1. Be helpful and concise. Focus on what the user is asking about.
 2. Reference specific documents and page numbers when discussing evidence.
-3. When suggesting actions, include a JSON block with the action details.
-4. For navigation suggestions, use: {{"actions": [{{"type": "navigate", "label": "View in Document", "params": {{"document_id": "...", "page": N}}}}]}}
-5. For validation actions, use: {{"actions": [{{"type": "validate", "label": "Run Validation", "params": {{}}}}]}}
-6. For extraction actions, use: {{"actions": [{{"type": "extract", "label": "Extract Evidence", "params": {{"requirement_id": "..."}}}}]}}
-7. Keep responses focused and actionable for a professional reviewer.
-8. If asked about requirements, reference their IDs (e.g., REQ-001, REQ-002).
-9. When evidence is found, mention the confidence level and source document."""
+3. Use the available tools to suggest actions - they will appear as buttons the user can click.
+4. Keep responses focused and actionable for a professional reviewer.
+5. If asked about requirements, reference their IDs (e.g., REQ-001, REQ-002).
+6. When evidence is found, mention the confidence level and source document.
+7. Use navigate_to_citation when pointing the user to specific evidence locations.
+8. Use suggest_verification when recommending the user verify evidence quality.
+9. Use search_evidence when the user wants to find specific information across evidence.
+10. Use get_requirement_status when discussing specific requirement compliance."""
 
     # Build messages with evidence context if discussing specific requirements
     user_message = request.message
@@ -1390,7 +1693,7 @@ GUIDELINES:
                     user_message = f"{request.message}\n{evidence_context}"
                 break
 
-    # Call Claude API
+    # Call Claude API with native tool calling
     try:
         client = AsyncAnthropic(api_key=settings.anthropic_api_key)
 
@@ -1398,16 +1701,51 @@ GUIDELINES:
             model=settings.get_active_llm_model(),
             max_tokens=2000,
             system=system_prompt,
+            tools=get_agent_tools(),
             messages=[
                 {"role": "user", "content": user_message}
             ]
         )
 
-        response_text = response.content[0].text
+        # Process response - handle both text and tool_use blocks
+        actions: List[AgentAction] = []
+        sources: List[AgentSource] = []
+        message_text = ""
 
-        # Parse the response to extract actions and sources
-        result = parse_agent_response(response_text, evidence_data, documents_data)
-        return result
+        for block in response.content:
+            if block.type == "text":
+                message_text = block.text
+            elif block.type == "tool_use":
+                # Convert tool_use to AgentAction
+                action_labels = {
+                    "navigate_to_citation": "View in Document",
+                    "suggest_verification": "Verify Evidence",
+                    "search_evidence": "Search",
+                    "get_requirement_status": "Check Status",
+                }
+                actions.append(AgentAction(
+                    type=block.name,
+                    label=action_labels.get(block.name, block.name.replace("_", " ").title()),
+                    params=block.input
+                ))
+
+        # Extract document references from text for sources
+        if documents_data:
+            for doc in documents_data.get("documents", []):
+                filename = doc.get("filename", "")
+                if filename.lower() in message_text.lower():
+                    sources.append(AgentSource(
+                        document_id=doc.get("document_id", ""),
+                        document_name=filename,
+                        page=None,
+                        text=None
+                    ))
+
+        return AgentChatResponse(
+            message=message_text,
+            actions=actions,
+            sources=sources
+        )
 
     except Exception as e:
         logger.error(f"Agent chat error: {e}")
@@ -1853,6 +2191,251 @@ async def check_upload_status(upload_id: str):
         "created_at": session["created_at"],
         "session_id": session.get("session_id"),
     }
+
+
+# ============================================================================
+# Google Drive Integration (Phase 9)
+# ============================================================================
+
+
+class GDriveFile(BaseModel):
+    id: str = Field(..., description="Google Drive file ID")
+    name: str = Field(..., description="File name")
+    mime_type: str = Field(..., description="MIME type")
+    size: int | None = Field(None, description="File size in bytes")
+    modified_time: str | None = Field(None, description="Last modified time")
+
+
+class GDriveFolder(BaseModel):
+    id: str = Field(..., description="Google Drive folder ID")
+    name: str = Field(..., description="Folder name")
+
+
+class GDriveImportRequest(BaseModel):
+    folder_id: str = Field(..., description="Google Drive folder ID to import from")
+    file_ids: list[str] = Field(..., description="List of file IDs to import")
+
+
+def get_gdrive_access_token() -> str:
+    """Get Google Drive access token using gcloud CLI with service account impersonation."""
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            [
+                "gcloud",
+                "auth",
+                "print-access-token",
+                "--impersonate-service-account=rag-ingestion-bot@koi-sensor.iam.gserviceaccount.com",
+                "--scopes=https://www.googleapis.com/auth/drive.readonly",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0:
+            logger.error(f"gcloud auth failed: {result.stderr}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to get Google Drive access token: {result.stderr}",
+            )
+        return result.stdout.strip()
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=500, detail="Timeout getting Google Drive access token")
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=500,
+            detail="gcloud CLI not found. Please install Google Cloud SDK.",
+        )
+
+
+def gdrive_api_request(endpoint: str, params: dict | None = None) -> dict:
+    """Make a request to the Google Drive API."""
+    import requests
+
+    token = get_gdrive_access_token()
+    headers = {"Authorization": f"Bearer {token}"}
+    url = f"https://www.googleapis.com/drive/v3/{endpoint}"
+
+    response = requests.get(url, headers=headers, params=params, timeout=30)
+    if response.status_code != 200:
+        logger.error(f"Google Drive API error: {response.status_code} - {response.text}")
+        raise HTTPException(
+            status_code=response.status_code,
+            detail=f"Google Drive API error: {response.text}",
+        )
+    return response.json()
+
+
+@app.get("/gdrive/folders", summary="List accessible Google Drive folders")
+async def list_gdrive_folders():
+    """List folders accessible to the service account.
+
+    Returns top-level folders that the service account has access to.
+    These are typically folders explicitly shared with the service account.
+    """
+    try:
+        params = {
+            "q": "mimeType='application/vnd.google-apps.folder' and trashed=false",
+            "fields": "files(id,name)",
+            "pageSize": 100,
+            "orderBy": "name",
+        }
+        result = gdrive_api_request("files", params)
+        folders = [GDriveFolder(id=f["id"], name=f["name"]) for f in result.get("files", [])]
+        return {"folders": folders, "count": len(folders)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing Google Drive folders: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/gdrive/folders/{folder_id}/files", summary="List files in a Google Drive folder")
+async def list_gdrive_folder_files(folder_id: str):
+    """List files in a specific Google Drive folder.
+
+    Returns PDF files and subfolders within the specified folder.
+    Only PDF files are returned as they are the supported document type.
+    """
+    try:
+        # List files in folder (PDFs only)
+        file_params = {
+            "q": f"'{folder_id}' in parents and mimeType='application/pdf' and trashed=false",
+            "fields": "files(id,name,mimeType,size,modifiedTime)",
+            "pageSize": 100,
+            "orderBy": "name",
+        }
+        files_result = gdrive_api_request("files", file_params)
+
+        # List subfolders
+        folder_params = {
+            "q": f"'{folder_id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false",
+            "fields": "files(id,name)",
+            "pageSize": 100,
+            "orderBy": "name",
+        }
+        folders_result = gdrive_api_request("files", folder_params)
+
+        files = [
+            GDriveFile(
+                id=f["id"],
+                name=f["name"],
+                mime_type=f.get("mimeType", "application/pdf"),
+                size=int(f["size"]) if f.get("size") else None,
+                modified_time=f.get("modifiedTime"),
+            )
+            for f in files_result.get("files", [])
+        ]
+
+        subfolders = [GDriveFolder(id=f["id"], name=f["name"]) for f in folders_result.get("files", [])]
+
+        return {
+            "folder_id": folder_id,
+            "files": files,
+            "subfolders": subfolders,
+            "file_count": len(files),
+            "subfolder_count": len(subfolders),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing files in folder {folder_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/sessions/{session_id}/import/gdrive", summary="Import files from Google Drive")
+async def import_gdrive_files(session_id: str, request: GDriveImportRequest):
+    """Import files from Google Drive to a session.
+
+    Downloads selected files from Google Drive and adds them to the session.
+    After import, runs document discovery to process the new files.
+    """
+    import requests
+
+    try:
+        # Verify session exists
+        state_manager = StateManager(session_id)
+        state_manager.read_json("session.json")
+
+        token = get_gdrive_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        imported_files = []
+        failed_files = []
+
+        for file_id in request.file_ids:
+            try:
+                # Get file metadata
+                metadata_url = f"https://www.googleapis.com/drive/v3/files/{file_id}"
+                metadata_params = {"fields": "id,name,mimeType,size"}
+                metadata_response = requests.get(
+                    metadata_url, headers=headers, params=metadata_params, timeout=30
+                )
+                if metadata_response.status_code != 200:
+                    failed_files.append({"file_id": file_id, "error": "Failed to get metadata"})
+                    continue
+
+                metadata = metadata_response.json()
+                filename = metadata.get("name", f"{file_id}.pdf")
+
+                # Download file content
+                download_url = f"https://www.googleapis.com/drive/v3/files/{file_id}"
+                download_params = {"alt": "media"}
+                download_response = requests.get(
+                    download_url, headers=headers, params=download_params, timeout=120
+                )
+                if download_response.status_code != 200:
+                    failed_files.append({"file_id": file_id, "error": "Failed to download"})
+                    continue
+
+                # Convert to base64
+                content_b64 = base64.b64encode(download_response.content).decode("utf-8")
+
+                imported_files.append({
+                    "filename": filename,
+                    "content_base64": content_b64,
+                    "size_bytes": len(download_response.content),
+                    "gdrive_id": file_id,
+                })
+
+            except Exception as e:
+                logger.error(f"Error importing file {file_id}: {e}")
+                failed_files.append({"file_id": file_id, "error": str(e)})
+
+        if not imported_files:
+            raise HTTPException(
+                status_code=400,
+                detail=f"No files were successfully imported. Failures: {failed_files}",
+            )
+
+        # Add files to session
+        file_list = [{"filename": f["filename"], "content_base64": f["content_base64"]} for f in imported_files]
+        upload_result = await upload_tools.upload_additional_files(session_id, file_list)
+
+        # Run discovery on updated session
+        discovery_result = await document_tools.discover_documents(session_id)
+
+        return {
+            "success": True,
+            "session_id": session_id,
+            "imported": [{"filename": f["filename"], "size_bytes": f["size_bytes"], "gdrive_id": f["gdrive_id"]} for f in imported_files],
+            "imported_count": len(imported_files),
+            "failed": failed_files,
+            "failed_count": len(failed_files),
+            "upload_result": upload_result,
+            "discovery": {
+                "documents_found": discovery_result.get("documents_found", 0),
+                "classification_summary": discovery_result.get("classification_summary", {}),
+            },
+        }
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error importing files from Google Drive: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================================================

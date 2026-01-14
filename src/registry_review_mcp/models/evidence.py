@@ -7,6 +7,30 @@ from pydantic import Field
 from .base import BaseModel, ConfidenceScore
 
 
+class BoundingBox(BaseModel):
+    """Bounding box coordinates for PDF highlighting."""
+
+    page: int = Field(..., description="Page number (1-indexed)")
+    x0: float = Field(..., ge=0.0, le=1.0, description="Left edge (normalized 0-1)")
+    y0: float = Field(..., ge=0.0, le=1.0, description="Top edge (normalized 0-1)")
+    x1: float = Field(..., ge=0.0, le=1.0, description="Right edge (normalized 0-1)")
+    y1: float = Field(..., ge=0.0, le=1.0, description="Bottom edge (normalized 0-1)")
+
+    # For multi-line selections
+    rects: list[dict] | None = Field(
+        None,
+        description="Additional rectangles for multi-line text [(x0,y0,x1,y1), ...]"
+    )
+
+    # Match confidence
+    match_score: float = Field(
+        1.0,
+        ge=0.0,
+        le=1.0,
+        description="How confident the coordinate match is (1.0 = exact text match)"
+    )
+
+
 class EvidenceSnippet(BaseModel):
     """A snippet of text that serves as evidence for a requirement."""
 
@@ -24,6 +48,10 @@ class EvidenceSnippet(BaseModel):
     structured_fields: dict[str, Any] | None = Field(
         None,
         description="Structured fields extracted for cross-validation (owner_name, project_id, dates, etc.)"
+    )
+    bounding_box: BoundingBox | None = Field(
+        None,
+        description="PDF coordinates for highlighting this snippet"
     )
 
 

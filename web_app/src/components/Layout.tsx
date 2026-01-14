@@ -2,6 +2,7 @@ import { Outlet, Link, useLocation } from 'react-router-dom'
 import { FileText, Home, LogOut, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
+import { NotificationBell } from '@/components/NotificationBell'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,7 +50,8 @@ export function Layout() {
           </nav>
 
           {/* User Menu */}
-          <div className="ml-auto flex items-center gap-4">
+          <div className="ml-auto flex items-center gap-2">
+            <NotificationBell />
             {user && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

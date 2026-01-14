@@ -12,6 +12,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
 import re
 import time
 from pathlib import Path
@@ -19,7 +20,14 @@ from typing import Any
 
 from anthropic import AsyncAnthropic
 
+# LiteLLM for multi-provider support
+import litellm
+from litellm import acompletion
+
 from ..config.settings import settings
+
+# Suppress LiteLLM debug output
+litellm.suppress_debug_info = True
 from ..models.evidence import (
     EvidenceSnippet,
     MappedDocument,
@@ -273,6 +281,63 @@ Return a JSON array of evidence snippets. If no relevant evidence found, return 
     return base_prompt + structured_guidance + evidence_instructions + output_format
 
 
+def _parse_json_response(response_text: str) -> list[dict]:
+    """Robustly parse JSON from LLM response.
+
+    Handles various formats:
+    - Plain JSON array
+    - JSON wrapped in ```json ... ``` markdown
+    - JSON with leading/trailing text
+    - Empty responses (returns empty array)
+
+    Args:
+        response_text: Raw LLM response text
+
+    Returns:
+        Parsed JSON array, or empty list if parsing fails
+    """
+    if not response_text or not response_text.strip():
+        return []
+
+    text = response_text.strip()
+
+    # Try 1: Extract from ```json ... ``` blocks
+    json_block_match = re.search(r'```(?:json)?\s*(\[[\s\S]*?\])\s*```', text)
+    if json_block_match:
+        try:
+            return json.loads(json_block_match.group(1))
+        except json.JSONDecodeError:
+            pass
+
+    # Try 2: Find array anywhere in response
+    array_match = re.search(r'\[[\s\S]*\]', text)
+    if array_match:
+        try:
+            return json.loads(array_match.group(0))
+        except json.JSONDecodeError:
+            pass
+
+    # Try 3: Direct parse (might be clean JSON)
+    try:
+        result = json.loads(text)
+        if isinstance(result, list):
+            return result
+        elif isinstance(result, dict):
+            # Some LLMs wrap array in object
+            if "evidence" in result:
+                return result["evidence"]
+            return [result]
+    except json.JSONDecodeError:
+        pass
+
+    # Try 4: Empty array indicators
+    if text in ("[]", "null", "None", "No evidence found", ""):
+        return []
+
+    logger.warning(f"Could not parse JSON from response: {text[:200]}...")
+    return []
+
+
 async def get_markdown_content(document: dict[str, Any], session_id: str) -> str | None:
     """Get markdown content for a document.
 
@@ -374,7 +439,8 @@ def load_from_cache(cache_key: str) -> list[EvidenceSnippet] | None:
 def save_to_cache(
     cache_key: str,
     snippets: list[EvidenceSnippet],
-    api_response
+    api_response,
+    use_litellm: bool = False
 ) -> None:
     """Save LLM response to cache.
 
@@ -382,8 +448,17 @@ def save_to_cache(
         cache_key: Cache key from generate_cache_key()
         snippets: Extracted evidence snippets
         api_response: Raw API response object with usage metadata
+        use_litellm: Whether response is from LiteLLM (uses different attribute names)
     """
     cache_path = settings.get_llm_cache_path(cache_key)
+
+    # Handle different usage attribute names between Anthropic and LiteLLM
+    if use_litellm:
+        input_tokens = api_response.usage.prompt_tokens
+        output_tokens = api_response.usage.completion_tokens
+    else:
+        input_tokens = api_response.usage.input_tokens
+        output_tokens = api_response.usage.output_tokens
 
     cache_data = {
         "cache_key": cache_key,
@@ -391,8 +466,8 @@ def save_to_cache(
         "ttl": settings.llm_cache_ttl,
         "response": [s.model_dump() for s in snippets],
         "metadata": {
-            "input_tokens": api_response.usage.input_tokens,
-            "output_tokens": api_response.usage.output_tokens,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
             "model": api_response.model
         }
     }
@@ -405,7 +480,7 @@ def save_to_cache(
 
 
 async def extract_evidence_with_llm(
-    client: AsyncAnthropic,
+    client: AsyncAnthropic | None,
     requirement: dict,
     document_content: str,
     document_id: str,
@@ -416,6 +491,7 @@ async def extract_evidence_with_llm(
 
     This replaces keyword matching with semantic understanding.
     Includes local caching to avoid redundant API calls during development.
+    Supports multiple providers: Anthropic (direct), Gemini/OpenAI (via LiteLLM).
 
     For cross_document and structured_field validation types, also extracts
     structured fields (owner_name, dates, etc.) for use in validation.
@@ -460,41 +536,60 @@ async def extract_evidence_with_llm(
     # Cache miss - call API
     logger.info(f"🌐 API call: {requirement_id} + {document_name}")
 
+    # Determine if using LiteLLM based on provider
+    provider = settings.llm_provider
+    use_litellm = provider in ("gemini", "openai")
+
+    system_prompt = "You are an expert at analyzing carbon credit project documentation and extracting relevant evidence for compliance requirements."
+
     try:
-        # Call Claude with prompt caching
-        response = await client.messages.create(
-            model=active_model,
-            max_tokens=4000,
-            system=[
-                {
-                    "type": "text",
-                    "text": "You are an expert at analyzing carbon credit project documentation and extracting relevant evidence for compliance requirements.",
-                    "cache_control": {"type": "ephemeral"}
-                }
-            ],
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": prompt,
-                            "cache_control": {"type": "ephemeral"}
-                        }
-                    ]
-                }
-            ]
-        )
+        if use_litellm:
+            # Set up API keys for LiteLLM
+            if provider == "gemini":
+                os.environ["GEMINI_API_KEY"] = settings.google_api_key
+            elif provider == "openai":
+                os.environ["OPENAI_API_KEY"] = settings.openai_api_key
 
-        # Parse JSON response
-        response_text = response.content[0].text
-
-        # Extract JSON from response (might be wrapped in markdown)
-        json_match = re.search(r'```json\s*(\[.*?\])\s*```', response_text, re.DOTALL)
-        if json_match:
-            evidence_array = json.loads(json_match.group(1))
+            # Call LiteLLM
+            response = await acompletion(
+                model=active_model,
+                max_tokens=4000,
+                temperature=settings.llm_temperature,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            response_text = response.choices[0].message.content
         else:
-            evidence_array = json.loads(response_text)
+            # Call Anthropic directly with prompt caching
+            response = await client.messages.create(
+                model=active_model,
+                max_tokens=4000,
+                system=[
+                    {
+                        "type": "text",
+                        "text": system_prompt,
+                        "cache_control": {"type": "ephemeral"}
+                    }
+                ],
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": prompt,
+                                "cache_control": {"type": "ephemeral"}
+                            }
+                        ]
+                    }
+                ]
+            )
+            response_text = response.content[0].text
+
+        # Extract JSON from response (might be wrapped in markdown or have extra text)
+        evidence_array = _parse_json_response(response_text)
 
         # Convert to EvidenceSnippet objects
         snippets = []
@@ -522,7 +617,7 @@ async def extract_evidence_with_llm(
 
         # Save to cache (if enabled)
         if settings.llm_cache_enabled:
-            save_to_cache(cache_key, snippets, response)
+            save_to_cache(cache_key, snippets, response, use_litellm=use_litellm)
 
         return snippets
 
@@ -682,8 +777,12 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
 
     print(f"\n🔍 Extracting evidence with LLM...\n", flush=True)
 
-    # Create LLM client (shared across all extractions)
-    anthropic_client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+    # Create LLM client (only needed for Anthropic provider)
+    provider = settings.llm_provider
+    if provider == "anthropic":
+        anthropic_client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+    else:
+        anthropic_client = None  # LiteLLM handles Gemini/OpenAI
 
     # Process requirements in parallel (rate-limited)
     semaphore = asyncio.Semaphore(5)  # Max 5 concurrent LLM calls
@@ -784,6 +883,33 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
     ]
 
     all_evidence = await asyncio.gather(*tasks)
+
+    # ========================================================================
+    # Phase 3.5: Enrich Snippets with PDF Coordinates (Bulk)
+    # ========================================================================
+    # Opens each PDF once and processes all snippets for that document
+
+    print(f"\n📍 Enriching evidence with PDF coordinates...", flush=True)
+
+    try:
+        from ..extractors.pdf_coordinates import enrich_snippets_with_coordinates
+
+        # Collect all snippets from all evidence
+        all_snippets = []
+        for evidence in all_evidence:
+            all_snippets.extend(evidence.evidence_snippets)
+
+        # Enrich snippets with coordinates (mutates in-place)
+        enriched_count = enrich_snippets_with_coordinates(
+            snippets=all_snippets,
+            doc_metadata=doc_metadata,
+            min_similarity=0.8,
+        )
+
+        print(f"✅ Enriched {enriched_count}/{len(all_snippets)} snippets with coordinates", flush=True)
+    except Exception as e:
+        logger.warning(f"Coordinate enrichment failed: {e}")
+        print(f"⚠️  Coordinate enrichment skipped: {e}", flush=True)
 
     # ========================================================================
     # Phase 4: Calculate Statistics & Save

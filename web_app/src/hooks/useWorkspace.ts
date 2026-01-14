@@ -2,15 +2,33 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import type { Requirement, Evidence } from '@/contexts/WorkspaceContext'
 
+interface BoundingBox {
+  page: number
+  x0: number
+  y0: number
+  x1: number
+  y1: number
+  match_score?: number
+  rects?: Array<{ x0: number; y0: number; x1: number; y1: number }>
+}
+
 interface EvidenceMatrixRow {
   requirement_id: string
   category: string
+  requirement_text: string
   status: 'covered' | 'partial' | 'missing'
   confidence: number
   source_document: string
+  document_id: string
+  snippet_id: string
   page: number
   section: string
   extracted_value: string
+  evidence_text: string
+  bounding_box: BoundingBox | null
+  evidence_count: number
+  verified_count: number
+  pending_verification: number
   validation_type: string
   human_review_required: boolean
 }
@@ -36,12 +54,22 @@ function transformMatrixToRequirements(matrix: EvidenceMatrixRow[]): Requirement
   for (const row of matrix) {
     const existing = requirementMap.get(row.requirement_id)
 
+    // Use snippet_id if available, otherwise generate one
+    const evidenceId = row.snippet_id || `${row.requirement_id}-${row.document_id || row.source_document}-${row.page}`
+
     const evidence: Evidence = {
-      id: `${row.requirement_id}-${row.source_document}-${row.page}`,
-      documentId: row.source_document,
+      id: evidenceId,
+      documentId: row.document_id || row.source_document,
       pageNumber: row.page,
-      text: row.extracted_value,
+      text: row.evidence_text || row.extracted_value,
       section: row.section,
+      boundingBox: row.bounding_box ? {
+        x0: row.bounding_box.x0,
+        y0: row.bounding_box.y0,
+        x1: row.bounding_box.x1,
+        y1: row.bounding_box.y1,
+        page: row.bounding_box.page,
+      } : undefined,
     }
 
     if (existing) {
@@ -54,7 +82,7 @@ function transformMatrixToRequirements(matrix: EvidenceMatrixRow[]): Requirement
       requirementMap.set(row.requirement_id, {
         id: row.requirement_id,
         category: row.category,
-        text: row.requirement_id,
+        text: row.requirement_text || row.requirement_id,
         status: row.status,
         confidence: row.confidence,
         extractedValue: row.extracted_value,

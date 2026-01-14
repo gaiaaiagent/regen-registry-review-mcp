@@ -5,41 +5,43 @@
       {
         "value": "2022-01-01",
         "field_type": "project_start_date",
-        "source": "Project Plan",
-        "notes": "Project start date documented in Project Plan, Section 1.8"
+        "source": "Project Plan, Section 1.8; Registry Agent Review",
+        "notes": "Project start date documented in multiple sources"
       },
       {
         "value": "2022-01-01",
         "field_type": "crediting_period_start",
-        "source": "Project Plan",
+        "source": "Project Plan, Registry Agent Review",
         "notes": "Crediting period starts with project"
       },
       {
+        "value": "2023-02-06",
+        "field_type": "sampling_date",
+        "source": "Baseline Report, Page 2",
+        "notes": "Soil Sampling Start/Finish: 06/02/2023 (UK date format)"
+      }
+    ],
+    "dates_not_extractable": [
+      {
         "value": "2023-08-09",
         "field_type": "submission_date",
-        "source": "Project Plan",
-        "notes": "Document submission/update date from cover page"
+        "source": "Project Plan cover page ('Last updated: 9 August 2023')",
+        "notes": "Format 'Last updated: 9 August 2023' not reliably extracted by LLM"
       },
       {
         "value": "2022-06-15",
         "field_type": "imagery_date",
-        "source": "Baseline Report",
-        "notes": "Satellite imagery acquisition date for baseline"
-      },
-      {
-        "value": "2022-08-20",
-        "field_type": "sampling_date",
-        "source": "Baseline Report",
-        "notes": "Soil sampling date"
+        "source": "N/A",
+        "notes": "Satellite imagery date not explicitly stated in any document"
       }
     ],
     "land_tenure": [
       {
-        "owner_name": "Nicholas Denman",
-        "area_hectares": 120.5,
+        "owner_name": "Nick Denman",
+        "area_hectares": 82.08,
         "tenure_type": "freehold",
-        "source": "Project Plan",
-        "notes": "Primary landowner, full freehold ownership"
+        "source": "Baseline Report, Page 2 (area); Project Plan, Section 1.7 (owner)",
+        "notes": "Owner name appears as 'Nick Denman' in Project Plan. Total Project Area: 82.08 ha from Baseline Report."
       }
     ],
     "project_ids": [
@@ -47,22 +49,22 @@
         "value": "C06-006",
         "registry": "Regen Network",
         "source": "Registry Agent Review documents",
-        "occurrences": "Registry Agent Review documents",
-        "notes": "Official Regen Network project ID"
-      },
+        "occurrences": "Registry Agent Review documents, Project Plan headers",
+        "notes": "Official Regen Network project ID - the only ID that should be extracted by the system"
+      }
+    ],
+    "internal_ids_not_extracted": [
       {
         "value": "4997Botany22",
-        "registry": "Internal",
+        "registry": "Internal/ecometric",
         "source": "Project Plan, Baseline Report",
-        "occurrences": "2022 baseline documents",
-        "notes": "Internal project name for 2022 baseline period"
+        "notes": "Internal project name for 2022. Intentionally filtered by system as 'filename prefix' pattern."
       },
       {
         "value": "4998Botany23",
-        "registry": "Internal",
-        "source": "Monitoring reports",
-        "occurrences": "2023 monitoring documents",
-        "notes": "Internal project name for 2023 monitoring period"
+        "registry": "Internal/ecometric",
+        "source": "Monitoring reports, GHG Emissions",
+        "notes": "Internal project name for 2023. Intentionally filtered by system as 'filename prefix' pattern."
       }
     ]
   },
@@ -70,31 +72,29 @@
     {
       "value": "2022-01-01",
       "field_type": "project_start_date",
-      "source": "Project Plan",
-      "notes": "Project start date documented in Project Plan, Section 1.8"
+      "source": "Project Plan, Section 1.8",
+      "notes": "Project start date documented in Project Plan"
     },
     {
       "value": "2022-01-01",
       "field_type": "crediting_period_start",
       "source": "Project Plan",
       "notes": "Crediting period starts with project"
-    },
-    {
-      "value": "2023-08-09",
-      "field_type": "submission_date",
-      "source": "Project Plan",
-      "notes": "Document submission/update date from cover page"
     }
   ],
   "validation_notes": {
-    "dates": "Project Plan contains: project_start_date (2022-01-01), crediting_period_start (2022-01-01), submission_date (2023-08-09). Baseline Report contains: imagery_date (2022-06-15), sampling_date (2022-08-20). These dates should align within the 120-day validation window.",
-    "land_tenure": "Nicholas Denman owns the property. Name may appear as 'Nick Denman' or 'N. Denman' in some documents. Total area is 120.5 hectares.",
-    "project_ids": "Official Regen Network ID is C06-006 (appears in Registry Agent Review documents). Internal project names are 4997Botany22 (2022) and 4998Botany23 (2023). The Project Plan only contains internal names, not the Regen Network ID."
+    "dates": "Extractable dates: project_start_date (2022-01-01), crediting_period_start (2022-01-01), sampling_date (2023-02-06). Some dates like submission_date and imagery_date are either not in documents or in formats not reliably extracted.",
+    "land_tenure": "Nick Denman owns 100% of the Project Area. Name appears as 'Nick Denman' in Project Plan Section 1.7. Total Project Area is 82.08 hectares (from Baseline Report Page 2).",
+    "project_ids": "Official Regen Network ID is C06-006 (appears in Registry Agent Review documents). Internal IDs (4997Botany22, 4998Botany23) are intentionally filtered out as 'filename prefixes' by the extraction system."
   },
   "acceptable_variations": {
     "owner_name": ["Nicholas Denman", "Nick Denman", "N. Denman", "Denman"],
+    "area_hectares": {
+      "tolerance_percent": 5,
+      "notes": "Allow 5% tolerance for area measurements"
+    },
     "dates": {
-      "formats": ["2022-01-01", "01/01/2022", "1 January 2022", "January 1, 2022"],
+      "formats": ["2022-01-01", "01/01/2022", "1 January 2022", "January 1, 2022", "06/02/2023", "2023-02-06"],
       "tolerance_days": 0
     }
   }

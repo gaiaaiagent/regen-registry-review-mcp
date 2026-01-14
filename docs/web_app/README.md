@@ -4,9 +4,10 @@
 
 A purpose-built web application for carbon credit project verification, transforming the existing MCP-based workflow into a document-centric interface with an embedded AI assistant.
 
-**Status:** MVP Development (Phases 1-7 Complete)
-**Version:** 1.5
+**Status:** MVP Development (Phases 1-9 Complete, Deployed to Production)
+**Version:** 1.7
 **Updated:** January 2026
+**Live URL:** https://registry.regen.gaiaai.xyz/
 
 ---
 
@@ -169,7 +170,7 @@ The following are already built and will be reused:
 
 The web application frontend is located in `/web_app/` with the following completed features:
 
-### Completed Phases (1-7)
+### Completed Phases (1-9)
 
 | Phase | Features |
 |-------|----------|
@@ -180,6 +181,8 @@ The web application frontend is located in `/web_app/` with the following comple
 | **5. Checklist Panel** | Category accordions, requirement cards, evidence preview, cross-panel navigation |
 | **6. Evidence Linking** | @dnd-kit drag-and-drop, scratchpad, manual evidence with toast notifications |
 | **7. AI Chat** | Agent endpoint, context-aware chat, action buttons with confirmation |
+| **8. PDF Highlighting** | Click evidence → navigate to PDF page, bounding box highlighting |
+| **9. Verification Workflow** | Per-snippet verify/reject buttons, verification progress tracking |
 
 ### Running the Application
 
@@ -193,22 +196,44 @@ npm run dev
 python chatgpt_rest_api.py
 ```
 
-### Remaining Phases (8-12)
+### Remaining Phases (10-12)
 
-- **8. Cross-Validation** - Fact sheets, stale badges, one-click refresh
-- **9. Google Drive** - Import documents from shared folders
 - **10. Proponent Flow** - Revision requests, responses, notifications
-- **11. Report Generation** - Markdown/JSON export
-- **12. Polish & Production** - Error handling, performance, deployment
+- **11. Report Generation** - Markdown/JSON export with full evidence citations
+- **12. Polish & Production** - Error handling, performance optimization
+
+---
+
+## Production Deployment
+
+The application is deployed at **https://registry.regen.gaiaai.xyz/**
+
+### Architecture
+- **Server:** `202.61.196.119`
+- **Backend:** FastAPI service (`registry-review-api.service`) on port 8003
+- **Frontend:** Static files in `/opt/projects/registry-review/web_app/dist/`
+- **Proxy:** nginx (Docker) with SSL from Let's Encrypt wildcard cert
+
+### Server Commands
+```bash
+# Check status
+sudo systemctl status registry-review-api
+
+# View logs
+journalctl -u registry-review-api -f
+
+# Restart
+sudo systemctl restart registry-review-api
+```
 
 ---
 
 ## Next Steps
 
-1. Complete Phase 8: Cross-Validation & Fact Sheets
-2. Implement real Google OAuth (requires backend endpoint)
-3. Test end-to-end with Botany Farm dataset
-4. Deploy to production server (202.61.196.119)
+1. **Phase 10: Proponent Flow** - Revision requests and responses
+2. **Phase 11: Report Generation** - Export review reports with full citations
+3. Implement real Google OAuth (requires backend endpoint)
+4. Multi-reviewer support (future)
 
 ---
 
@@ -222,3 +247,5 @@ python chatgpt_rest_api.py
 | v1.3 | January 2026 | Restructured into separate frontend/backend docs; added AI agent |
 | v1.4 | January 2026 | Switch to Vite + React 19 (align with GAIA); add Google Drive + Mailjet |
 | v1.5 | January 2026 | Phases 1-7 implemented; added Current Implementation section |
+| v1.6 | January 2026 | Added Phase 9B: Verification Workflow ("DocuSign with AI" pattern) |
+| v1.7 | January 2026 | Phases 8-9 complete (PDF highlighting, verification); deployed to production |

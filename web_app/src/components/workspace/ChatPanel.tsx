@@ -261,14 +261,15 @@ function EmptyState() {
       <MessageSquare className="h-12 w-12 text-muted-foreground/30 mb-4" />
       <h3 className="font-medium text-sm">AI Assistant</h3>
       <p className="text-xs text-muted-foreground mt-2 max-w-[200px]">
-        Ask questions about the review, search for evidence, or get help understanding requirements.
+        Ask questions about the review, search for evidence, or get help navigating documents.
       </p>
       <div className="mt-4 space-y-2 text-xs text-muted-foreground">
         <p className="font-medium">Try asking:</p>
-        <ul className="space-y-1">
+        <ul className="space-y-1 text-left">
+          <li>"Show me where you found the project start date"</li>
           <li>"What evidence do we have for land tenure?"</li>
           <li>"Which requirements are missing evidence?"</li>
-          <li>"Summarize the project status"</li>
+          <li>"Navigate to the baseline report section"</li>
         </ul>
       </div>
     </div>

@@ -19,9 +19,14 @@ class UnsafeDeleteError(Exception):
 
 
 # Paths that ARE safe to delete (allowlist approach)
+# Note: /private/tmp/ and /private/var are included for macOS where /tmp is a symlink
+# and pytest creates temp dirs in /var/folders/
 SAFE_PATH_PREFIXES = (
     "/tmp/",
     "/var/tmp/",
+    "/var/folders/",
+    "/private/tmp/",
+    "/private/var/",
 )
 
 

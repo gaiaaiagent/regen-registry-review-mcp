@@ -3,35 +3,45 @@ import { api } from '@/lib/api'
 
 export type ValidationStatus = 'pass' | 'warning' | 'error'
 
+export interface SourceReference {
+  document_id: string
+  document_name: string
+  page_number: number
+}
+
 export interface ValidationIssue {
   requirement_id: string
   message: string
   severity: 'warning' | 'error'
+  source?: SourceReference
 }
 
-export interface DateAlignmentRow {
+export interface FactSheetRowBase {
   document: string
+  document_id?: string
+  page_number?: number
+  review_status?: 'pending' | 'approved' | 'rejected'
+}
+
+export interface DateAlignmentRow extends FactSheetRowBase {
   start_date: string | null
   end_date: string | null
   document_type: string
 }
 
-export interface LandTenureRow {
-  document: string
+export interface LandTenureRow extends FactSheetRowBase {
   owner_name: string | null
   area_hectares: number | null
   tenure_type: string | null
   expiry_date: string | null
 }
 
-export interface ProjectIdRow {
-  document: string
+export interface ProjectIdRow extends FactSheetRowBase {
   project_id: string | null
   document_type: string
 }
 
-export interface QuantificationRow {
-  document: string
+export interface QuantificationRow extends FactSheetRowBase {
   metric: string
   value: number | null
   unit: string | null

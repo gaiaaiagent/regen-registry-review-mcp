@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Save, Download } from 'lucide-react'
+import { AssignProponentDialog } from './AssignProponentDialog'
 
 interface WorkflowProgress {
   current_stage: number
@@ -10,6 +11,7 @@ interface WorkflowProgress {
 }
 
 interface WorkspaceHeaderProps {
+  sessionId: string
   projectName: string
   methodology: string
   workflowProgress: WorkflowProgress
@@ -27,6 +29,7 @@ const WORKFLOW_STAGES = [
 ] as const
 
 export function WorkspaceHeader({
+  sessionId,
   projectName,
   methodology,
   workflowProgress,
@@ -89,6 +92,10 @@ export function WorkspaceHeader({
         <div className="h-6 w-px bg-border" />
 
         <div className="flex items-center gap-2">
+          <AssignProponentDialog
+            sessionId={sessionId}
+            projectName={projectName}
+          />
           <Button variant="outline" size="sm" onClick={onSave}>
             <Save className="h-4 w-4 mr-2" />
             Save

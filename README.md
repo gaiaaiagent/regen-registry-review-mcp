@@ -1,19 +1,42 @@
 # Registry Review MCP Server
 
-MCP server that automates carbon credit project registration reviews through an eight-stage workflow.
+MCP server and web application that automates carbon credit project registration reviews through an eight-stage workflow.
 
 ## Overview
 
-The Registry Review MCP Server transforms a 6-8 hour manual document review into a guided workflow where AI handles document organization, data extraction, and consistency checking while humans provide expertise, judgment, and final approval.
+The Registry Review system transforms a 6-8 hour manual document review into a 60-90 minute guided workflow where AI handles document organization, data extraction, and consistency checking while humans provide expertise, judgment, and final approval.
 
 **Core Capabilities:**
 - Document discovery and intelligent classification
 - Requirement mapping with semantic matching
-- Evidence extraction with page citations
+- Evidence extraction with PDF bounding box coordinates for click-to-highlight
 - Cross-document validation (dates, land tenure, project IDs)
 - Structured report generation (Markdown + JSON)
+- Web-based review workspace with side-by-side document viewing
+
+## Live Deployment
+
+The application is deployed at: **https://registry.regen.gaiaai.xyz/**
 
 ## Quick Start
+
+### Web Application (Recommended)
+
+```bash
+# Install dependencies
+uv sync
+cd web_app && npm install && cd ..
+
+# Start backend API (port 8003)
+python chatgpt_rest_api.py
+
+# In another terminal, start frontend (port 5173)
+cd web_app && npm run dev
+```
+
+Then open http://localhost:5173 in your browser.
+
+### MCP Server Only (Claude Desktop)
 
 ```bash
 # Install dependencies
@@ -183,6 +206,37 @@ Finalize and archive the review.
 
 Each stage auto-selects the most recent session, so you can run them in sequence without specifying session IDs.
 
+## Web Application
+
+The `web_app/` directory contains a React-based review workspace that provides:
+
+- **Three-panel layout:** PDF viewer, checklist, and AI chat side-by-side
+- **Click-to-highlight:** Evidence snippets link to exact PDF locations with bounding boxes
+- **Drag-and-drop:** Link manual evidence from scratchpad to requirements
+- **AI assistance:** Chat panel for questions, automation, and explanations
+- **Verification workflow:** DocuSign-style verify/reject for each evidence snippet
+
+See [docs/web_app/README.md](docs/web_app/README.md) for detailed frontend documentation.
+
+### Running Locally
+
+```bash
+# Terminal 1: Backend API
+python chatgpt_rest_api.py
+
+# Terminal 2: Frontend dev server
+cd web_app && npm run dev
+```
+
+### Production Deployment
+
+The application is deployed to `registry.regen.gaiaai.xyz` via:
+- **Backend:** systemd service (`registry-review-api.service`) running FastAPI on port 8003
+- **Frontend:** Built static files served by nginx
+- **Proxy:** nginx routes `/api/` to the backend
+
+See server management commands in the deployment section.
+
 ## Available Tools
 
 **Session Management:**
@@ -234,18 +288,28 @@ regen-registry-review-mcp/
 ├── src/registry_review_mcp/
 │   ├── server.py           # MCP entry point
 │   ├── config/             # Settings management
-│   ├── extractors/         # PDF and LLM extraction
-│   ├── models/             # Pydantic models
+│   ├── extractors/         # PDF, LLM extraction, coordinate resolution
+│   ├── models/             # Pydantic models (evidence, verification)
 │   ├── prompts/            # A-H workflow prompts
 │   ├── services/           # Document processing
 │   ├── tools/              # MCP tool implementations
 │   └── utils/              # State, cache, helpers
+├── web_app/                # React frontend
+│   ├── src/
+│   │   ├── components/     # UI components (workspace/, ui/)
+│   │   ├── contexts/       # React contexts (Auth, Workspace)
+│   │   ├── hooks/          # Custom hooks (useWorkspace, useVerification)
+│   │   ├── pages/          # Route pages (Dashboard, SessionWorkspace)
+│   │   └── lib/            # API client, utilities
+│   └── dist/               # Production build output
+├── chatgpt_rest_api.py     # FastAPI backend (45+ endpoints)
 ├── data/
 │   ├── checklists/         # Methodology requirements (JSON)
 │   ├── sessions/           # Active sessions (gitignored)
 │   └── cache/              # Cached extractions (gitignored)
 ├── tests/                  # Test suite
 ├── docs/
+│   ├── web_app/            # Web application documentation
 │   └── specs/              # Workflow specifications
 └── examples/               # Test data (Botany Farm)
 ```
@@ -272,8 +336,54 @@ See `pytest.ini` for marker configuration.
 ## Requirements
 
 - Python >= 3.10
+- Node.js >= 18 (for web app)
 - [uv](https://github.com/astral-sh/uv) package manager
 - 4GB RAM minimum (8GB recommended for large PDFs)
+
+## Production Deployment
+
+The application is deployed at **https://registry.regen.gaiaai.xyz/** on server `202.61.196.119`.
+
+### Server Management
+
+```bash
+# SSH to server
+ssh darren@202.61.196.119
+
+# Check backend status
+sudo systemctl status registry-review-api
+
+# View backend logs
+journalctl -u registry-review-api -f
+
+# Restart backend
+sudo systemctl restart registry-review-api
+
+# Check nginx logs
+docker logs nginx --tail 50
+```
+
+### Redeploying
+
+```bash
+# From local machine
+rsync -avz --exclude='.venv' --exclude='node_modules' --exclude='examples' \
+  . darren@202.61.196.119:/opt/projects/registry-review/
+
+# On server: rebuild and restart
+ssh darren@202.61.196.119
+cd /opt/projects/registry-review
+uv sync
+cd web_app && npm install && npm run build
+sudo systemctl restart registry-review-api
+```
+
+### Architecture
+
+- **Backend:** FastAPI (`chatgpt_rest_api.py`) running via systemd on port 8003
+- **Frontend:** React/Vite static files in `/opt/projects/registry-review/web_app/dist/`
+- **Proxy:** nginx (Docker) routes `registry.regen.gaiaai.xyz` to backend and serves frontend
+- **SSL:** Let's Encrypt wildcard certificate for `*.regen.gaiaai.xyz`
 
 ## License
 

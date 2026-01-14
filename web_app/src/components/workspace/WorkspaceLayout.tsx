@@ -1,9 +1,10 @@
 import { useCallback } from 'react'
 import { toast } from 'sonner'
+import { useQueryClient } from '@tanstack/react-query'
 import { Group, Panel, Separator } from 'react-resizable-panels'
 import { WorkspaceHeader } from './WorkspaceHeader'
 import { DocumentPanel } from './DocumentPanel'
-import { MiddlePanel } from './MiddlePanel'
+import { ToolsPanel } from './MiddlePanel'
 import { ChatPanel } from './ChatPanel'
 import { DragDropProvider } from './DragDropProvider'
 import { WorkspaceProvider, type DragData } from '@/contexts/WorkspaceContext'
@@ -33,6 +34,7 @@ function WorkspaceContent({
   documents,
   getDocumentUrl,
 }: WorkspaceLayoutProps) {
+  const queryClient = useQueryClient()
   const { addEvidence, linkToRequirement } = useManualEvidence(sessionId)
 
   const handleSave = () => {
@@ -89,10 +91,16 @@ function WorkspaceContent({
     [addEvidence, linkToRequirement]
   )
 
+  const handleDocumentsImported = useCallback(() => {
+    // Invalidate session query to refresh document list
+    queryClient.invalidateQueries({ queryKey: ['session', sessionId] })
+  }, [queryClient, sessionId])
+
   return (
     <DragDropProvider onDrop={handleDrop}>
       <div className="h-screen flex flex-col">
         <WorkspaceHeader
+          sessionId={sessionId}
           projectName={projectName}
           methodology={methodology}
           workflowProgress={workflowProgress}
@@ -102,24 +110,20 @@ function WorkspaceContent({
 
         <div className="flex-1 overflow-hidden">
           <Group orientation="horizontal" className="h-full">
-            <Panel defaultSize={50} minSize={30} maxSize={70}>
+            <Panel defaultSize={65} minSize={40} maxSize={80}>
               <DocumentPanel
+                sessionId={sessionId}
                 documents={documents}
                 getDocumentUrl={getDocumentUrl}
                 onClipText={handleClipText}
+                onDocumentsImported={handleDocumentsImported}
               />
             </Panel>
 
             <Separator className="w-1.5 bg-border hover:bg-primary/20 transition-colors cursor-col-resize" />
 
-            <Panel defaultSize={25} minSize={20} maxSize={45}>
-              <MiddlePanel sessionId={sessionId} />
-            </Panel>
-
-            <Separator className="w-1.5 bg-border hover:bg-primary/20 transition-colors cursor-col-resize" />
-
-            <Panel defaultSize={25} minSize={20} maxSize={45}>
-              <ChatPanel />
+            <Panel defaultSize={35} minSize={20} maxSize={50}>
+              <ToolsPanel sessionId={sessionId} />
             </Panel>
           </Group>
         </div>

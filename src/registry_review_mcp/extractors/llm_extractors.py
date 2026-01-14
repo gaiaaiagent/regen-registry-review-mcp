@@ -1,14 +1,15 @@
 """
 LLM-powered field extraction for cross-document validation.
 
-Uses Anthropic Claude API to extract structured fields from unstructured
-evidence (markdown + images) with confidence scoring.
+Supports multiple LLM providers (Anthropic, Gemini, OpenAI) via LiteLLM.
+Uses structured prompts to extract fields from unstructured evidence.
 """
 
 import asyncio
 import base64
 import json
 import logging
+import os
 import random
 import re
 import time
@@ -25,8 +26,21 @@ from anthropic import (
 from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
 
+# LiteLLM for multi-provider support
+import litellm
+from litellm import acompletion
+from litellm.exceptions import (
+    RateLimitError as LiteLLMRateLimitError,
+    ServiceUnavailableError,
+    APIConnectionError as LiteLLMAPIConnectionError,
+    Timeout as LiteLLMTimeout,
+)
+
 from ..config.settings import settings
 from ..utils.cache import Cache
+
+# Suppress LiteLLM debug output
+litellm.suppress_debug_info = True
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +108,7 @@ class BaseExtractor:
     """Base class for LLM-powered field extractors.
 
     Provides shared functionality for chunking, image distribution, and caching.
+    Supports multiple LLM providers via LiteLLM (Anthropic, Gemini, OpenAI).
     """
 
     def __init__(self, cache_namespace: str, client: AsyncAnthropic | None = None):
@@ -101,10 +116,103 @@ class BaseExtractor:
 
         Args:
             cache_namespace: Namespace for caching (e.g., "date_extraction")
-            client: Optional AsyncAnthropic client (will create new one if not provided)
+            client: Optional AsyncAnthropic client (only used for anthropic provider)
         """
-        self.client = client or AsyncAnthropic(api_key=settings.anthropic_api_key)
+        self.provider = settings.llm_provider
+        self.use_litellm = self.provider in ("gemini", "openai")
+
+        if self.use_litellm:
+            # Set up API keys for LiteLLM
+            if self.provider == "gemini":
+                os.environ["GEMINI_API_KEY"] = settings.google_api_key
+            elif self.provider == "openai":
+                os.environ["OPENAI_API_KEY"] = settings.openai_api_key
+            self.client = None  # LiteLLM doesn't use a client object
+        else:
+            # Use Anthropic directly
+            self.client = client or AsyncAnthropic(api_key=settings.anthropic_api_key)
+
         self.cache = Cache(cache_namespace)
+
+    async def _call_litellm_with_retry(
+        self,
+        system_prompt: str,
+        user_content: str | list,
+        max_retries: int = 3,
+        initial_delay: float = 1.0,
+        max_delay: float = 32.0,
+    ) -> dict[str, Any]:
+        """Call LiteLLM API with exponential backoff retry.
+
+        Args:
+            system_prompt: System prompt text
+            user_content: User message content (text or list of content parts)
+            max_retries: Maximum retry attempts
+            initial_delay: Initial delay between retries
+            max_delay: Maximum delay between retries
+
+        Returns:
+            Dict with 'text' and 'usage' keys
+        """
+        delay = initial_delay
+        last_exception = None
+        model = settings.get_active_llm_model()
+
+        # Build messages
+        messages = [
+            {"role": "system", "content": system_prompt},
+        ]
+
+        # Handle content (text or multimodal)
+        if isinstance(user_content, str):
+            messages.append({"role": "user", "content": user_content})
+        else:
+            # For multimodal content, convert to LiteLLM format
+            messages.append({"role": "user", "content": user_content})
+
+        for attempt in range(max_retries + 1):
+            try:
+                response = await acompletion(
+                    model=model,
+                    messages=messages,
+                    max_tokens=settings.llm_max_tokens,
+                    temperature=settings.llm_temperature,
+                )
+
+                return {
+                    "text": response.choices[0].message.content,
+                    "usage": {
+                        "input_tokens": response.usage.prompt_tokens,
+                        "output_tokens": response.usage.completion_tokens,
+                    },
+                    "model": response.model,
+                }
+
+            except (LiteLLMRateLimitError, ServiceUnavailableError, LiteLLMAPIConnectionError, LiteLLMTimeout) as e:
+                last_exception = e
+                error_type = type(e).__name__
+
+                if attempt < max_retries:
+                    jitter = delay * 0.25 * (2 * random.random() - 1)
+                    sleep_time = min(delay + jitter, max_delay)
+
+                    logger.warning(
+                        f"LiteLLM API call failed with {error_type} (attempt {attempt + 1}/{max_retries + 1}). "
+                        f"Retrying in {sleep_time:.2f}s..."
+                    )
+
+                    await asyncio.sleep(sleep_time)
+                    delay = min(delay * 2, max_delay)
+                else:
+                    logger.error(f"LiteLLM API call failed after {max_retries + 1} attempts: {str(e)}")
+                    raise
+
+            except Exception as e:
+                logger.error(f"LiteLLM API call failed: {type(e).__name__}: {str(e)}")
+                raise
+
+        if last_exception:
+            raise last_exception
 
     async def _call_api_with_retry(
         self,
@@ -520,39 +628,50 @@ class DateExtractor(BaseExtractor):
                 except Exception as e:
                     logger.warning(f"Failed to load image {img_path}: {e}")
 
-        # Call Anthropic API with retry logic and prompt caching
-        # Mark system prompt for caching to save 90% on repeated extractions
+        # Call LLM API with retry logic
         try:
             start_time = time.time()
-            response = await self._call_api_with_retry(
-                self.client.messages.create,
-                model=settings.llm_model,
-                max_tokens=settings.llm_max_tokens,
-                temperature=settings.llm_temperature,
-                system=[
-                    {
-                        "type": "text",
-                        "text": DATE_EXTRACTION_PROMPT,
-                        "cache_control": {"type": "ephemeral"}
-                    }
-                ],
-                messages=[{"role": "user", "content": content}],
-                timeout=settings.api_call_timeout_seconds,
-            )
+            model = settings.get_active_llm_model()
+
+            if self.use_litellm:
+                # Use LiteLLM for Gemini/OpenAI
+                result = await self._call_litellm_with_retry(
+                    system_prompt=DATE_EXTRACTION_PROMPT,
+                    user_content=content,
+                )
+                response_text = result["text"]
+                usage = result["usage"]
+            else:
+                # Use Anthropic directly with prompt caching
+                response = await self._call_api_with_retry(
+                    self.client.messages.create,
+                    model=model,
+                    max_tokens=settings.llm_max_tokens,
+                    temperature=settings.llm_temperature,
+                    system=[
+                        {
+                            "type": "text",
+                            "text": DATE_EXTRACTION_PROMPT,
+                            "cache_control": {"type": "ephemeral"}
+                        }
+                    ],
+                    messages=[{"role": "user", "content": content}],
+                    timeout=settings.api_call_timeout_seconds,
+                )
+                response_text = response.content[0].text
+                usage = response.usage.model_dump() if hasattr(response, "usage") else {}
+
             duration = time.time() - start_time
 
             # Track cost if tracker is enabled
             _track_api_call(
-                model=settings.llm_model,
+                model=model,
                 extractor="date",
                 document_name=chunk_name,
-                usage=response.usage.model_dump() if hasattr(response, "usage") else {},
+                usage=usage,
                 duration=duration,
                 cached=False,
             )
-
-            # Parse response
-            response_text = response.content[0].text
 
             # Extract and validate JSON from response
             json_str = extract_json_from_response(response_text)
@@ -725,38 +844,50 @@ class LandTenureExtractor(BaseExtractor):
                     except Exception as e:
                         logger.warning(f"Failed to load image {img_path}: {e}")
 
-            # Call Anthropic API with retry logic and prompt caching
+            # Call LLM API with retry logic
             try:
                 start_time = time.time()
-                response = await self._call_api_with_retry(
-                    self.client.messages.create,
-                    model=settings.llm_model,
-                    max_tokens=settings.llm_max_tokens,
-                    temperature=settings.llm_temperature,
-                    system=[
-                        {
-                            "type": "text",
-                            "text": LAND_TENURE_EXTRACTION_PROMPT,
-                            "cache_control": {"type": "ephemeral"}
-                        }
-                    ],
-                    messages=[{"role": "user", "content": content}],
-                    timeout=settings.api_call_timeout_seconds,
-                )
+                model = settings.get_active_llm_model()
+
+                if self.use_litellm:
+                    # Use LiteLLM for Gemini/OpenAI
+                    result = await self._call_litellm_with_retry(
+                        system_prompt=LAND_TENURE_EXTRACTION_PROMPT,
+                        user_content=content,
+                    )
+                    response_text = result["text"]
+                    usage = result["usage"]
+                else:
+                    # Use Anthropic directly with prompt caching
+                    response = await self._call_api_with_retry(
+                        self.client.messages.create,
+                        model=model,
+                        max_tokens=settings.llm_max_tokens,
+                        temperature=settings.llm_temperature,
+                        system=[
+                            {
+                                "type": "text",
+                                "text": LAND_TENURE_EXTRACTION_PROMPT,
+                                "cache_control": {"type": "ephemeral"}
+                            }
+                        ],
+                        messages=[{"role": "user", "content": content}],
+                        timeout=settings.api_call_timeout_seconds,
+                    )
+                    response_text = response.content[0].text
+                    usage = response.usage.model_dump() if hasattr(response, "usage") else {}
+
                 duration = time.time() - start_time
 
                 # Track cost if tracker is enabled
                 _track_api_call(
-                    model=settings.llm_model,
+                    model=model,
                     extractor="tenure",
                     document_name=chunk_name,
-                    usage=response.usage.model_dump() if hasattr(response, "usage") else {},
+                    usage=usage,
                     duration=duration,
                     cached=False,
                 )
-
-                # Parse response
-                response_text = response.content[0].text
 
                 # Extract and validate JSON from response
                 json_str = extract_json_from_response(response_text)
@@ -915,38 +1046,50 @@ class ProjectIDExtractor(BaseExtractor):
                     except Exception as e:
                         logger.warning(f"Failed to load image {img_path}: {e}")
 
-            # Call Anthropic API with retry logic and prompt caching
+            # Call LLM API with retry logic
             try:
                 start_time = time.time()
-                response = await self._call_api_with_retry(
-                    self.client.messages.create,
-                    model=settings.llm_model,
-                    max_tokens=settings.llm_max_tokens,
-                    temperature=settings.llm_temperature,
-                    system=[
-                        {
-                            "type": "text",
-                            "text": PROJECT_ID_EXTRACTION_PROMPT,
-                            "cache_control": {"type": "ephemeral"}
-                        }
-                    ],
-                    messages=[{"role": "user", "content": content}],
-                    timeout=settings.api_call_timeout_seconds,
-                )
+                model = settings.get_active_llm_model()
+
+                if self.use_litellm:
+                    # Use LiteLLM for Gemini/OpenAI
+                    result = await self._call_litellm_with_retry(
+                        system_prompt=PROJECT_ID_EXTRACTION_PROMPT,
+                        user_content=content,
+                    )
+                    response_text = result["text"]
+                    usage = result["usage"]
+                else:
+                    # Use Anthropic directly with prompt caching
+                    response = await self._call_api_with_retry(
+                        self.client.messages.create,
+                        model=model,
+                        max_tokens=settings.llm_max_tokens,
+                        temperature=settings.llm_temperature,
+                        system=[
+                            {
+                                "type": "text",
+                                "text": PROJECT_ID_EXTRACTION_PROMPT,
+                                "cache_control": {"type": "ephemeral"}
+                            }
+                        ],
+                        messages=[{"role": "user", "content": content}],
+                        timeout=settings.api_call_timeout_seconds,
+                    )
+                    response_text = response.content[0].text
+                    usage = response.usage.model_dump() if hasattr(response, "usage") else {}
+
                 duration = time.time() - start_time
 
                 # Track cost if tracker is enabled
                 _track_api_call(
-                    model=settings.llm_model,
+                    model=model,
                     extractor="project_id",
                     document_name=chunk_name,
-                    usage=response.usage.model_dump() if hasattr(response, "usage") else {},
+                    usage=usage,
                     duration=duration,
                     cached=False,
                 )
-
-                # Parse response
-                response_text = response.content[0].text
 
                 # Extract and validate JSON from response
                 json_str = extract_json_from_response(response_text)
@@ -1210,6 +1353,7 @@ async def extract_fields_with_llm(
     Extract structured fields from evidence using LLM.
 
     Main entry point called by cross_validate().
+    Supports multiple providers: Anthropic, Gemini, OpenAI (via LiteLLM).
 
     Args:
         session_id: Session identifier
@@ -1223,10 +1367,17 @@ async def extract_fields_with_llm(
             "project_ids": [ExtractedField, ...]
         }
     """
-    if not settings.anthropic_api_key:
-        raise ValueError("ANTHROPIC_API_KEY not set - required for LLM extraction")
+    # Validate API key based on provider
+    provider = settings.llm_provider
+    if provider == "anthropic" and not settings.anthropic_api_key:
+        raise ValueError("ANTHROPIC_API_KEY not set - required for Anthropic LLM extraction")
+    elif provider == "gemini" and not settings.google_api_key:
+        raise ValueError("GOOGLE_API_KEY not set - required for Gemini LLM extraction")
+    elif provider == "openai" and not settings.openai_api_key:
+        raise ValueError("OPENAI_API_KEY not set - required for OpenAI LLM extraction")
 
-    client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+    # Create extractors - they handle provider selection internally
+    client = AsyncAnthropic(api_key=settings.anthropic_api_key) if provider == "anthropic" else None
     date_extractor = DateExtractor(client)
     tenure_extractor = LandTenureExtractor(client)
     project_id_extractor = ProjectIDExtractor(client)

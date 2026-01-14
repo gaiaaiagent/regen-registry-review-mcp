@@ -22,6 +22,8 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from registry_review_mcp.tools import session_tools, document_tools
 from registry_review_mcp.tools.evidence_tools import extract_all_evidence
 from registry_review_mcp.tools.mapping_tools import map_all_requirements
+from registry_review_mcp.tools.validation_tools import cross_validate
+from registry_review_mcp.tools.report_tools import generate_review_report
 
 
 async def main():
@@ -100,14 +102,49 @@ async def main():
             print(f"  Message: {result_data.get('message', 'Complete')}")
         print()
 
-        # Stage 5-8 status
+        # Stage 5: Cross-Validation
         print("=" * 80)
-        print("REMAINING STAGES")
+        print("STAGE 5: CROSS-VALIDATION")
         print("=" * 80)
-        print("Stage 5: Cross-Referencing - Not yet implemented")
-        print("Stage 6: Report Generation - Not yet implemented")
-        print("Stage 7: Human Review - Not yet implemented")
-        print("Stage 8: Completion - Not yet implemented")
+        result_data = await cross_validate(session_id=session_id)
+        print(f"✓ Cross-validation complete")
+        if isinstance(result_data, dict):
+            print(f"  Validations run: {result_data.get('validations_run', 'N/A')}")
+            print(f"  Issues found: {result_data.get('issues_found', 'N/A')}")
+            if 'summary' in result_data:
+                summary = result_data['summary']
+                print(f"  Date alignment: {summary.get('date_alignment', 'N/A')}")
+                print(f"  Land tenure: {summary.get('land_tenure', 'N/A')}")
+                print(f"  Project ID: {summary.get('project_id', 'N/A')}")
+        print()
+
+        # Stage 6: Report Generation
+        print("=" * 80)
+        print("STAGE 6: REPORT GENERATION")
+        print("=" * 80)
+        result_data = await generate_review_report(session_id=session_id)
+        print(f"✓ Report generated")
+        if isinstance(result_data, dict):
+            print(f"  Report sections: {len(result_data.get('sections', []))}")
+            print(f"  Overall status: {result_data.get('overall_status', 'N/A')}")
+            if 'summary' in result_data:
+                summary = result_data['summary']
+                print(f"  Requirements covered: {summary.get('requirements_covered', 'N/A')}")
+                print(f"  Evidence items: {summary.get('evidence_items', 'N/A')}")
+        print()
+
+        # Stage 7: Human Review (skip for automated backtest)
+        print("=" * 80)
+        print("STAGE 7: HUMAN REVIEW")
+        print("=" * 80)
+        print("⏭️  Skipped (automated backtest - no human review needed)")
+        print()
+
+        # Stage 8: Completion
+        print("=" * 80)
+        print("STAGE 8: COMPLETION")
+        print("=" * 80)
+        print("✓ Backtest workflow complete")
         print()
 
         # Verify session state

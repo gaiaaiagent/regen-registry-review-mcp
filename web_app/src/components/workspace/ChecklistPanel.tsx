@@ -14,6 +14,7 @@ import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { CategoryAccordion } from './CategoryAccordion'
 import { EvidenceScratchpad } from './EvidenceScratchpad'
+import { VerificationProgress } from './VerificationProgress'
 import { useWorkspaceRequirements } from '@/hooks/useWorkspace'
 import { useManualEvidence, type ScratchpadItem } from '@/hooks/useManualEvidence'
 import { cn } from '@/lib/utils'
@@ -181,6 +182,10 @@ export function ChecklistPanel({ sessionId: propSessionId }: ChecklistPanelProps
         )}
       </div>
 
+      <div className="px-4 py-2">
+        <VerificationProgress sessionId={sessionId ?? null} />
+      </div>
+
       <div className="flex-1 overflow-y-auto p-2">
         <CategoryAccordion
           categories={requirementsByCategory}
@@ -188,6 +193,7 @@ export function ChecklistPanel({ sessionId: propSessionId }: ChecklistPanelProps
           onExpandedChange={setExpandedCategories}
           manualEvidence={linkedEvidence}
           onUnlinkEvidence={handleUnlinkEvidence}
+          sessionId={sessionId}
         />
       </div>
 

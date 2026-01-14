@@ -18,7 +18,7 @@ interface PDFDocument {
   }>
 }
 import { useHighlights } from '@/hooks/useHighlights'
-import { useWorkspaceContext, type DragData } from '@/contexts/WorkspaceContext'
+import { useWorkspaceContext, type DragData, type ExternalHighlight } from '@/contexts/WorkspaceContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -143,6 +143,131 @@ function SelectionTip({ position, content, onConfirm, onClip, hideTipAndSelectio
       </div>
     </div>
   )
+}
+
+interface ExternalHighlightOverlayProps {
+  highlight: ExternalHighlight
+  containerRef: React.RefObject<HTMLDivElement | null>
+}
+
+function ExternalHighlightOverlay({ highlight, containerRef }: ExternalHighlightOverlayProps) {
+  // Create a unique ID for this highlight based on its content
+  // Replace periods with underscores to create valid CSS selectors
+  const highlightId = `ext-highlight-${highlight.pageNumber}-${highlight.boundingBox.x0.toFixed(4).replace('.', '_')}`
+
+  useEffect(() => {
+    let mounted = true
+    let observer: MutationObserver | null = null
+    let highlightDiv: HTMLDivElement | null = null
+
+    const createHighlightElement = (): HTMLDivElement => {
+      const { x0, y0, x1, y1 } = highlight.boundingBox
+      const div = document.createElement('div')
+      div.id = highlightId
+      div.className = 'external-highlight-overlay'
+      div.style.cssText = `
+        position: absolute;
+        left: ${x0 * 100}%;
+        top: ${y0 * 100}%;
+        width: ${(x1 - x0) * 100}%;
+        height: ${(y1 - y0) * 100}%;
+        background-color: rgba(59, 130, 246, 0.3);
+        border: 2px solid rgb(59, 130, 246);
+        border-radius: 2px;
+        pointer-events: none;
+        z-index: 10;
+        box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+      `
+      return div
+    }
+
+    const ensureHighlight = () => {
+      if (!mounted || !containerRef.current) return
+
+      const page = containerRef.current.querySelector(
+        `[data-page-number="${highlight.pageNumber}"]`
+      ) as HTMLElement | null
+
+      if (!page) return
+
+      // Check if highlight already exists
+      if (page.querySelector(`#${highlightId}`)) return
+
+      // Ensure the page has position relative for absolute children
+      if (getComputedStyle(page).position === 'static') {
+        page.style.position = 'relative'
+      }
+
+      // Create and append highlight
+      highlightDiv = createHighlightElement()
+      page.appendChild(highlightDiv)
+    }
+
+    const setupObserver = () => {
+      if (!containerRef.current) return
+
+      // Use MutationObserver to re-add highlight if PDF viewer re-renders
+      observer = new MutationObserver(() => {
+        if (mounted) {
+          ensureHighlight()
+        }
+      })
+
+      observer.observe(containerRef.current, {
+        childList: true,
+        subtree: true,
+      })
+    }
+
+    // Initial setup with retry
+    let retryCount = 0
+    const maxRetries = 30
+
+    const init = () => {
+      if (!mounted) return
+
+      if (!containerRef.current) {
+        if (retryCount < maxRetries) {
+          retryCount++
+          setTimeout(init, 100)
+        }
+        return
+      }
+
+      const page = containerRef.current.querySelector(
+        `[data-page-number="${highlight.pageNumber}"]`
+      ) as HTMLElement | null
+
+      if (!page) {
+        if (retryCount < maxRetries) {
+          retryCount++
+          setTimeout(init, 100)
+        }
+        return
+      }
+
+      ensureHighlight()
+      setupObserver()
+    }
+
+    // Delay to let scroll complete
+    setTimeout(init, 300)
+
+    return () => {
+      mounted = false
+      if (observer) {
+        observer.disconnect()
+      }
+      // Cleanup: remove highlight element
+      const existing = document.getElementById(highlightId)
+      if (existing) {
+        existing.remove()
+      }
+    }
+  }, [highlight, containerRef, highlightId])
+
+  // This component doesn't render anything directly - it manages DOM elements
+  return null
 }
 
 function PDFContent({
@@ -291,7 +416,7 @@ export function PDFViewer({ url, documentId, onHighlightAdded, initialPage, onSc
     clearHighlights,
   } = useHighlights(documentId)
 
-  const { isDragging } = useWorkspaceContext()
+  const { isDragging, externalHighlight } = useWorkspaceContext()
 
   const [scrollToHighlightId, setScrollToHighlightId] = useState<string | null>(null)
   const [hasTextContent, setHasTextContent] = useState<boolean | null>(null)
@@ -300,17 +425,53 @@ export function PDFViewer({ url, documentId, onHighlightAdded, initialPage, onSc
   const pdfContainerRef = useRef<HTMLDivElement | null>(null)
   const pendingScrollRef = useRef<number | null>(initialPage ?? null)
 
-  const scrollToPage = useCallback((pageNumber: number) => {
-    if (pdfContainerRef.current && pageNumber >= 1) {
-      const pageElement = pdfContainerRef.current.querySelector(
-        `[data-page-number="${pageNumber}"]`
-      ) as HTMLElement | null
-      if (pageElement) {
-        pageElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const lastScrollHeightRef = useRef<number>(0)
+
+  const scrollToPage = useCallback((pageNumber: number, retryCount = 0) => {
+    const maxRetries = 25
+    const retryDelay = 120
+
+    if (pageNumber < 1) return
+
+    if (!pdfContainerRef.current) {
+      if (retryCount < maxRetries) {
+        setTimeout(() => scrollToPage(pageNumber, retryCount + 1), retryDelay)
       } else {
         pendingScrollRef.current = pageNumber
       }
+      return
     }
+
+    const scrollContainer = pdfContainerRef.current.querySelector('[class*="_container_"]') as HTMLElement | null
+    const pageElement = pdfContainerRef.current.querySelector(
+      `[data-page-number="${pageNumber}"]`
+    ) as HTMLElement | null
+
+    if (!pageElement || !scrollContainer) {
+      if (retryCount < maxRetries) {
+        setTimeout(() => scrollToPage(pageNumber, retryCount + 1), retryDelay)
+      } else {
+        pendingScrollRef.current = pageNumber
+      }
+      return
+    }
+
+    // Wait for scroll height to stabilize (indicates all pages rendered)
+    const currentScrollHeight = scrollContainer.scrollHeight
+    const heightStable = currentScrollHeight === lastScrollHeightRef.current && currentScrollHeight > 0
+    lastScrollHeightRef.current = currentScrollHeight
+
+    // Also check page offset is reasonable
+    const pageTop = pageElement.offsetTop
+    const minExpectedOffset = (pageNumber - 1) * 500 // ~500px per page minimum
+
+    if ((!heightStable || pageTop < minExpectedOffset) && retryCount < maxRetries) {
+      setTimeout(() => scrollToPage(pageNumber, retryCount + 1), retryDelay)
+      return
+    }
+
+    // Use instant scroll to avoid being interrupted
+    scrollContainer.scrollTo({ top: pageTop, behavior: 'instant' })
   }, [])
 
   useEffect(() => {
@@ -323,11 +484,44 @@ export function PDFViewer({ url, documentId, onHighlightAdded, initialPage, onSc
     if (pendingScrollRef.current && pageCount > 0) {
       const targetPage = pendingScrollRef.current
       pendingScrollRef.current = null
-      requestAnimationFrame(() => {
-        scrollToPage(targetPage)
-      })
+      // Small delay to allow initial page rendering
+      setTimeout(() => scrollToPage(targetPage), 100)
     }
   }, [pageCount, scrollToPage])
+
+  // Scroll to center external highlight when it changes
+  useEffect(() => {
+    if (!externalHighlight || externalHighlight.documentId !== documentId) return
+
+    const scrollToHighlight = (retryCount = 0) => {
+      const maxRetries = 30
+      if (!pdfContainerRef.current || retryCount >= maxRetries) return
+
+      const scrollContainer = pdfContainerRef.current.querySelector('[class*="_container_"]') as HTMLElement | null
+      const pageElement = pdfContainerRef.current.querySelector(
+        `[data-page-number="${externalHighlight.pageNumber}"]`
+      ) as HTMLElement | null
+
+      if (!pageElement || !scrollContainer) {
+        setTimeout(() => scrollToHighlight(retryCount + 1), 100)
+        return
+      }
+
+      // Calculate position within page to scroll highlight into center of view
+      const { y0, y1 } = externalHighlight.boundingBox
+      const highlightCenterY = (y0 + y1) / 2
+      const pageTop = pageElement.offsetTop
+      const pageHeight = pageElement.offsetHeight
+      const highlightY = pageTop + highlightCenterY * pageHeight
+      const containerHeight = scrollContainer.clientHeight
+      const targetScrollTop = highlightY - containerHeight / 2
+
+      scrollContainer.scrollTo({ top: Math.max(0, targetScrollTop), behavior: 'instant' })
+    }
+
+    // Delay to let page render
+    setTimeout(scrollToHighlight, 150)
+  }, [externalHighlight, documentId])
 
   const highlightsForViewer: IHighlight[] = highlights.map(h => ({
     id: h.id,
@@ -418,6 +612,12 @@ export function PDFViewer({ url, documentId, onHighlightAdded, initialPage, onSc
       )}
 
       <div className="flex-1 overflow-hidden relative" ref={pdfContainerRef}>
+        {externalHighlight && externalHighlight.documentId === documentId && (
+          <ExternalHighlightOverlay
+            highlight={externalHighlight}
+            containerRef={pdfContainerRef}
+          />
+        )}
         <PdfLoader
           url={url}
           beforeLoad={

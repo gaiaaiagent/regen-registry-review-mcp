@@ -1,5 +1,7 @@
+import { useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { ShieldCheck, AlertCircle, Play } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -25,7 +27,7 @@ export function ValidationPanel({
 }: ValidationPanelProps) {
   const { sessionId: paramSessionId } = useParams<{ sessionId: string }>()
   const sessionId = propSessionId ?? paramSessionId
-  const { setFocusedRequirementId } = useWorkspaceContext()
+  const { setFocusedRequirementId, scrollToEvidence } = useWorkspaceContext()
 
   const {
     validation,
@@ -41,6 +43,19 @@ export function ValidationPanel({
     setFocusedRequirementId(requirementId)
     onSwitchToChecklist?.()
   }
+
+  const handleShowSource = useCallback((documentId: string, pageNumber: number) => {
+    scrollToEvidence(documentId, pageNumber)
+    toast.success('Navigated to source', {
+      description: `Page ${pageNumber}`,
+    })
+  }, [scrollToEvidence])
+
+  const handleReviewStatusChange = useCallback((rowIndex: number, status: 'approved' | 'rejected') => {
+    toast.info(`Row ${rowIndex + 1} marked as ${status}`, {
+      description: 'Review status updated (local only)',
+    })
+  }, [])
 
   const handleRunValidation = async () => {
     try {
@@ -137,6 +152,8 @@ export function ValidationPanel({
             ]}
             issues={fact_sheets.date_alignment.issues}
             onIssueClick={handleIssueClick}
+            onShowSource={handleShowSource}
+            onReviewStatusChange={handleReviewStatusChange}
             emptyMessage="No date information extracted"
           />
 
@@ -154,6 +171,8 @@ export function ValidationPanel({
             ]}
             issues={fact_sheets.land_tenure.issues}
             onIssueClick={handleIssueClick}
+            onShowSource={handleShowSource}
+            onReviewStatusChange={handleReviewStatusChange}
             emptyMessage="No land tenure records found"
           />
 
@@ -169,6 +188,8 @@ export function ValidationPanel({
             ]}
             issues={fact_sheets.project_id.issues}
             onIssueClick={handleIssueClick}
+            onShowSource={handleShowSource}
+            onReviewStatusChange={handleReviewStatusChange}
             emptyMessage="No project IDs found"
           />
 
@@ -191,6 +212,8 @@ export function ValidationPanel({
             ]}
             issues={fact_sheets.quantification.issues}
             onIssueClick={handleIssueClick}
+            onShowSource={handleShowSource}
+            onReviewStatusChange={handleReviewStatusChange}
             emptyMessage="No quantification data found"
           />
         </div>
