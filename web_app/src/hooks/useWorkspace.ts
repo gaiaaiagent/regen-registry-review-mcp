@@ -109,18 +109,27 @@ function groupByCategory(requirements: Requirement[]): RequirementsByCategory {
 export function useEvidenceMatrix(sessionId: string | undefined) {
   return useQuery({
     queryKey: ['evidence-matrix', sessionId],
-    queryFn: async (): Promise<EvidenceMatrixResponse> => {
+    queryFn: async (): Promise<EvidenceMatrixResponse | null> => {
       if (!sessionId) throw new Error('Session ID required')
-      const { data, error } = await api.GET('/sessions/{session_id}/evidence-matrix', {
+      const { data, error, response } = await api.GET('/sessions/{session_id}/evidence-matrix', {
         params: { path: { session_id: sessionId } },
       })
+      // 400 means evidence not yet extracted - return null instead of throwing
+      if (response?.status === 400) {
+        return null
+      }
       if (error) {
-        throw new Error('Unable to load requirements. Evidence extraction may not have run yet.')
+        throw new Error('Unable to load requirements.')
       }
       return data as EvidenceMatrixResponse
     },
     enabled: !!sessionId,
     staleTime: 30000,
+    retry: (failureCount, error) => {
+      // Don't retry on "no evidence" responses
+      if (error?.message?.includes('Evidence not yet extracted')) return false
+      return failureCount < 2
+    },
   })
 }
 
@@ -140,6 +149,9 @@ export function useWorkspaceRequirements(sessionId: string | undefined) {
     missing: 0,
   }
 
+  // null means "no evidence yet" (400 response) - treat as no data, not error
+  const hasData = matrixData !== null && matrixData !== undefined && matrixData.matrix.length > 0
+
   return {
     requirements,
     requirementsByCategory,
@@ -147,6 +159,6 @@ export function useWorkspaceRequirements(sessionId: string | undefined) {
     isLoading,
     isError,
     error,
-    hasData: matrixData !== undefined && matrixData.matrix.length > 0,
+    hasData,
   }
 }
