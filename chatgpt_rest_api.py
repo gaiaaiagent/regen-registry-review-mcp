@@ -1938,7 +1938,7 @@ async def agent_chat(session_id: str, request: AgentChatRequest):
     try:
         state_manager = StateManager(session_id)
         session_data = state_manager.read_json("session.json")
-    except FileNotFoundError:
+    except Exception:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
 
     # Load evidence and documents if available
@@ -1947,12 +1947,14 @@ async def agent_chat(session_id: str, request: AgentChatRequest):
 
     try:
         evidence_data = state_manager.read_json("evidence.json")
-    except FileNotFoundError:
+    except Exception:
+        # evidence.json may not exist yet if extraction hasn't run
         pass
 
     try:
         documents_data = state_manager.read_json("documents.json")
-    except FileNotFoundError:
+    except Exception:
+        # documents.json may not exist yet
         pass
 
     # Build system prompt with session context
