@@ -1898,11 +1898,13 @@ GUIDELINES:
                 break
 
     # Call Claude API with native tool calling
+    # Always use Claude for agent chat (tool calling support)
+    AGENT_MODEL = "claude-sonnet-4-20250514"
     try:
         client = AsyncAnthropic(api_key=settings.anthropic_api_key)
 
         response = await client.messages.create(
-            model=settings.get_active_llm_model(),
+            model=AGENT_MODEL,
             max_tokens=2000,
             system=system_prompt,
             tools=get_agent_tools(),
