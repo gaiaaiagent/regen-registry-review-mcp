@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ClipboardCheck, ShieldCheck, MessageSquare } from 'lucide-react'
+import { ClipboardCheck, ShieldCheck, MessageSquare, FileText } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ChecklistPanel } from './ChecklistPanel'
 import { ValidationPanel } from './ValidationPanel'
 import { ChatPanel } from './ChatPanel'
+import { ReportPanel } from './ReportPanel'
 import { useWorkspaceContext } from '@/contexts/WorkspaceContext'
 
 interface ToolsPanelProps {
@@ -32,7 +33,7 @@ export function ToolsPanel({ sessionId }: ToolsPanelProps) {
         className="h-full flex flex-col"
       >
         <div className="px-2 pt-2 border-b bg-muted/30">
-          <TabsList className="w-full grid grid-cols-3">
+          <TabsList className="w-full grid grid-cols-4">
             <TabsTrigger value="checklist" className="flex items-center gap-1.5">
               <ClipboardCheck className="h-3.5 w-3.5" />
               <span className="text-xs">Checklist</span>
@@ -44,6 +45,10 @@ export function ToolsPanel({ sessionId }: ToolsPanelProps) {
             <TabsTrigger value="chat" className="flex items-center gap-1.5">
               <MessageSquare className="h-3.5 w-3.5" />
               <span className="text-xs">AI Chat</span>
+            </TabsTrigger>
+            <TabsTrigger value="report" className="flex items-center gap-1.5">
+              <FileText className="h-3.5 w-3.5" />
+              <span className="text-xs">Report</span>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -61,6 +66,10 @@ export function ToolsPanel({ sessionId }: ToolsPanelProps) {
 
         <TabsContent value="chat" className="flex-1 m-0 overflow-hidden">
           <ChatPanel sessionId={sessionId} />
+        </TabsContent>
+
+        <TabsContent value="report" className="flex-1 m-0 overflow-hidden">
+          <ReportPanel sessionId={sessionId} />
         </TabsContent>
       </Tabs>
     </div>

@@ -183,6 +183,8 @@ The web application frontend is located in `/web_app/` with the following comple
 | **7. AI Chat** | Agent endpoint, context-aware chat, action buttons with confirmation |
 | **8. PDF Highlighting** | Click evidence → navigate to PDF page, bounding box highlighting |
 | **9. Verification Workflow** | Per-snippet verify/reject buttons, verification progress tracking |
+| **9.5 Google OAuth** | Real Google OAuth with @regen.network domain restriction |
+| **11. Report Generation** | Report tab with generation, Markdown preview, and download (MD/Checklist/DOCX) |
 
 ### Running the Application
 
@@ -230,10 +232,9 @@ sudo systemctl restart registry-review-api
 
 ## Next Steps
 
-1. **Phase 10: Proponent Flow** - Revision requests and responses
-2. **Phase 11: Report Generation** - Export review reports with full citations
-3. Implement real Google OAuth (requires backend endpoint)
-4. Multi-reviewer support (future)
+1. **Phase 11: Report Generation** - Export review reports with full evidence citations
+2. **Phase 10: Proponent Flow** - *Deferred* - May integrate with **Regen Teams** (launching Q1 2026) which provides organization workspaces, role-based permissions, and team collaboration natively within Regen Registry
+3. Multi-reviewer support (future, potentially via Regen Teams)
 
 ---
 
@@ -249,3 +250,4 @@ sudo systemctl restart registry-review-api
 | v1.5 | January 2026 | Phases 1-7 implemented; added Current Implementation section |
 | v1.6 | January 2026 | Added Phase 9B: Verification Workflow ("DocuSign with AI" pattern) |
 | v1.7 | January 2026 | Phases 8-9 complete (PDF highlighting, verification); deployed to production |
+| v1.8 | January 2026 | Google OAuth implemented with koi-sensor OAuth client |
