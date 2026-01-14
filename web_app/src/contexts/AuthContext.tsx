@@ -34,7 +34,7 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 const STORAGE_KEY_USER = 'auth_user'
 const STORAGE_KEY_TOKEN = 'auth_token'
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8003'
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8003'
 
 export function getAuthToken(): string | null {
   return localStorage.getItem(STORAGE_KEY_TOKEN)
