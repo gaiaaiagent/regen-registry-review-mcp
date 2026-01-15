@@ -1,11 +1,13 @@
-import { useEffect, lazy, Suspense } from 'react'
+import { useEffect, useRef, useState, lazy, Suspense } from 'react'
 import { toast } from 'sonner'
 import { DocumentSidebar, type Document } from './DocumentSidebar'
 import { GDriveImportDialog } from '@/components/gdrive'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
-import { FileText, HardDrive, Loader2 } from 'lucide-react'
+import { FileText, HardDrive, Loader2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useWorkspaceContext } from '@/contexts/WorkspaceContext'
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8003'
 
 const LazyPDFViewer = lazy(() => import('@/components/PDFViewer').then(m => ({ default: m.PDFViewer })))
 
@@ -34,6 +36,9 @@ export function DocumentPanel({ sessionId, documents, getDocumentUrl, onClipText
     registerScrollHandler,
   } = useWorkspaceContext()
 
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isUploading, setIsUploading] = useState(false)
+
   console.log('DocumentPanel: Render', { activeDocumentId, documentsCount: documents.length })
 
   useEffect(() => {
@@ -56,6 +61,65 @@ export function DocumentPanel({ sessionId, documents, getDocumentUrl, onClipText
     onDocumentsImported?.()
   }
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files || files.length === 0) return
+
+    setIsUploading(true)
+    const token = localStorage.getItem('auth_token')
+    let successCount = 0
+    let errorCount = 0
+
+    for (const file of Array.from(files)) {
+      try {
+        // Read file as ArrayBuffer and convert to base64
+        const arrayBuffer = await file.arrayBuffer()
+        const bytes = new Uint8Array(arrayBuffer)
+        let binary = ''
+        for (let i = 0; i < bytes.length; i++) {
+          binary += String.fromCharCode(bytes[i])
+        }
+        const base64 = btoa(binary)
+
+        const response = await fetch(`${API_URL}/sessions/${sessionId}/upload`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            filename: file.name,
+            content_base64: base64,
+          }),
+        })
+
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.detail || 'Upload failed')
+        }
+
+        successCount++
+      } catch (err) {
+        errorCount++
+        console.error(`Failed to upload ${file.name}:`, err)
+      }
+    }
+
+    setIsUploading(false)
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+
+    if (successCount > 0) {
+      toast.success(`Uploaded ${successCount} file${successCount > 1 ? 's' : ''}`)
+      onDocumentsImported?.()
+    }
+    if (errorCount > 0) {
+      toast.error(`Failed to upload ${errorCount} file${errorCount > 1 ? 's' : ''}`)
+    }
+  }
+
   return (
     <div className="flex h-full w-full overflow-hidden">
       {/* Fixed Sidebar */}
@@ -65,7 +129,34 @@ export function DocumentPanel({ sessionId, documents, getDocumentUrl, onClipText
           activeDocumentId={activeDocumentId}
           onSelectDocument={setActiveDocumentId}
         />
-        <div className="p-3 border-t bg-muted/20">
+        <div className="p-3 border-t bg-muted/20 space-y-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.xlsx,.csv,.json,.shp,.dbf,.shx,.prj"
+            multiple
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+          >
+            {isUploading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              <>
+                <Upload className="h-4 w-4 mr-2" />
+                Upload Files
+              </>
+            )}
+          </Button>
           <GDriveImportDialog
             sessionId={sessionId}
             existingFilenames={new Set(documents.map(d => d.filename))}

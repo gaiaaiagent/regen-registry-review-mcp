@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import type { Requirement, Evidence } from '@/contexts/WorkspaceContext'
 
@@ -160,5 +160,102 @@ export function useWorkspaceRequirements(sessionId: string | undefined) {
     isError,
     error,
     hasData,
+  }
+}
+
+export function useDiscoverDocuments(sessionId: string | undefined) {
+  return useMutation({
+    mutationFn: async () => {
+      if (!sessionId) throw new Error('Session ID required')
+      const { data, error } = await api.POST('/sessions/{session_id}/discover', {
+        params: { path: { session_id: sessionId } },
+      })
+      if (error) throw new Error('Document discovery failed')
+      return data
+    },
+  })
+}
+
+export function useMapRequirements(sessionId: string | undefined) {
+  return useMutation({
+    mutationFn: async () => {
+      if (!sessionId) throw new Error('Session ID required')
+      const { data, error } = await api.POST('/sessions/{session_id}/map', {
+        params: { path: { session_id: sessionId } },
+      })
+      if (error) throw new Error('Requirement mapping failed')
+      return data
+    },
+  })
+}
+
+export function useConfirmAllMappings(sessionId: string | undefined) {
+  return useMutation({
+    mutationFn: async () => {
+      if (!sessionId) throw new Error('Session ID required')
+      const { data, error } = await api.POST('/sessions/{session_id}/confirm-all-mappings', {
+        params: { path: { session_id: sessionId } },
+      })
+      if (error) throw new Error('Mapping confirmation failed')
+      return data
+    },
+  })
+}
+
+export function useExtractEvidence(sessionId: string | undefined) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!sessionId) throw new Error('Session ID required')
+      const { data, error } = await api.POST('/sessions/{session_id}/evidence', {
+        params: { path: { session_id: sessionId } },
+      })
+      if (error) throw new Error('Evidence extraction failed')
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['evidence-matrix', sessionId] })
+    },
+  })
+}
+
+export function useFullWorkflow(sessionId: string | undefined) {
+  const queryClient = useQueryClient()
+  const discoverMutation = useDiscoverDocuments(sessionId)
+  const mapMutation = useMapRequirements(sessionId)
+  const confirmMutation = useConfirmAllMappings(sessionId)
+  const extractMutation = useExtractEvidence(sessionId)
+
+  const runFullWorkflow = async (onProgress?: (stage: string) => void) => {
+    if (!sessionId) throw new Error('Session ID required')
+
+    onProgress?.('Discovering documents...')
+    await discoverMutation.mutateAsync()
+
+    onProgress?.('Mapping requirements...')
+    await mapMutation.mutateAsync()
+
+    onProgress?.('Confirming mappings...')
+    await confirmMutation.mutateAsync()
+
+    onProgress?.('Extracting evidence...')
+    await extractMutation.mutateAsync()
+
+    queryClient.invalidateQueries({ queryKey: ['evidence-matrix', sessionId] })
+
+    return { success: true }
+  }
+
+  const isPending = discoverMutation.isPending || mapMutation.isPending ||
+                    confirmMutation.isPending || extractMutation.isPending
+
+  return {
+    runFullWorkflow,
+    isPending,
+    currentStage: discoverMutation.isPending ? 'discover' :
+                  mapMutation.isPending ? 'map' :
+                  confirmMutation.isPending ? 'confirm' :
+                  extractMutation.isPending ? 'extract' : null,
   }
 }

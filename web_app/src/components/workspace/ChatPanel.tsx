@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
-import { MessageSquare, Send, Trash2, Info } from 'lucide-react'
+import { MessageSquare, Send, Trash2, Info, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -16,6 +16,8 @@ import {
 import { ChatMessage } from './ChatMessage'
 import { useAgentChat, type AgentAction, type AgentSource, type AgentContext } from '@/hooks/useAgentChat'
 import { useWorkspaceContext } from '@/contexts/WorkspaceContext'
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8003'
 
 interface ChatPanelProps {
   sessionId?: string
@@ -34,6 +36,7 @@ export function ChatPanel({ sessionId: propSessionId }: ChatPanelProps) {
 
   const [inputValue, setInputValue] = useState('')
   const [confirmAction, setConfirmAction] = useState<AgentAction | null>(null)
+  const [isExecuting, setIsExecuting] = useState(false)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -78,39 +81,92 @@ export function ChatPanel({ sessionId: propSessionId }: ChatPanelProps) {
     setConfirmAction(action)
   }, [])
 
-  const executeAction = useCallback(() => {
-    if (!confirmAction) return
+  const executeAction = useCallback(async () => {
+    if (!confirmAction || !sessionId) return
 
-    switch (confirmAction.type) {
-      case 'navigate': {
+    setIsExecuting(true)
+
+    try {
+      // Handle navigate locally for immediate response
+      if (confirmAction.type === 'navigate' || confirmAction.type === 'navigate_to_citation') {
         const documentId = confirmAction.params.document_id as string
         const page = confirmAction.params.page as number
         if (documentId && page) {
           scrollToEvidence(documentId, page)
-          toast.success('Navigated to document', {
-            description: `Page ${page}`,
-          })
+          toast.success('Navigated to document', { description: `Page ${page}` })
         }
-        break
+        setConfirmAction(null)
+        setIsExecuting(false)
+        return
       }
-      case 'validate':
-        toast.info('Validation', {
-          description: 'Validation feature will run cross-document checks.',
-        })
-        break
-      case 'extract':
-        toast.info('Extract Evidence', {
-          description: `Would extract evidence for ${confirmAction.params.requirement_id}`,
-        })
-        break
-      default:
-        toast.info('Action', {
-          description: `Would execute: ${confirmAction.label}`,
-        })
-    }
 
-    setConfirmAction(null)
-  }, [confirmAction, scrollToEvidence])
+      // Call the backend execute endpoint for other actions
+      const token = localStorage.getItem('auth_token')
+      const response = await fetch(`${API_URL}/sessions/${sessionId}/agent/execute`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          action_type: confirmAction.type,
+          params: confirmAction.params,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (!result.success) {
+        toast.error('Action failed', { description: result.error })
+        setConfirmAction(null)
+        setIsExecuting(false)
+        return
+      }
+
+      // Handle different action results
+      switch (confirmAction.type) {
+        case 'search_evidence': {
+          const matches = result.result?.matches ?? []
+          if (matches.length === 0) {
+            toast.info('No matches', { description: `No evidence found for "${result.result?.query}"` })
+          } else {
+            toast.success('Search complete', {
+              description: `Found ${result.result?.total_matches} matches. First: ${matches[0]?.document_name}, page ${matches[0]?.page}`,
+            })
+            // Navigate to the first match
+            if (matches[0]?.document_id && matches[0]?.page) {
+              scrollToEvidence(matches[0].document_id, matches[0].page)
+            }
+          }
+          break
+        }
+        case 'get_requirement_status': {
+          const data = result.result
+          toast.success(`Requirement ${data?.requirement_id}`, {
+            description: `Status: ${data?.status}, ${data?.evidence_count} evidence snippets`,
+          })
+          break
+        }
+        case 'suggest_verification': {
+          toast.success('Verification suggested', {
+            description: result.result?.message ?? 'Check the checklist panel',
+          })
+          break
+        }
+        default:
+          toast.success('Action executed', {
+            description: JSON.stringify(result.result).slice(0, 100),
+          })
+      }
+    } catch (err) {
+      toast.error('Action failed', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      })
+    } finally {
+      setConfirmAction(null)
+      setIsExecuting(false)
+    }
+  }, [confirmAction, sessionId, scrollToEvidence])
 
   const handleSourceClick = useCallback(
     (source: AgentSource) => {
@@ -244,10 +300,19 @@ export function ChatPanel({ sessionId: propSessionId }: ChatPanelProps) {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmAction(null)}>
+            <Button variant="outline" onClick={() => setConfirmAction(null)} disabled={isExecuting}>
               Cancel
             </Button>
-            <Button onClick={executeAction}>Execute</Button>
+            <Button onClick={executeAction} disabled={isExecuting}>
+              {isExecuting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Executing...
+                </>
+              ) : (
+                'Execute'
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

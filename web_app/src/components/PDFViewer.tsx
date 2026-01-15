@@ -421,6 +421,7 @@ export function PDFViewer({ url, documentId, onHighlightAdded, initialPage, onSc
   const [scrollToHighlightId, setScrollToHighlightId] = useState<string | null>(null)
   const [hasTextContent, setHasTextContent] = useState<boolean | null>(null)
   const [pageCount, setPageCount] = useState<number>(0)
+  const [isViewerReady, setIsViewerReady] = useState(false)
   const scrollViewerToRef = useRef<((highlight: IHighlight) => void) | null>(null)
   const pdfContainerRef = useRef<HTMLDivElement | null>(null)
   const pendingScrollRef = useRef<number | null>(initialPage ?? null)
@@ -433,6 +434,12 @@ export function PDFViewer({ url, documentId, onHighlightAdded, initialPage, onSc
 
     if (pageNumber < 1) return
 
+    // Store pending scroll if viewer not ready yet
+    if (!isViewerReady && retryCount === 0) {
+      pendingScrollRef.current = pageNumber
+      return
+    }
+
     if (!pdfContainerRef.current) {
       if (retryCount < maxRetries) {
         setTimeout(() => scrollToPage(pageNumber, retryCount + 1), retryDelay)
@@ -442,37 +449,45 @@ export function PDFViewer({ url, documentId, onHighlightAdded, initialPage, onSc
       return
     }
 
-    const scrollContainer = pdfContainerRef.current.querySelector('[class*="_container_"]') as HTMLElement | null
-    const pageElement = pdfContainerRef.current.querySelector(
-      `[data-page-number="${pageNumber}"]`
-    ) as HTMLElement | null
+    try {
+      const scrollContainer = pdfContainerRef.current.querySelector('[class*="_container_"]') as HTMLElement | null
+      const pageElement = pdfContainerRef.current.querySelector(
+        `[data-page-number="${pageNumber}"]`
+      ) as HTMLElement | null
 
-    if (!pageElement || !scrollContainer) {
+      if (!pageElement || !scrollContainer) {
+        if (retryCount < maxRetries) {
+          setTimeout(() => scrollToPage(pageNumber, retryCount + 1), retryDelay)
+        } else {
+          pendingScrollRef.current = pageNumber
+        }
+        return
+      }
+
+      // Wait for scroll height to stabilize (indicates all pages rendered)
+      const currentScrollHeight = scrollContainer.scrollHeight
+      const heightStable = currentScrollHeight === lastScrollHeightRef.current && currentScrollHeight > 0
+      lastScrollHeightRef.current = currentScrollHeight
+
+      // Also check page offset is reasonable
+      const pageTop = pageElement.offsetTop
+      const minExpectedOffset = (pageNumber - 1) * 500 // ~500px per page minimum
+
+      if ((!heightStable || pageTop < minExpectedOffset) && retryCount < maxRetries) {
+        setTimeout(() => scrollToPage(pageNumber, retryCount + 1), retryDelay)
+        return
+      }
+
+      // Use instant scroll to avoid being interrupted
+      scrollContainer.scrollTo({ top: pageTop, behavior: 'instant' })
+    } catch (err) {
+      // Catch any errors from DOM operations during initialization
+      console.warn('scrollToPage error (will retry):', err)
       if (retryCount < maxRetries) {
         setTimeout(() => scrollToPage(pageNumber, retryCount + 1), retryDelay)
-      } else {
-        pendingScrollRef.current = pageNumber
       }
-      return
     }
-
-    // Wait for scroll height to stabilize (indicates all pages rendered)
-    const currentScrollHeight = scrollContainer.scrollHeight
-    const heightStable = currentScrollHeight === lastScrollHeightRef.current && currentScrollHeight > 0
-    lastScrollHeightRef.current = currentScrollHeight
-
-    // Also check page offset is reasonable
-    const pageTop = pageElement.offsetTop
-    const minExpectedOffset = (pageNumber - 1) * 500 // ~500px per page minimum
-
-    if ((!heightStable || pageTop < minExpectedOffset) && retryCount < maxRetries) {
-      setTimeout(() => scrollToPage(pageNumber, retryCount + 1), retryDelay)
-      return
-    }
-
-    // Use instant scroll to avoid being interrupted
-    scrollContainer.scrollTo({ top: pageTop, behavior: 'instant' })
-  }, [])
+  }, [isViewerReady])
 
   useEffect(() => {
     if (onScrollHandlerReady) {
@@ -481,54 +496,63 @@ export function PDFViewer({ url, documentId, onHighlightAdded, initialPage, onSc
   }, [onScrollHandlerReady, scrollToPage])
 
   useEffect(() => {
-    if (pendingScrollRef.current && pageCount > 0) {
+    if (pendingScrollRef.current && isViewerReady && pageCount > 0) {
       const targetPage = pendingScrollRef.current
       pendingScrollRef.current = null
-      // Small delay to allow initial page rendering
-      setTimeout(() => scrollToPage(targetPage), 100)
+      // Small delay to allow viewer to fully stabilize
+      setTimeout(() => scrollToPage(targetPage, 1), 150)
     }
-  }, [pageCount, scrollToPage])
+  }, [pageCount, isViewerReady, scrollToPage])
 
   // Scroll to center external highlight when it changes
   useEffect(() => {
     if (!externalHighlight || externalHighlight.documentId !== documentId) return
+    if (!isViewerReady) return
 
     const scrollToHighlight = (retryCount = 0) => {
       const maxRetries = 30
       if (!pdfContainerRef.current || retryCount >= maxRetries) return
 
-      const scrollContainer = pdfContainerRef.current.querySelector('[class*="_container_"]') as HTMLElement | null
-      const pageElement = pdfContainerRef.current.querySelector(
-        `[data-page-number="${externalHighlight.pageNumber}"]`
-      ) as HTMLElement | null
+      try {
+        const scrollContainer = pdfContainerRef.current.querySelector('[class*="_container_"]') as HTMLElement | null
+        const pageElement = pdfContainerRef.current.querySelector(
+          `[data-page-number="${externalHighlight.pageNumber}"]`
+        ) as HTMLElement | null
 
-      if (!pageElement || !scrollContainer) {
-        setTimeout(() => scrollToHighlight(retryCount + 1), 100)
-        return
+        if (!pageElement || !scrollContainer) {
+          setTimeout(() => scrollToHighlight(retryCount + 1), 100)
+          return
+        }
+
+        // Calculate position within page to scroll highlight into center of view
+        const { y0, y1 } = externalHighlight.boundingBox
+        const highlightCenterY = (y0 + y1) / 2
+        const pageTop = pageElement.offsetTop
+        const pageHeight = pageElement.offsetHeight
+        const highlightY = pageTop + highlightCenterY * pageHeight
+        const containerHeight = scrollContainer.clientHeight
+        const targetScrollTop = highlightY - containerHeight / 2
+
+        scrollContainer.scrollTo({ top: Math.max(0, targetScrollTop), behavior: 'instant' })
+      } catch (err) {
+        console.warn('scrollToHighlight error (will retry):', err)
+        if (retryCount < maxRetries) {
+          setTimeout(() => scrollToHighlight(retryCount + 1), 100)
+        }
       }
-
-      // Calculate position within page to scroll highlight into center of view
-      const { y0, y1 } = externalHighlight.boundingBox
-      const highlightCenterY = (y0 + y1) / 2
-      const pageTop = pageElement.offsetTop
-      const pageHeight = pageElement.offsetHeight
-      const highlightY = pageTop + highlightCenterY * pageHeight
-      const containerHeight = scrollContainer.clientHeight
-      const targetScrollTop = highlightY - containerHeight / 2
-
-      scrollContainer.scrollTo({ top: Math.max(0, targetScrollTop), behavior: 'instant' })
     }
 
     // Delay to let page render
     setTimeout(scrollToHighlight, 150)
-  }, [externalHighlight, documentId])
+  }, [externalHighlight, documentId, isViewerReady])
 
-  const highlightsForViewer: IHighlight[] = highlights.map(h => ({
+  // Don't pass highlights to the viewer until it's ready to prevent race condition
+  const highlightsForViewer: IHighlight[] = isViewerReady ? highlights.map(h => ({
     id: h.id,
     position: h.position,
     content: h.content,
     comment: ensureComment(h.comment),
-  }))
+  })) : []
 
   const handleAddHighlight = useCallback(
     (position: ScaledPosition, content: Content, comment?: { text: string; emoji: string }) => {
@@ -553,16 +577,25 @@ export function PDFViewer({ url, documentId, onHighlightAdded, initialPage, onSc
   const handleDocumentLoaded = useCallback((pages: number, hasText: boolean) => {
     setPageCount(pages)
     setHasTextContent(hasText)
+    // Mark viewer as ready after document is loaded
+    // Delay slightly to allow internal viewer initialization to complete
+    setTimeout(() => setIsViewerReady(true), 200)
   }, [])
 
   const scrollToHighlightFn = useCallback((highlightId: string) => {
+    if (!isViewerReady) return
+
     const highlight = highlightsForViewer.find(h => h.id === highlightId)
     if (highlight && scrollViewerToRef.current) {
-      scrollViewerToRef.current(highlight)
-      setScrollToHighlightId(highlightId)
-      setTimeout(() => setScrollToHighlightId(null), 1000)
+      try {
+        scrollViewerToRef.current(highlight)
+        setScrollToHighlightId(highlightId)
+        setTimeout(() => setScrollToHighlightId(null), 1000)
+      } catch (err) {
+        console.warn('scrollToHighlight error:', err)
+      }
     }
-  }, [highlightsForViewer])
+  }, [highlightsForViewer, isViewerReady])
 
   return (
     <div className="flex flex-col h-full">

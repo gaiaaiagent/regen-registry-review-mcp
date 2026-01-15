@@ -8,14 +8,17 @@ import {
   CheckCircle2,
   XCircle,
   AlertTriangle,
+  Loader2,
+  Play,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
+import { toast } from 'sonner'
 import { CategoryAccordion } from './CategoryAccordion'
 import { EvidenceScratchpad } from './EvidenceScratchpad'
 import { VerificationProgress } from './VerificationProgress'
-import { useWorkspaceRequirements } from '@/hooks/useWorkspace'
+import { useWorkspaceRequirements, useFullWorkflow } from '@/hooks/useWorkspace'
 import { useManualEvidence, type ScratchpadItem } from '@/hooks/useManualEvidence'
 import { cn } from '@/lib/utils'
 
@@ -44,6 +47,23 @@ export function ChecklistPanel({ sessionId: propSessionId }: ChecklistPanelProps
     removeEvidence,
     clearScratchpad,
   } = useManualEvidence(sessionId)
+
+  const { runFullWorkflow, isPending: workflowPending, currentStage } = useFullWorkflow(sessionId)
+  const [progressMessage, setProgressMessage] = useState<string | null>(null)
+
+  const handleExtractEvidence = async () => {
+    toast.info('Starting evidence workflow...', { description: 'This runs discover → map → extract.' })
+    try {
+      await runFullWorkflow((stage) => setProgressMessage(stage))
+      setProgressMessage(null)
+      toast.success('Evidence extracted', { description: 'Checklist has been populated.' })
+    } catch (err) {
+      setProgressMessage(null)
+      toast.error('Workflow failed', {
+        description: err instanceof Error ? err.message : 'Please try again.',
+      })
+    }
+  }
 
   const [expandedCategories, setExpandedCategories] = useState<string[]>([])
 
@@ -112,9 +132,26 @@ export function ChecklistPanel({ sessionId: propSessionId }: ChecklistPanelProps
         <div className="flex-1 flex flex-col items-center justify-center p-4 text-muted-foreground">
           <ClipboardCheck className="h-12 w-12 mb-4 opacity-30" />
           <p className="text-sm font-medium">No Evidence Yet</p>
-          <p className="text-xs text-center mt-2">
+          <p className="text-xs text-center mt-2 max-w-[200px]">
             Run evidence extraction to populate the requirements checklist with findings from your documents.
           </p>
+          <Button
+            onClick={handleExtractEvidence}
+            disabled={workflowPending}
+            className="mt-4"
+          >
+            {workflowPending ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                {progressMessage || 'Processing...'}
+              </>
+            ) : (
+              <>
+                <Play className="h-4 w-4 mr-2" />
+                Extract Evidence
+              </>
+            )}
+          </Button>
         </div>
         <EvidenceScratchpad
           items={scratchpadItems}

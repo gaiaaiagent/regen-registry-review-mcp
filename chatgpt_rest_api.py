@@ -11,7 +11,7 @@ import secrets
 import base64
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import List, Optional, Any
+from typing import Dict, List, Optional, Any
 import json
 import logging
 
@@ -774,6 +774,9 @@ async def extract_evidence(session_id: str):
         return result
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    except ValueError as e:
+        # Validation errors (e.g., "Requirement mapping not complete")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -2084,6 +2087,148 @@ The reviewer is using Regen Network's Registry Review Tool to verify compliance 
         raise HTTPException(status_code=500, detail=f"Agent error: {str(e)}")
 
 
+class AgentExecuteRequest(BaseModel):
+    """Request to execute an agent action."""
+    action_type: str
+    params: Dict[str, Any]
+
+
+class AgentExecuteResponse(BaseModel):
+    """Response from action execution."""
+    success: bool
+    result: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+
+@app.post("/sessions/{session_id}/agent/execute", response_model=AgentExecuteResponse, summary="Execute agent action")
+async def execute_agent_action(session_id: str, request: AgentExecuteRequest):
+    """Execute an action proposed by the AI agent.
+
+    Supported action types:
+    - navigate_to_citation: Returns navigation info (frontend handles actual navigation)
+    - search_evidence: Searches evidence for matching text
+    - get_requirement_status: Returns status and evidence for a requirement
+    - suggest_verification: Marks a snippet for verification
+    """
+    try:
+        state_manager = StateManager(session_id)
+        state_manager.read_json("session.json")  # Verify session exists
+    except Exception:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+
+    action_type = request.action_type
+    params = request.params
+
+    try:
+        if action_type == "navigate_to_citation":
+            # Return navigation info - frontend handles the actual navigation
+            return AgentExecuteResponse(
+                success=True,
+                result={
+                    "action": "navigate",
+                    "document_id": params.get("document_id"),
+                    "page": params.get("page"),
+                    "highlight_text": params.get("highlight_text"),
+                }
+            )
+
+        elif action_type == "search_evidence":
+            query = params.get("query", "").lower()
+            try:
+                evidence_data = state_manager.read_json("evidence.json")
+            except Exception:
+                return AgentExecuteResponse(
+                    success=False,
+                    error="No evidence extracted yet. Run evidence extraction first."
+                )
+
+            matches = []
+            for ev in evidence_data.get("evidence", []):
+                for snippet in ev.get("evidence_snippets", []):
+                    text = snippet.get("text", "").lower()
+                    if query in text:
+                        matches.append({
+                            "requirement_id": ev.get("requirement_id"),
+                            "document_name": snippet.get("document_name"),
+                            "document_id": snippet.get("document_id"),
+                            "page": snippet.get("page"),
+                            "text": snippet.get("text", "")[:200],
+                            "status": ev.get("status"),
+                        })
+
+            return AgentExecuteResponse(
+                success=True,
+                result={
+                    "query": params.get("query"),
+                    "matches": matches[:10],
+                    "total_matches": len(matches),
+                }
+            )
+
+        elif action_type == "get_requirement_status":
+            requirement_id = params.get("requirement_id")
+            try:
+                evidence_data = state_manager.read_json("evidence.json")
+            except Exception:
+                return AgentExecuteResponse(
+                    success=False,
+                    error="No evidence extracted yet."
+                )
+
+            for ev in evidence_data.get("evidence", []):
+                if ev.get("requirement_id") == requirement_id:
+                    return AgentExecuteResponse(
+                        success=True,
+                        result={
+                            "requirement_id": requirement_id,
+                            "status": ev.get("status"),
+                            "confidence": ev.get("confidence"),
+                            "evidence_count": len(ev.get("evidence_snippets", [])),
+                            "snippets": [
+                                {
+                                    "document_name": s.get("document_name"),
+                                    "page": s.get("page"),
+                                    "text": s.get("text", "")[:150],
+                                }
+                                for s in ev.get("evidence_snippets", [])[:3]
+                            ],
+                        }
+                    )
+
+            return AgentExecuteResponse(
+                success=False,
+                error=f"Requirement {requirement_id} not found"
+            )
+
+        elif action_type == "suggest_verification":
+            snippet_id = params.get("snippet_id")
+            requirement_id = params.get("requirement_id")
+            reason = params.get("reason", "AI suggested verification")
+
+            # For now, just acknowledge the suggestion - verification is handled via
+            # the existing verification endpoints
+            return AgentExecuteResponse(
+                success=True,
+                result={
+                    "action": "verification_suggested",
+                    "snippet_id": snippet_id,
+                    "requirement_id": requirement_id,
+                    "reason": reason,
+                    "message": "Navigate to the checklist to verify this evidence.",
+                }
+            )
+
+        else:
+            return AgentExecuteResponse(
+                success=False,
+                error=f"Unknown action type: {action_type}"
+            )
+
+    except Exception as e:
+        logger.error(f"Action execution error: {e}")
+        return AgentExecuteResponse(success=False, error=str(e))
+
+
 # Import StateManager after sys.path is set up
 from registry_review_mcp.utils.state import StateManager
 
@@ -2549,20 +2694,39 @@ class GDriveImportRequest(BaseModel):
 
 
 def get_gdrive_access_token() -> str:
-    """Get Google Drive access token using ADC or gcloud CLI impersonation."""
+    """Get Google Drive access token using impersonated credentials or gcloud CLI."""
     import subprocess
 
-    # Try Application Default Credentials first (production)
+    SERVICE_ACCOUNT = "rag-ingestion-bot@koi-sensor.iam.gserviceaccount.com"
+    SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
+
+    # Try impersonated credentials from ADC (production - uses darren@regen.network's credentials)
     if os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
         try:
-            from google.auth import default
+            from google.oauth2.credentials import Credentials as UserCredentials
+            from google.auth.impersonated_credentials import Credentials as ImpersonatedCredentials
             from google.auth.transport.requests import Request
+            import json
 
-            creds, _ = default(scopes=["https://www.googleapis.com/auth/drive.readonly"])
-            creds.refresh(Request())
-            return creds.token
+            adc_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+            with open(adc_path) as f:
+                adc_data = json.load(f)
+
+            # Load user credentials from ADC file (authorized_user type)
+            source_creds = UserCredentials.from_authorized_user_info(adc_data)
+            # Must refresh source credentials before impersonation
+            source_creds.refresh(Request())
+
+            # Create impersonated credentials targeting the service account
+            target_creds = ImpersonatedCredentials(
+                source_credentials=source_creds,
+                target_principal=SERVICE_ACCOUNT,
+                target_scopes=SCOPES,
+            )
+            target_creds.refresh(Request())
+            return target_creds.token
         except Exception as e:
-            logger.warning(f"ADC auth failed, falling back to gcloud: {e}")
+            logger.warning(f"Impersonated credentials failed, falling back to gcloud: {e}")
 
     # Fall back to gcloud CLI with service account impersonation (local dev)
     try:
@@ -2571,8 +2735,8 @@ def get_gdrive_access_token() -> str:
                 "gcloud",
                 "auth",
                 "print-access-token",
-                "--impersonate-service-account=rag-ingestion-bot@koi-sensor.iam.gserviceaccount.com",
-                "--scopes=https://www.googleapis.com/auth/drive.readonly",
+                f"--impersonate-service-account={SERVICE_ACCOUNT}",
+                f"--scopes={','.join(SCOPES)}",
             ],
             capture_output=True,
             text=True,
@@ -2601,7 +2765,6 @@ def gdrive_api_request(endpoint: str, params: dict | None = None) -> dict:
     token = get_gdrive_access_token()
     headers = {
         "Authorization": f"Bearer {token}",
-        "x-goog-user-project": "koi-sensor",  # Required for ADC quota billing
     }
     url = f"https://www.googleapis.com/drive/v3/{endpoint}"
 
