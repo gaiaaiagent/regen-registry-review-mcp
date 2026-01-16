@@ -899,6 +899,32 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
         for evidence in all_evidence:
             all_snippets.extend(evidence.evidence_snippets)
 
+        # === DEBUG: Log diagnostic info before enrichment ===
+        logger.info(f"[EVIDENCE] Starting coordinate enrichment")
+        logger.info(f"[EVIDENCE] Total snippets to enrich: {len(all_snippets)}")
+        logger.info(f"[EVIDENCE] Documents in metadata: {len(doc_metadata)}")
+
+        # Pre-validate PDF paths exist
+        pdf_validation = {}
+        for doc_id, doc_info in doc_metadata.items():
+            filepath = doc_info.get("filepath", "")
+            if filepath and filepath.lower().endswith(".pdf"):
+                exists = Path(filepath).exists()
+                pdf_validation[doc_id] = {"path": filepath, "exists": exists}
+                if not exists:
+                    logger.error(f"[EVIDENCE] PDF NOT FOUND: {doc_id} -> {filepath}")
+                else:
+                    logger.info(f"[EVIDENCE] PDF verified: {doc_id} -> {filepath}")
+
+        if not pdf_validation:
+            logger.error("[EVIDENCE] No PDF documents found in doc_metadata!")
+            print(f"⚠️  No PDF documents found for coordinate enrichment", flush=True)
+        else:
+            missing_pdfs = sum(1 for v in pdf_validation.values() if not v["exists"])
+            if missing_pdfs > 0:
+                logger.error(f"[EVIDENCE] {missing_pdfs}/{len(pdf_validation)} PDFs are missing!")
+                print(f"⚠️  {missing_pdfs} PDF(s) not found on disk", flush=True)
+
         # Enrich snippets with coordinates (mutates in-place)
         enriched_count = enrich_snippets_with_coordinates(
             snippets=all_snippets,
@@ -906,10 +932,21 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
             min_similarity=0.8,
         )
 
-        print(f"✅ Enriched {enriched_count}/{len(all_snippets)} snippets with coordinates", flush=True)
+        # Log enrichment results
+        if enriched_count == 0 and len(all_snippets) > 0:
+            logger.error(f"[EVIDENCE] ENRICHMENT FAILED: 0/{len(all_snippets)} snippets enriched!")
+            print(f"⚠️  Coordinate enrichment returned 0 results - check logs for details", flush=True)
+        else:
+            success_rate = (enriched_count / len(all_snippets) * 100) if all_snippets else 0
+            logger.info(f"[EVIDENCE] Enrichment complete: {enriched_count}/{len(all_snippets)} ({success_rate:.1f}%)")
+            print(f"✅ Enriched {enriched_count}/{len(all_snippets)} snippets with coordinates ({success_rate:.0f}%)", flush=True)
+
+    except ImportError as e:
+        logger.error(f"[EVIDENCE] Import error during coordinate enrichment: {e}", exc_info=True)
+        print(f"⚠️  Coordinate enrichment unavailable: missing dependency", flush=True)
     except Exception as e:
-        logger.warning(f"Coordinate enrichment failed: {e}")
-        print(f"⚠️  Coordinate enrichment skipped: {e}", flush=True)
+        logger.error(f"[EVIDENCE] Coordinate enrichment failed: {e}", exc_info=True)
+        print(f"⚠️  Coordinate enrichment failed: {e}", flush=True)
 
     # ========================================================================
     # Phase 4: Calculate Statistics & Save

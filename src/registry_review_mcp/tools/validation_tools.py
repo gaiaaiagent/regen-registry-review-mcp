@@ -503,6 +503,8 @@ async def cross_validate(session_id: str) -> dict[str, Any]:
         structural=result_dict.get("structural"),
         cross_document=result_dict.get("cross_document"),
         llm_synthesis=result_dict.get("llm_synthesis"),
+        # Fact sheet data for UI
+        fact_sheets=result_dict.get("fact_sheets"),
         # Summary with enhanced metrics
         summary=ValidationSummary(
             total_validations=result.summary.total_checks,

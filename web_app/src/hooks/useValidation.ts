@@ -53,6 +53,15 @@ export interface FactSheet<T> {
   issues: ValidationIssue[]
 }
 
+export interface GeneralCheck {
+  check_id: string
+  check_type: string
+  field_name: string
+  status: ValidationStatus
+  message: string
+  flagged_for_review: boolean
+}
+
 export interface ValidationResults {
   session_id: string
   last_run: string
@@ -70,21 +79,62 @@ export interface ValidationResults {
     project_id: FactSheet<ProjectIdRow>
     quantification: FactSheet<QuantificationRow>
   }
+  general_checks: GeneralCheck[]
+}
+
+interface BackendFactSheet<T> {
+  status: string
+  rows: T[]
+  issues: Array<{
+    requirement_id: string
+    message: string
+    severity: 'warning' | 'error'
+  }>
 }
 
 interface BackendValidationResponse {
   session_id: string
-  status: string
-  checks: Array<{
+  validated_at: string
+  // New three-layer structure
+  structural?: {
+    checks: Array<Record<string, unknown>>
+    total_checks: number
+    passed: number
+    warnings: number
+    failed: number
+  }
+  cross_document?: {
+    checks: Array<Record<string, unknown>>
+    documents_analyzed: number
+    sufficient_data: boolean
+    total_checks: number
+    passed: number
+    warnings: number
+    failed: number
+  }
+  // Fact sheets for UI (new format)
+  fact_sheets?: {
+    date_alignment: BackendFactSheet<DateAlignmentRow>
+    land_tenure: BackendFactSheet<LandTenureRow>
+    project_id: BackendFactSheet<ProjectIdRow>
+    quantification: BackendFactSheet<QuantificationRow>
+  }
+  // Summary
+  summary: {
+    total_checks?: number
+    passed: number
+    warnings: number
+    failed?: number
+    errors?: number
+    flagged_for_review?: number
+  }
+  all_passed?: boolean
+  // Legacy format support
+  checks?: Array<{
     check: string
     status: string
     details: Record<string, unknown>
   }>
-  summary: {
-    passed: number
-    warnings: number
-    errors: number
-  }
 }
 
 function transformBackendResponse(
@@ -92,6 +142,108 @@ function transformBackendResponse(
   sessionId: string,
   evidenceUpdatedAt: string | null
 ): ValidationResults {
+  const mapStatus = (status: string | undefined): ValidationStatus => {
+    if (!status) return 'pass'
+    if (status === 'passed' || status === 'pass') return 'pass'
+    if (status === 'warning') return 'warning'
+    return 'error'
+  }
+
+  // Extract general checks from structural and cross_document layers
+  const extractGeneralChecks = (): GeneralCheck[] => {
+    const checks: GeneralCheck[] = []
+
+    // Extract from structural checks
+    for (const check of response.structural?.checks || []) {
+      const c = check as Record<string, unknown>
+      checks.push({
+        check_id: String(c.check_id || ''),
+        check_type: String(c.check_type || 'structural'),
+        field_name: String(c.field_name || ''),
+        status: mapStatus(String(c.status || '')),
+        message: String(c.message || ''),
+        flagged_for_review: Boolean(c.flagged_for_review),
+      })
+    }
+
+    // Extract from cross_document checks
+    for (const check of response.cross_document?.checks || []) {
+      const c = check as Record<string, unknown>
+      checks.push({
+        check_id: String(c.check_id || ''),
+        check_type: String(c.check_type || 'cross_document'),
+        field_name: String(c.field_name || ''),
+        status: mapStatus(String(c.status || '')),
+        message: String(c.message || ''),
+        flagged_for_review: Boolean(c.flagged_for_review),
+      })
+    }
+
+    return checks
+  }
+
+  // Use new fact_sheets format if available (preferred)
+  if (response.fact_sheets) {
+    const fs = response.fact_sheets
+    const totalChecks = (response.structural?.total_checks ?? 0) + (response.cross_document?.total_checks ?? 0)
+    const passed = (response.structural?.passed ?? 0) + (response.cross_document?.passed ?? 0)
+    const warnings = (response.structural?.warnings ?? 0) + (response.cross_document?.warnings ?? 0)
+    const errors = (response.structural?.failed ?? 0) + (response.cross_document?.failed ?? 0)
+
+    return {
+      session_id: sessionId,
+      last_run: response.validated_at || new Date().toISOString(),
+      is_stale: false,
+      evidence_updated_at: evidenceUpdatedAt,
+      summary: {
+        passed,
+        warnings,
+        errors,
+        total_checks: totalChecks || response.summary?.total_checks || 0,
+      },
+      fact_sheets: {
+        date_alignment: {
+          status: mapStatus(fs.date_alignment?.status),
+          rows: fs.date_alignment?.rows || [],
+          issues: (fs.date_alignment?.issues || []).map(i => ({
+            requirement_id: i.requirement_id,
+            message: i.message,
+            severity: i.severity,
+          })),
+        },
+        land_tenure: {
+          status: mapStatus(fs.land_tenure?.status),
+          rows: fs.land_tenure?.rows || [],
+          issues: (fs.land_tenure?.issues || []).map(i => ({
+            requirement_id: i.requirement_id,
+            message: i.message,
+            severity: i.severity,
+          })),
+        },
+        project_id: {
+          status: mapStatus(fs.project_id?.status),
+          rows: fs.project_id?.rows || [],
+          issues: (fs.project_id?.issues || []).map(i => ({
+            requirement_id: i.requirement_id,
+            message: i.message,
+            severity: i.severity,
+          })),
+        },
+        quantification: {
+          status: mapStatus(fs.quantification?.status),
+          rows: fs.quantification?.rows || [],
+          issues: (fs.quantification?.issues || []).map(i => ({
+            requirement_id: i.requirement_id,
+            message: i.message,
+            severity: i.severity,
+          })),
+        },
+      },
+      general_checks: extractGeneralChecks(),
+    }
+  }
+
+  // Legacy format fallback (for backwards compatibility)
   const checks = response.checks || []
 
   const dateAlignmentCheck = checks.find(c => c.check === 'date_alignment')
@@ -116,13 +268,6 @@ function transformBackendResponse(
     }))
   }
 
-  const mapStatus = (status: string | undefined): ValidationStatus => {
-    if (!status) return 'pass'
-    if (status === 'passed' || status === 'pass') return 'pass'
-    if (status === 'warning') return 'warning'
-    return 'error'
-  }
-
   return {
     session_id: sessionId,
     last_run: new Date().toISOString(),
@@ -131,41 +276,36 @@ function transformBackendResponse(
     summary: {
       passed: response.summary?.passed ?? 0,
       warnings: response.summary?.warnings ?? 0,
-      errors: response.summary?.errors ?? 0,
+      errors: response.summary?.errors ?? response.summary?.failed ?? 0,
       total_checks: checks.length,
     },
     fact_sheets: {
       date_alignment: {
         status: mapStatus(dateAlignmentCheck?.status),
         rows: extractRows<DateAlignmentRow>(dateAlignmentCheck, 'dates') ||
-              extractRows<DateAlignmentRow>(dateAlignmentCheck, 'documents') ||
-              (dateAlignmentCheck?.details?.sampling_dates ? [{
-                document: 'Sampling Data',
-                start_date: (dateAlignmentCheck.details.sampling_dates as string[])?.[0] || null,
-                end_date: null,
-                document_type: 'sampling',
-              }] : []),
+              extractRows<DateAlignmentRow>(dateAlignmentCheck, 'documents') || [],
         issues: extractIssues(dateAlignmentCheck),
       },
       land_tenure: {
         status: mapStatus(landTenureCheck?.status),
         rows: extractRows<LandTenureRow>(landTenureCheck, 'tenure_records') ||
-              extractRows<LandTenureRow>(landTenureCheck, 'records'),
+              extractRows<LandTenureRow>(landTenureCheck, 'records') || [],
         issues: extractIssues(landTenureCheck),
       },
       project_id: {
         status: mapStatus(projectIdCheck?.status),
         rows: extractRows<ProjectIdRow>(projectIdCheck, 'project_ids') ||
-              extractRows<ProjectIdRow>(projectIdCheck, 'occurrences'),
+              extractRows<ProjectIdRow>(projectIdCheck, 'occurrences') || [],
         issues: extractIssues(projectIdCheck),
       },
       quantification: {
         status: mapStatus(quantificationCheck?.status),
         rows: extractRows<QuantificationRow>(quantificationCheck, 'metrics') ||
-              extractRows<QuantificationRow>(quantificationCheck, 'calculations'),
+              extractRows<QuantificationRow>(quantificationCheck, 'calculations') || [],
         issues: extractIssues(quantificationCheck),
       },
     },
+    general_checks: extractGeneralChecks(),
   }
 }
 

@@ -37,16 +37,6 @@ export function Layout() {
               <Home className="h-4 w-4" />
               Dashboard
             </Link>
-            <Link
-              to="/pdf-test"
-              className={cn(
-                "flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary",
-                location.pathname === "/pdf-test" ? "text-primary" : "text-muted-foreground"
-              )}
-            >
-              <FileText className="h-4 w-4" />
-              PDF Viewer Test
-            </Link>
           </nav>
 
           {/* User Menu */}

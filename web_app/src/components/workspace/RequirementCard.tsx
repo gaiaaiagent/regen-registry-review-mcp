@@ -15,12 +15,15 @@ import {
   FileText,
   ExternalLink,
   Link2Off,
-  Check,
-  X,
   Loader2,
+  RotateCcw,
+  ThumbsUp,
+  ThumbsDown,
+  AlertTriangle,
 } from 'lucide-react'
-import { useVerifySnippet } from '@/hooks/useVerification'
+import { useRequirementOverride, type OverrideStatus, type RequirementOverride } from '@/hooks/useReviewDecisions'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
 interface RequirementCardProps {
   requirement: Requirement
@@ -29,7 +32,7 @@ interface RequirementCardProps {
   manualEvidence?: ManualEvidence[]
   onUnlinkEvidence?: (evidenceId: string) => void
   sessionId?: string
-  verificationStatus?: Record<string, string>
+  override?: RequirementOverride | null
 }
 
 const STATUS_CONFIG = {
@@ -59,6 +62,34 @@ const STATUS_CONFIG = {
   },
 }
 
+const OVERRIDE_STATUS_CONFIG: Record<OverrideStatus, { label: string; className: string; icon: typeof CheckCircle2 }> = {
+  approved: {
+    label: 'Approved',
+    className: 'text-green-600 bg-green-50 dark:bg-green-900/30',
+    icon: CheckCircle2,
+  },
+  rejected: {
+    label: 'Rejected',
+    className: 'text-red-600 bg-red-50 dark:bg-red-900/30',
+    icon: XCircle,
+  },
+  needs_revision: {
+    label: 'Needs Revision',
+    className: 'text-orange-600 bg-orange-50 dark:bg-orange-900/30',
+    icon: AlertTriangle,
+  },
+  conditional: {
+    label: 'Conditional',
+    className: 'text-yellow-600 bg-yellow-50 dark:bg-yellow-900/30',
+    icon: AlertCircle,
+  },
+  pending: {
+    label: 'Pending Review',
+    className: 'text-blue-600 bg-blue-50 dark:bg-blue-900/30',
+    icon: CircleDashed,
+  },
+}
+
 export function RequirementCard({
   requirement,
   isSelected,
@@ -66,11 +97,11 @@ export function RequirementCard({
   manualEvidence = [],
   onUnlinkEvidence,
   sessionId,
-  verificationStatus,
+  override,
 }: RequirementCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(true)
   const { scrollToEvidence, isDragging, highlightFromCoordinates } = useWorkspaceContext()
-  const verifySnippet = useVerifySnippet(sessionId ?? null)
+  const setOverride = useRequirementOverride(sessionId ?? null)
 
   const { isOver, setNodeRef } = useDroppable({
     id: `requirement-${requirement.id}`,
@@ -82,7 +113,6 @@ export function RequirementCard({
   const hasEvidence = evidenceCount > 0
 
   const handleEvidenceClick = (documentId: string, pageNumber: number, boundingBox?: { x0: number; y0: number; x1: number; y1: number }) => {
-    console.log('RequirementCard: Evidence clicked', { documentId, pageNumber, boundingBox })
     scrollToEvidence(documentId, pageNumber)
     if (boundingBox) {
       highlightFromCoordinates({
@@ -93,9 +123,28 @@ export function RequirementCard({
     }
   }
 
+  const handleSetOverride = async (status: OverrideStatus) => {
+    try {
+      await setOverride.mutateAsync({
+        requirementId: requirement.id,
+        status,
+      })
+      toast.success(`Requirement ${status}`, {
+        description: `${requirement.id} marked as ${status}`,
+      })
+    } catch (error) {
+      toast.error('Failed to set decision', {
+        description: error instanceof Error ? error.message : 'Please try again',
+      })
+    }
+  }
+
   const confidencePercent = requirement.confidence
     ? Math.round(requirement.confidence * 100)
     : null
+
+  const overrideConfig = override?.status ? OVERRIDE_STATUS_CONFIG[override.status] : null
+  const OverrideIcon = overrideConfig?.icon
 
   return (
     <div
@@ -152,25 +201,103 @@ export function RequirementCard({
                 </p>
               )}
 
-              {hasEvidence && (
-                <div className="mt-2">
+              {/* Override Status Display */}
+              {override?.status && overrideConfig && OverrideIcon && (
+                <div className={cn('mt-2 flex items-center gap-2 text-xs px-2 py-1.5 rounded', overrideConfig.className)}>
+                  <OverrideIcon className="h-3.5 w-3.5" />
+                  <span className="font-medium">{overrideConfig.label}</span>
+                  <span className="text-muted-foreground">by {override.set_by}</span>
+                </div>
+              )}
+
+              {/* Requirement-Level Decision Buttons */}
+              {sessionId && (
+                <div className="mt-3 flex items-center gap-2 border-t pt-3">
+                  <span className="text-[10px] text-muted-foreground mr-1">Decision:</span>
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
-                    className="h-6 px-2 text-xs"
+                    className={cn(
+                      'h-7 px-2.5 text-xs',
+                      override?.status === 'approved'
+                        ? 'bg-green-100 border-green-400 text-green-700 dark:bg-green-900/50'
+                        : 'border-green-300 hover:bg-green-50 hover:text-green-700 hover:border-green-400'
+                    )}
                     onClick={(e) => {
                       e.stopPropagation()
-                      setIsExpanded(!isExpanded)
+                      handleSetOverride('approved')
                     }}
+                    disabled={setOverride.isPending}
                   >
-                    <FileText className="h-3 w-3 mr-1" />
-                    {evidenceCount} evidence{evidenceCount !== 1 ? 's' : ''}
-                    {isExpanded ? (
-                      <ChevronUp className="h-3 w-3 ml-1" />
+                    {setOverride.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
-                      <ChevronDown className="h-3 w-3 ml-1" />
+                      <>
+                        <ThumbsUp className="h-3.5 w-3.5 mr-1" />
+                        Approve
+                      </>
                     )}
                   </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      'h-7 px-2.5 text-xs',
+                      override?.status === 'needs_revision'
+                        ? 'bg-orange-100 border-orange-400 text-orange-700 dark:bg-orange-900/50'
+                        : 'border-orange-300 hover:bg-orange-50 hover:text-orange-700 hover:border-orange-400'
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleSetOverride('needs_revision')
+                    }}
+                    disabled={setOverride.isPending}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                    Revision
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      'h-7 px-2.5 text-xs',
+                      override?.status === 'rejected'
+                        ? 'bg-red-100 border-red-400 text-red-700 dark:bg-red-900/50'
+                        : 'border-red-300 hover:bg-red-50 hover:text-red-700 hover:border-red-400'
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleSetOverride('rejected')
+                    }}
+                    disabled={setOverride.isPending}
+                  >
+                    <ThumbsDown className="h-3.5 w-3.5 mr-1" />
+                    Reject
+                  </Button>
+                </div>
+              )}
+
+              {hasEvidence && (
+                <div className="mt-2">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setIsExpanded(!isExpanded)
+                      }}
+                    >
+                      <FileText className="h-3 w-3 mr-1" />
+                      {evidenceCount} evidence{evidenceCount !== 1 ? 's' : ''}
+                      {isExpanded ? (
+                        <ChevronUp className="h-3 w-3 ml-1" />
+                      ) : (
+                        <ChevronDown className="h-3 w-3 ml-1" />
+                      )}
+                    </Button>
+                  </div>
 
                   {isExpanded && (
                     <div className="mt-2 space-y-2 pl-1">
@@ -216,50 +343,6 @@ export function RequirementCard({
                           >
                             {ev.text}
                           </p>
-                          <div className="flex items-center gap-1 mt-1 pt-1 border-t border-muted">
-                            <span className="text-[10px] text-muted-foreground mr-auto">
-                              {verificationStatus?.[ev.id] === 'verified' ? '✓ Verified' :
-                               verificationStatus?.[ev.id] === 'rejected' ? '✗ Rejected' : 'Verify:'}
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className={cn(
-                                'h-5 px-1.5 text-xs',
-                                verificationStatus?.[ev.id] === 'verified' && 'text-green-600 bg-green-50'
-                              )}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                verifySnippet.mutate({
-                                  snippetId: ev.id,
-                                  requirementId: requirement.id,
-                                  status: 'verified',
-                                })
-                              }}
-                              disabled={verifySnippet.isPending}
-                            >
-                              {verifySnippet.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className={cn(
-                                'h-5 px-1.5 text-xs',
-                                verificationStatus?.[ev.id] === 'rejected' && 'text-red-600 bg-red-50'
-                              )}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                verifySnippet.mutate({
-                                  snippetId: ev.id,
-                                  requirementId: requirement.id,
-                                  status: 'rejected',
-                                })
-                              }}
-                              disabled={verifySnippet.isPending}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
                         </div>
                       ))}
 

@@ -1,145 +1,233 @@
-import { useState } from 'react'
-import { FileText, Download, Loader2, CheckCircle, RefreshCw } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { useGenerateReport, useDownloadReport } from '@/hooks/useReport'
-import ReactMarkdown from 'react-markdown'
+import { useState, useEffect } from 'react'
+import { useParams } from 'react-router-dom'
+import {
+  FileText,
+  Download,
+  Loader2,
+  CheckCircle2,
+  RefreshCw,
+  AlertCircle,
+} from 'lucide-react'
 import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import ReactMarkdown from 'react-markdown'
+import { useGenerateReport, useDownloadReport, useExistingReport } from '@/hooks/useReport'
+import { FinalDeterminationPanel } from './FinalDeterminationPanel'
 
 interface ReportPanelProps {
-  sessionId: string
+  sessionId?: string
 }
 
-export function ReportPanel({ sessionId }: ReportPanelProps) {
+export function ReportPanel({ sessionId: propSessionId }: ReportPanelProps) {
+  const { sessionId: paramSessionId } = useParams<{ sessionId: string }>()
+  const sessionId = propSessionId ?? paramSessionId ?? ''
+
   const [reportContent, setReportContent] = useState<string | null>(null)
   const [generatedAt, setGeneratedAt] = useState<string | null>(null)
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [generationStep, setGenerationStep] = useState<string | null>(null)
+  const [summary, setSummary] = useState<{
+    requirements_total: number
+    requirements_covered: number
+    requirements_partial: number
+    requirements_missing: number
+    overall_coverage: number
+  } | null>(null)
 
   const generateMutation = useGenerateReport(sessionId)
   const { downloadFile } = useDownloadReport(sessionId)
+  const { data: existingReport, isLoading: isLoadingExisting } = useExistingReport(sessionId)
+
+  // Load existing report content on mount
+  useEffect(() => {
+    if (existingReport && !reportContent) {
+      setReportContent(existingReport.content)
+      setGeneratedAt(existingReport.generated_at)
+      if (existingReport.summary) {
+        setSummary(existingReport.summary)
+      }
+    }
+  }, [existingReport, reportContent])
 
   const handleGenerate = async () => {
-    setIsGenerating(true)
+    toast.info('Generating report...', { description: 'This may take a moment.' })
     try {
-      // 1. Generate Markdown for preview
-      setGenerationStep('Generating report...')
+      // Generate all formats: markdown report, checklist, and docx
       const result = await generateMutation.mutateAsync('markdown')
       setGeneratedAt(result.generated_at)
-      
-      // Fetch the markdown content for preview
+      setSummary(result.summary)
+
+      // Generate checklist and docx formats in parallel (for download buttons)
+      await Promise.all([
+        generateMutation.mutateAsync('checklist').catch(() => {}),
+        generateMutation.mutateAsync('docx').catch(() => {}),
+      ])
+
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8003'
       const token = localStorage.getItem('auth_token')
-      
       const response = await fetch(`${API_URL}/sessions/${sessionId}/report/download`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       })
-      
+
       if (response.ok) {
         const text = await response.text()
         setReportContent(text)
+        toast.success('Report generated', { description: 'Preview and download options available.' })
+      } else {
+        toast.error('Failed to fetch report content')
       }
-      
-      // 2. Generate Checklist
-      setGenerationStep('Populating checklist...')
-      await generateMutation.mutateAsync('checklist')
-      
-      // 3. Generate DOCX
-      setGenerationStep('Preparing DOCX...')
-      await generateMutation.mutateAsync('docx')
-      
-      toast.success('Report and checklist generated successfully')
     } catch (error) {
-      toast.error('Failed to generate one or more report formats')
-      console.error(error)
-    } finally {
-      setIsGenerating(false)
-      setGenerationStep(null)
+      toast.error('Report generation failed', {
+        description: error instanceof Error ? error.message : 'Please try again.',
+      })
     }
   }
 
   const handleDownload = async (type: 'report' | 'checklist' | 'checklist-docx') => {
     try {
       await downloadFile(type)
-      toast.success('Download started')
+      const names = {
+        report: 'Markdown report',
+        checklist: 'Checklist markdown',
+        'checklist-docx': 'DOCX checklist',
+      }
+      toast.success(`Downloaded ${names[type]}`)
     } catch (error) {
-      toast.error('Failed to download file')
-      console.error(error)
+      toast.error('Download failed', {
+        description: error instanceof Error ? error.message : 'Please try again.',
+      })
     }
   }
 
-  return (
-    <div className="flex flex-col h-full p-4 space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <FileText className="h-5 w-5" />
-          <h2 className="font-semibold">Review Report</h2>
-        </div>
-
-        <Button
-          onClick={handleGenerate}
-          disabled={isGenerating}
-          size="sm"
-        >
-          {isGenerating ? (
-            <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {generationStep || 'Generating...'}</>
-          ) : generatedAt ? (
-            <><RefreshCw className="h-4 w-4 mr-2" /> Regenerate</>
-          ) : (
-            'Generate Report'
-          )}
-        </Button>
+  if (!sessionId) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center p-4 text-muted-foreground">
+        <AlertCircle className="h-12 w-12 mb-4 opacity-50" />
+        <p className="text-sm font-medium">No session selected</p>
       </div>
+    )
+  }
 
-      {/* Status */}
-      {generatedAt && (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <CheckCircle className="h-3.5 w-3.5 text-green-500" />
-          Generated {new Date(generatedAt).toLocaleString()}
+  if ((generateMutation.isPending || isLoadingExisting) && !reportContent) {
+    return (
+      <div className="h-full flex flex-col">
+        <div className="flex-1 p-4 space-y-4">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-8 w-3/4" />
+          <Skeleton className="h-64 w-full" />
         </div>
-      )}
+      </div>
+    )
+  }
 
-      {/* Preview */}
-      {reportContent ? (
-        <div className="flex-1 overflow-auto border rounded-lg p-4 bg-muted/30">
-          <div className="prose prose-sm max-w-none dark:prose-invert">
-            <ReactMarkdown>{reportContent}</ReactMarkdown>
-          </div>
+  return (
+    <ScrollArea className="h-full">
+      {/* Final Determination Section */}
+      <FinalDeterminationPanel sessionId={sessionId} />
+
+      {/* Report Generation Section */}
+      {!reportContent && !generateMutation.isPending ? (
+        <div className="flex flex-col items-center justify-center p-8 text-muted-foreground">
+          <FileText className="h-12 w-12 mb-4 opacity-30" />
+          <p className="text-sm font-medium">No Report Generated</p>
+          <p className="text-xs text-center mt-2 max-w-[280px]">
+            Generate a review report with evidence citations, validation results,
+            and coverage summary for download.
+          </p>
+          <Button className="mt-4" onClick={handleGenerate}>
+            <FileText className="h-4 w-4 mr-2" />
+            Generate Report
+          </Button>
         </div>
       ) : (
-        !isGenerating && (
-          <div className="flex-1 flex items-center justify-center text-muted-foreground border rounded-lg bg-muted/10 border-dashed">
-            <div className="text-center p-6">
-              <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="font-medium">Generate a report to see the preview</p>
-              <p className="text-sm mt-1">Includes evidence citations and validation results</p>
+        <div className="flex flex-col">
+          <div className="px-4 py-3 border-t bg-muted/20">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                <span className="text-sm font-medium">Review Report</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleGenerate}
+                disabled={generateMutation.isPending}
+              >
+                {generateMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                    Regenerate
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {generatedAt && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                Generated {new Date(generatedAt).toLocaleString()}
+              </div>
+            )}
+
+            {summary && (
+              <div className="flex items-center gap-4 text-xs">
+                <span className="text-green-600">
+                  {summary.requirements_covered} covered
+                </span>
+                <span className="text-yellow-600">
+                  {summary.requirements_partial} partial
+                </span>
+                <span className="text-red-600">
+                  {summary.requirements_missing} missing
+                </span>
+                <span className="text-muted-foreground">
+                  ({summary.overall_coverage}% coverage)
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="p-4">
+            <div className="prose prose-sm max-w-none dark:prose-invert">
+              <ReactMarkdown>{reportContent}</ReactMarkdown>
             </div>
           </div>
-        )
-      )}
-      
-      {/* Loading State Skeleton */}
-      {isGenerating && !reportContent && (
-         <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground border rounded-lg bg-muted/10">
-           <Loader2 className="h-8 w-8 animate-spin mb-4 opacity-50" />
-           <p>{generationStep || 'Generating analysis...'}</p>
-         </div>
-      )}
 
-      {/* Download Buttons */}
-      {generatedAt && (
-        <div className="flex gap-2 pt-4 border-t overflow-x-auto">
-          <Button variant="outline" size="sm" onClick={() => handleDownload('report')}>
-            <Download className="h-4 w-4 mr-2" /> Markdown
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => handleDownload('checklist')}>
-            <Download className="h-4 w-4 mr-2" /> Checklist
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => handleDownload('checklist-docx')}>
-            <Download className="h-4 w-4 mr-2" /> DOCX
-          </Button>
+          <div className="px-4 py-3 border-t bg-muted/20">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDownload('report')}
+              >
+                <Download className="h-3.5 w-3.5 mr-1.5" />
+                Report (.md)
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDownload('checklist')}
+              >
+                <Download className="h-3.5 w-3.5 mr-1.5" />
+                Checklist (.md)
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDownload('checklist-docx')}
+              >
+                <Download className="h-3.5 w-3.5 mr-1.5" />
+                Checklist (.docx)
+              </Button>
+            </div>
+          </div>
         </div>
       )}
-    </div>
+    </ScrollArea>
   )
 }

@@ -24,6 +24,7 @@ from .llm_synthesis import (
     run_llm_synthesis,
     LLMSynthesisResult,
 )
+from ..tools.validation_tools import extract_structured_fields_from_evidence
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,9 @@ class ValidationResult:
 
     # Summary
     summary: ValidationSummary
+
+    # Fact sheet data for UI (extracted from evidence)
+    fact_sheets: dict[str, Any] = field(default_factory=dict)
 
     # Backward compatibility with old validation.json format
     date_alignments: list[dict] = field(default_factory=list)
@@ -101,6 +105,9 @@ class ValidationResult:
             # Summary
             "summary": asdict(self.summary),
 
+            # Fact sheet data for UI
+            "fact_sheets": self.fact_sheets,
+
             # Backward compatibility
             "date_alignments": self.date_alignments,
             "land_tenure": self.land_tenure,
@@ -142,6 +149,131 @@ def _build_summary(
         cross_document_checks=cross_doc.total_checks,
         llm_synthesis_available=llm_synthesis.available,
     )
+
+
+def _build_fact_sheets(
+    evidence_data: dict,
+    structural: StructuralValidationResult,
+    cross_doc: CrossDocumentValidationResult
+) -> dict[str, Any]:
+    """Build fact sheet data for the UI from extracted evidence.
+
+    Returns formatted data for the fact sheet tables:
+    - date_alignment: Documents with their start/end dates
+    - land_tenure: Documents with ownership info
+    - project_id: Documents with project IDs
+    - quantification: Documents with GHG metrics
+    """
+    # Extract structured fields from evidence
+    extracted = extract_structured_fields_from_evidence(evidence_data)
+
+    # Compute overall status for each category based on checks
+    def compute_status(check_type: str) -> str:
+        relevant_checks = [c for c in cross_doc.checks if c.check_type == check_type]
+        if not relevant_checks:
+            # Check structural checks for this field type
+            structural_checks = [c for c in structural.checks if check_type in c.field_name.lower()]
+            if not structural_checks:
+                return "pass"
+            if any(c.status == "fail" for c in structural_checks):
+                return "error"
+            if any(c.status == "warning" for c in structural_checks):
+                return "warning"
+            return "pass"
+        if any(c.status == "fail" for c in relevant_checks):
+            return "error"
+        if any(c.status == "warning" for c in relevant_checks):
+            return "warning"
+        return "pass"
+
+    def extract_issues(check_type: str) -> list[dict]:
+        issues = []
+        for c in cross_doc.checks:
+            if c.check_type == check_type and c.status in ("warning", "fail"):
+                issues.append({
+                    "requirement_id": c.field_name,
+                    "message": c.message,
+                    "severity": "error" if c.status == "fail" else "warning",
+                })
+        for c in structural.checks:
+            if check_type in c.field_name.lower() and c.status in ("warning", "fail"):
+                issues.append({
+                    "requirement_id": c.field_name,
+                    "message": c.message,
+                    "severity": "error" if c.status == "fail" else "warning",
+                })
+        return issues
+
+    # Transform dates into date_alignment rows
+    date_rows = []
+    for d in extracted.get("dates", []):
+        # Group dates by document for date alignment display
+        date_rows.append({
+            "document": d.get("document_name", "Unknown"),
+            "document_id": d.get("document_id"),
+            "page_number": d.get("page"),
+            "document_type": d.get("date_type", "date").replace("_", " ").title(),
+            "start_date": d.get("date_value") if "start" in d.get("date_type", "") else None,
+            "end_date": d.get("date_value") if "end" in d.get("date_type", "") else None,
+        })
+
+    # Transform tenure into land_tenure rows
+    tenure_rows = []
+    for t in extracted.get("tenure", []):
+        tenure_rows.append({
+            "document": t.get("document_name", "Unknown"),
+            "document_id": t.get("document_id"),
+            "page_number": t.get("page"),
+            "owner_name": t.get("owner_name"),
+            "area_hectares": t.get("area_hectares"),
+            "tenure_type": t.get("tenure_type"),
+            "expiry_date": t.get("expiry_date"),
+        })
+
+    # Transform project_ids into project_id rows
+    project_id_rows = []
+    for p in extracted.get("project_ids", []):
+        project_id_rows.append({
+            "document": p.get("document_name", "Unknown"),
+            "document_id": p.get("document_id"),
+            "page_number": p.get("page"),
+            "document_type": "Project Document",
+            "project_id": p.get("project_id"),
+        })
+
+    # Build quantification rows from structured checks
+    quantification_rows = []
+    for c in structural.checks:
+        if c.field_name in ("area_hectares", "crediting_period_years", "carbon_stock"):
+            quantification_rows.append({
+                "document": c.source or "Multiple",
+                "metric": c.field_name.replace("_", " ").title(),
+                "value": c.value if isinstance(c.value, (int, float)) else None,
+                "unit": "ha" if "hectares" in c.field_name else "years" if "years" in c.field_name else "tCO2e",
+            })
+
+    return {
+        "date_alignment": {
+            "status": compute_status("date_alignment"),
+            "rows": date_rows,
+            "issues": extract_issues("date_alignment"),
+        },
+        "land_tenure": {
+            "status": compute_status("name_consistency"),
+            "rows": tenure_rows,
+            "issues": extract_issues("name_consistency"),
+        },
+        "project_id": {
+            "status": compute_status("id_consistency"),
+            "rows": project_id_rows,
+            "issues": extract_issues("id_consistency"),
+        },
+        "quantification": {
+            "status": compute_status("range"),
+            "rows": quantification_rows,
+            "issues": extract_issues("range"),
+        },
+    }
 
 
 def _build_backward_compat(
@@ -274,6 +406,9 @@ async def validate_session(session_id: str) -> ValidationResult:
     # Build summary
     summary = _build_summary(structural_results, cross_doc_results, llm_results)
 
+    # Build fact sheet data for UI
+    fact_sheets = _build_fact_sheets(evidence_data, structural_results, cross_doc_results)
+
     # Build backward-compatible structures
     compat = _build_backward_compat(structural_results, cross_doc_results)
 
@@ -291,6 +426,7 @@ async def validate_session(session_id: str) -> ValidationResult:
         cross_document=cross_doc_results,
         llm_synthesis=llm_results,
         summary=summary,
+        fact_sheets=fact_sheets,
         sanity_checks=compat["sanity_checks"],
         date_alignments=compat["date_alignments"],
         land_tenure=compat["land_tenure"],
@@ -301,6 +437,11 @@ async def validate_session(session_id: str) -> ValidationResult:
 
     # Save validation results
     state_manager.write_json("validation.json", result.to_dict())
+
+    # Update workflow progress to mark validation as completed
+    state_manager.update_json("session.json", {
+        "workflow_progress.cross_validation": "completed"
+    })
 
     logger.info(
         f"Validation complete for {session_id}: "

@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import type { Requirement, Evidence } from '@/contexts/WorkspaceContext'
+import { useValidation } from '@/hooks/useValidation'
 
 interface BoundingBox {
   page: number
@@ -37,7 +39,8 @@ interface EvidenceMatrixResponse {
   session_id: string
   matrix: EvidenceMatrixRow[]
   summary: {
-    total: number
+    total_requirements: number
+    total?: number
     covered: number
     partial: number
     missing: number
@@ -142,15 +145,20 @@ export function useWorkspaceRequirements(sessionId: string | undefined) {
 
   const requirementsByCategory = groupByCategory(requirements)
 
-  const summary = matrixData?.summary ?? {
-    total: 0,
-    covered: 0,
-    partial: 0,
-    missing: 0,
+  // Map API response fields to frontend expected structure
+  const apiSummary = matrixData?.summary
+  const summary = {
+    total: apiSummary?.total_requirements ?? apiSummary?.total ?? 0,
+    covered: apiSummary?.covered ?? 0,
+    partial: apiSummary?.partial ?? 0,
+    missing: apiSummary?.missing ?? 0,
   }
 
-  // null means "no evidence yet" (400 response) - treat as no data, not error
-  const hasData = matrixData !== null && matrixData !== undefined && matrixData.matrix.length > 0
+  // Check if evidence has actually been extracted (not just requirements loaded)
+  // Evidence exists when at least one requirement has coverage
+  const hasData = matrixData !== null && matrixData !== undefined &&
+    matrixData.matrix.length > 0 &&
+    (matrixData.summary.covered > 0 || matrixData.summary.partial > 0)
 
   return {
     requirements,
@@ -257,5 +265,77 @@ export function useFullWorkflow(sessionId: string | undefined) {
                   mapMutation.isPending ? 'map' :
                   confirmMutation.isPending ? 'confirm' :
                   extractMutation.isPending ? 'extract' : null,
+  }
+}
+
+/**
+ * Hook to run the complete review workflow end-to-end:
+ * Discover → Map → Confirm → Extract → Validate → Report
+ *
+ * One-click automation for clean projects where all documents are present.
+ */
+export function useCompleteReview(sessionId: string | undefined) {
+  const queryClient = useQueryClient()
+  const { runFullWorkflow } = useFullWorkflow(sessionId)
+
+  // Use the validation hook's runValidation for proper caching
+  const { runValidation } = useValidation(sessionId)
+
+  const reportMutation = useMutation({
+    mutationFn: async () => {
+      if (!sessionId) throw new Error('Session ID required')
+      const { data, error } = await api.POST('/sessions/{session_id}/report', {
+        params: {
+          path: { session_id: sessionId },
+          query: { format: 'markdown' },
+        },
+      })
+      if (error) throw new Error('Report generation failed')
+      return data
+    },
+  })
+
+  const [currentStage, setCurrentStage] = useState<string | null>(null)
+  const [isPending, setIsPending] = useState(false)
+
+  const runCompleteReview = async (onProgress?: (stage: string) => void) => {
+    if (!sessionId) throw new Error('Session ID required')
+
+    setIsPending(true)
+    try {
+      // Run extraction workflow (discover, map, confirm, extract)
+      await runFullWorkflow(onProgress)
+
+      // Run validation using the validation hook (handles caching)
+      onProgress?.('Running validation...')
+      setCurrentStage('validate')
+      await runValidation()
+
+      // Generate report
+      onProgress?.('Generating report...')
+      setCurrentStage('report')
+      await reportMutation.mutateAsync()
+
+      // Invalidate queries to refresh UI
+      queryClient.invalidateQueries({ queryKey: ['validation', sessionId] })
+      queryClient.invalidateQueries({ queryKey: ['session', sessionId] })
+      queryClient.invalidateQueries({ queryKey: ['existing-report', sessionId] })
+
+      onProgress?.('Complete!')
+      setCurrentStage(null)
+
+      return { success: true }
+    } catch (error) {
+      throw error
+    } finally {
+      setIsPending(false)
+      setCurrentStage(null)
+    }
+  }
+
+  return {
+    runCompleteReview,
+    isPending,
+    currentStage,
   }
 }

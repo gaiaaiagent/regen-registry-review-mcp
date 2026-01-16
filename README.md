@@ -385,6 +385,47 @@ sudo systemctl restart registry-review-api
 - **Proxy:** nginx (Docker) routes `registry.regen.gaiaai.xyz` to backend and serves frontend
 - **SSL:** Let's Encrypt wildcard certificate for `*.regen.gaiaai.xyz`
 
+## Web App vs Custom GPT
+
+The Registry Review system can be accessed through two interfaces that share the same backend:
+
+### Interface Comparison
+
+| Aspect | Web App | Custom GPT |
+|--------|---------|------------|
+| **URL** | [registry.regen.gaiaai.xyz](https://registry.regen.gaiaai.xyz) | [ChatGPT GPT](https://chatgpt.com/g/g-6928c53496ac8191bd6b3b93a1f266c6-registry-review-assistant) |
+| **Session Creation** | 1-click from Google Drive projects | Manual or via example projects |
+| **Document Loading** | Template fast-path (~3s) or GDrive download | Upload manually or use example projects |
+| **User Interaction** | Visual UI with tabs, buttons, panels | Conversational chat interface |
+| **Authentication** | Google OAuth (@regen.network) | ChatGPT account + per-action confirmations |
+| **Progress Visibility** | Real-time stage indicators (1-6) | Text updates after each step |
+| **Evidence Navigation** | Click-to-highlight in side-by-side PDF viewer | Download checklist with citations |
+| **Validation View** | Interactive tables with approve/reject buttons | Summary text table |
+| **Report Generation** | In-UI preview + download buttons | Download link |
+
+### When to Use Which
+
+| Use Case | Recommended Interface |
+|----------|----------------------|
+| Full document review with PDF viewing | **Web App** |
+| Quick status check / list sessions | Either |
+| Non-technical users | **Web App** |
+| Bulk operations via conversation | **GPT** |
+| API exploration / debugging | **GPT** |
+| Mobile access | **GPT** |
+
+### Shared Backend
+
+Both interfaces call the same FastAPI backend (`chatgpt_rest_api.py`), so you get:
+- Identical evidence extraction (same snippets, same citations)
+- Same requirement coverage calculations
+- Same validation checks and report formats
+- Sessions created in one interface are visible in the other
+
+### Note on Validation Display
+
+The Web App shows all validation results including informational warnings (e.g., "recommended field 'project_id' is missing"), while the GPT shows a simplified summary focusing on actionable items. Both see the same underlying data.
+
 ## License
 
 Copyright 2025 Regen Network Development, Inc.

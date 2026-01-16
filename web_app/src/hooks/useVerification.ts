@@ -82,3 +82,39 @@ export function useVerifySnippet(sessionId: string | null) {
     },
   })
 }
+
+export function useBulkVerify(sessionId: string | null) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (snippets: { snippetId: string; requirementId: string }[]) => {
+      if (!sessionId) throw new Error('No session')
+
+      const results = await Promise.all(
+        snippets.map(({ snippetId, requirementId }) =>
+          api.POST('/sessions/{session_id}/verify-extraction', {
+            params: { path: { session_id: sessionId } },
+            body: {
+              snippet_id: snippetId,
+              requirement_id: requirementId,
+              status: 'verified',
+              reviewer: 'user',
+            },
+          })
+        )
+      )
+
+      const failed = results.filter((r) => r.error)
+      if (failed.length > 0) {
+        throw new Error(`Failed to verify ${failed.length} snippets`)
+      }
+
+      return results.length
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['verification-status', sessionId] })
+      queryClient.invalidateQueries({ queryKey: ['evidence-matrix', sessionId] })
+      queryClient.invalidateQueries({ queryKey: ['requirements', sessionId] })
+    },
+  })
+}

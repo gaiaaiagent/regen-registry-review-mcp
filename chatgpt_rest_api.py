@@ -77,10 +77,55 @@ def get_derived_status(workflow_progress: dict | None) -> str:
     return "Initialized"
 
 
+def transform_workflow_progress(workflow_progress: dict | None) -> dict:
+    """Transform backend workflow_progress to frontend expected format.
+
+    Backend stores individual stage statuses like:
+        {"initialize": "completed", "document_discovery": "completed", ...}
+
+    Frontend expects:
+        {"current_stage": 3, "stage_name": "Map", "completed_stages": ["Initialize", "Discover"]}
+    """
+    if not workflow_progress:
+        return {"current_stage": 1, "stage_name": "Initialize", "completed_stages": []}
+
+    # Map backend stage keys to frontend stage names (ordered)
+    stages = [
+        ("initialize", "Initialize"),
+        ("document_discovery", "Discover"),
+        ("requirement_mapping", "Map"),
+        ("evidence_extraction", "Extract"),
+        ("cross_validation", "Validate"),
+        ("report_generation", "Report"),
+    ]
+
+    completed_stages = []
+    current_stage = 1
+    stage_name = "Initialize"
+
+    for i, (stage_key, display_name) in enumerate(stages):
+        if workflow_progress.get(stage_key) == "completed":
+            completed_stages.append(display_name)
+            current_stage = i + 1
+            stage_name = display_name
+        elif workflow_progress.get(stage_key) == "in_progress":
+            current_stage = i + 1
+            stage_name = display_name
+            break
+
+    return {
+        "current_stage": current_stage,
+        "stage_name": stage_name,
+        "completed_stages": completed_stages,
+    }
+
+
 def apply_derived_status(session: dict) -> dict:
-    """Apply derived status to a session dict, replacing the static status field."""
+    """Apply derived status and transform workflow_progress for frontend."""
     if "workflow_progress" in session:
         session["status"] = get_derived_status(session["workflow_progress"])
+        # Transform workflow_progress to frontend expected format
+        session["workflow_progress"] = transform_workflow_progress(session["workflow_progress"])
     return session
 
 
@@ -635,12 +680,15 @@ async def map_requirements(session_id: str):
     Uses semantic matching to identify which documents address which
     checklist requirements.
     """
+    logger.info(f"map_requirements called for session_id={session_id}")
     try:
         result = await mapping_tools.map_all_requirements(session_id)
         return result
-    except FileNotFoundError:
+    except FileNotFoundError as e:
+        logger.error(f"FileNotFoundError in map_requirements: {e}")
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
     except Exception as e:
+        logger.error(f"Exception in map_requirements: {type(e).__name__}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -3018,7 +3066,6 @@ def gdrive_download_file_content(file_id: str) -> bytes:
     token = get_gdrive_access_token()
     headers = {
         "Authorization": f"Bearer {token}",
-        "x-goog-user-project": "koi-sensor",
     }
     download_url = f"https://www.googleapis.com/drive/v3/files/{file_id}"
     download_params = {"alt": "media"}
@@ -3128,15 +3175,101 @@ async def discover_gdrive_projects(parent_folder_id: str | None = Query(None, de
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def get_template_for_project(project_name: str, project_id: str | None) -> Path | None:
+    """Check if a pre-staged template exists for the project.
+
+    Templates allow instant session creation by copying local files
+    instead of downloading from Google Drive.
+    """
+    templates_dir = Path.home() / ".local/share/registry-review-mcp/templates"
+    if not templates_dir.exists():
+        return None
+
+    # Check each template directory for a matching manifest
+    for template_dir in templates_dir.iterdir():
+        if not template_dir.is_dir():
+            continue
+        manifest_path = template_dir / "template_manifest.json"
+        if not manifest_path.exists():
+            continue
+        try:
+            with open(manifest_path) as f:
+                manifest = json.load(f)
+            # Match by project_id (preferred) or project_name
+            if project_id and manifest.get("project_id") == project_id:
+                return template_dir
+            if manifest.get("project_name") == project_name:
+                return template_dir
+        except Exception:
+            continue
+    return None
+
+
+async def create_session_from_template(
+    template_dir: Path,
+    project_name: str,
+    methodology: str,
+    project_id: str | None,
+) -> CreateSessionFromProjectResponse:
+    """Fast-path: create session from pre-staged template files."""
+    import shutil
+    from src.registry_review_mcp.utils.state import StateManager
+
+    # Create the session
+    session_result = await session_tools.create_session(
+        project_name=project_name,
+        methodology=methodology,
+        project_id=project_id,
+    )
+    session_id = session_result["session_id"]
+
+    # Get session uploads directory
+    session_dir = Path.home() / ".local/share/registry-review-mcp/sessions" / session_id / "uploads"
+    session_dir.mkdir(parents=True, exist_ok=True)
+
+    # Copy PDF files directly (no base64, no download - instant!)
+    imported_count = 0
+    for pdf_file in template_dir.glob("*.pdf"):
+        dest_path = session_dir / pdf_file.name
+        shutil.copy2(pdf_file, dest_path)
+        imported_count += 1
+
+    # Register uploads directory as a document source (required for discover_documents)
+    state_manager = StateManager(session_id)
+    session_data = state_manager.read_json("session.json")
+    document_sources = session_data.get("document_sources", [])
+    document_sources.append({
+        "source_type": "upload",
+        "metadata": {"directory": str(session_dir)},
+    })
+    state_manager.update_json("session.json", {"document_sources": document_sources})
+
+    # Run document discovery
+    discovery_result = await document_tools.discover_documents(session_id)
+
+    return CreateSessionFromProjectResponse(
+        success=True,
+        session_id=session_id,
+        project_name=project_name,
+        methodology=methodology,
+        imported_count=imported_count,
+        discovery_summary={
+            "documents_found": discovery_result.get("documents_found", 0),
+            "classification_summary": discovery_result.get("classification_summary", {}),
+        },
+    )
+
+
 @app.post("/gdrive/projects/{folder_id}/create-session", response_model=CreateSessionFromProjectResponse, summary="Create session from Google Drive project")
 async def create_session_from_gdrive_project(folder_id: str):
     """One-click session creation from a Google Drive project folder.
 
     This endpoint:
     1. Reads the project_manifest.json from the folder
-    2. Creates a new review session with the manifest metadata
-    3. Imports all PDF files from the folder
-    4. Runs document discovery
+    2. Checks for pre-staged template (instant local copy if available)
+    3. Creates a new review session with the manifest metadata
+    4. Imports all PDF files from the folder (or template)
+    5. Runs document discovery
 
     Returns the new session ID and import summary.
     """
@@ -3175,6 +3308,18 @@ async def create_session_from_gdrive_project(folder_id: str):
                 detail=f"Session already exists for this project: {existing_session_id}",
             )
 
+        # FAST PATH: Check for pre-staged template
+        template_dir = get_template_for_project(manifest.project_name, manifest.project_id)
+        if template_dir:
+            logger.info(f"Using template from {template_dir} for fast session creation")
+            return await create_session_from_template(
+                template_dir=template_dir,
+                project_name=manifest.project_name,
+                methodology=manifest.methodology,
+                project_id=manifest.project_id,
+            )
+
+        # SLOW PATH: Download from Google Drive
         # Create the session
         session_result = await session_tools.create_session(
             project_name=manifest.project_name,
@@ -3203,7 +3348,6 @@ async def create_session_from_gdrive_project(folder_id: str):
         token = get_gdrive_access_token()
         headers = {
             "Authorization": f"Bearer {token}",
-            "x-goog-user-project": "koi-sensor",
         }
 
         imported_files = []

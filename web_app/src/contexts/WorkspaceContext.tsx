@@ -175,3 +175,7 @@ export function useWorkspaceContext(): WorkspaceContextType {
   }
   return context
 }
+
+export function useOptionalWorkspaceContext(): WorkspaceContextType | null {
+  return useContext(WorkspaceContext)
+}

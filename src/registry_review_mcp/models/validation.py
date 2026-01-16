@@ -145,6 +145,9 @@ class ValidationResult(BaseModel):
     cross_document: dict | None = None  # Full Layer 2 results
     llm_synthesis: dict | None = None  # Full Layer 3 results
 
+    # Fact sheet data for UI display
+    fact_sheets: dict | None = None
+
 
 __all__ = [
     "DateField",

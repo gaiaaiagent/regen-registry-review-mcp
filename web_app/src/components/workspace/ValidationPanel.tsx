@@ -1,19 +1,23 @@
-import { useCallback } from 'react'
+import { useCallback, useState, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
-import { ShieldCheck, AlertCircle, Play } from 'lucide-react'
+import { ShieldCheck, AlertCircle, Play, RefreshCw, AlertTriangle, CheckCircle2, XCircle, Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Badge } from '@/components/ui/badge'
 import { ValidationSummary } from './ValidationSummary'
 import { FactSheetTable } from './FactSheetTable'
 import { useValidation } from '@/hooks/useValidation'
+import { useExtractEvidence } from '@/hooks/useWorkspace'
 import { useWorkspaceContext } from '@/contexts/WorkspaceContext'
+import { cn } from '@/lib/utils'
 import type {
   DateAlignmentRow,
   LandTenureRow,
   ProjectIdRow,
   QuantificationRow,
+  GeneralCheck,
 } from '@/hooks/useValidation'
 
 interface ValidationPanelProps {
@@ -28,6 +32,7 @@ export function ValidationPanel({
   const { sessionId: paramSessionId } = useParams<{ sessionId: string }>()
   const sessionId = propSessionId ?? paramSessionId
   const { setFocusedRequirementId, scrollToEvidence } = useWorkspaceContext()
+  const [isReextracting, setIsReextracting] = useState(false)
 
   const {
     validation,
@@ -38,6 +43,8 @@ export function ValidationPanel({
     isRunning,
     runValidation,
   } = useValidation(sessionId)
+
+  const extractEvidence = useExtractEvidence(sessionId)
 
   const handleIssueClick = (requirementId: string) => {
     setFocusedRequirementId(requirementId)
@@ -62,6 +69,28 @@ export function ValidationPanel({
       await runValidation()
     } catch (error) {
       console.error('Validation failed:', error)
+    }
+  }
+
+  const handleReextractAndValidate = async () => {
+    setIsReextracting(true)
+    try {
+      toast.info('Re-extracting evidence...', {
+        description: 'This may take a few minutes for large document sets.',
+      })
+      await extractEvidence.mutateAsync()
+      toast.success('Evidence re-extracted', {
+        description: 'Now running validation with structured field data...',
+      })
+      await runValidation()
+      toast.success('Validation complete')
+    } catch (error) {
+      console.error('Re-extraction failed:', error)
+      toast.error('Re-extraction failed', {
+        description: 'Please try again or check the console for details.',
+      })
+    } finally {
+      setIsReextracting(false)
     }
   }
 
@@ -120,7 +149,25 @@ export function ValidationPanel({
     )
   }
 
-  const { summary, fact_sheets, last_run } = validation!
+  const { summary, fact_sheets, last_run, general_checks } = validation!
+
+  // Filter general checks to show warnings and errors
+  const warningChecks = useMemo(() =>
+    (general_checks || []).filter(c => c.status === 'warning'),
+    [general_checks]
+  )
+  const errorChecks = useMemo(() =>
+    (general_checks || []).filter(c => c.status === 'error'),
+    [general_checks]
+  )
+  const hasGeneralIssues = warningChecks.length > 0 || errorChecks.length > 0
+
+  // Check if validation ran but found no data (structured fields missing)
+  const hasNoData = summary.total_checks === 0 &&
+    fact_sheets.date_alignment.rows.length === 0 &&
+    fact_sheets.land_tenure.rows.length === 0 &&
+    fact_sheets.project_id.rows.length === 0 &&
+    fact_sheets.quantification.rows.length === 0
 
   return (
     <div className="h-full flex flex-col">
@@ -132,10 +179,46 @@ export function ValidationPanel({
           warnings={summary.warnings}
           errors={summary.errors}
           totalChecks={summary.total_checks}
-          isRunning={isRunning}
+          isRunning={isRunning || isReextracting}
           onRunValidation={handleRunValidation}
         />
       </div>
+
+      {hasNoData && (
+        <div className="mx-4 my-3 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-yellow-500 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-yellow-700 dark:text-yellow-300">
+                No structured data found for validation
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Evidence was extracted without structured field data (dates, owner names, project IDs).
+                Re-extract evidence to enable validation checks.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={handleReextractAndValidate}
+                disabled={isReextracting || extractEvidence.isPending}
+              >
+                {isReextracting || extractEvidence.isPending ? (
+                  <>
+                    <RefreshCw className="h-3 w-3 mr-2 animate-spin" />
+                    Re-extracting...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-3 w-3 mr-2" />
+                    Re-extract Evidence & Validate
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-4">
@@ -216,6 +299,75 @@ export function ValidationPanel({
             onReviewStatusChange={handleReviewStatusChange}
             emptyMessage="No quantification data found"
           />
+
+          {hasGeneralIssues && (
+            <div className="border rounded-lg overflow-hidden bg-card">
+              <div className="px-4 py-3 border-b bg-muted/30">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Info className="h-4 w-4 text-blue-500" />
+                    <h3 className="font-medium text-sm">General Validation Checks</h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {warningChecks.length > 0 && (
+                      <Badge variant="warning">{warningChecks.length} warning{warningChecks.length !== 1 ? 's' : ''}</Badge>
+                    )}
+                    {errorChecks.length > 0 && (
+                      <Badge variant="destructive">{errorChecks.length} error{errorChecks.length !== 1 ? 's' : ''}</Badge>
+                    )}
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Additional structural and cross-document validation results
+                </p>
+              </div>
+
+              <div className="p-4 space-y-2">
+                {errorChecks.map((check) => (
+                  <div
+                    key={check.check_id}
+                    className="flex items-start gap-2 p-2 rounded bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800"
+                  >
+                    <XCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-red-700 dark:text-red-300">
+                          {check.field_name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </span>
+                        <Badge variant="outline" className="text-[10px] px-1 py-0">
+                          {check.check_type}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                        {check.message}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                {warningChecks.map((check) => (
+                  <div
+                    key={check.check_id}
+                    className="flex items-start gap-2 p-2 rounded bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800"
+                  >
+                    <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-yellow-700 dark:text-yellow-300">
+                          {check.field_name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </span>
+                        <Badge variant="outline" className="text-[10px] px-1 py-0">
+                          {check.check_type}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-1">
+                        {check.message}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </ScrollArea>
     </div>

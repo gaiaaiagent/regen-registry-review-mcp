@@ -6,7 +6,6 @@ import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { RoleProtectedRoute } from '@/components/RoleProtectedRoute'
 import { Layout } from '@/components/Layout'
 import { Dashboard } from '@/pages/Dashboard'
-import { PDFTestPage } from '@/pages/PDFTestPage'
 import { SessionWorkspace } from '@/pages/SessionWorkspace'
 import { LoginPage } from '@/pages/LoginPage'
 import { AuthCallback } from '@/pages/AuthCallback'
@@ -51,7 +50,6 @@ function App() {
               }
             >
               <Route index element={<Dashboard />} />
-              <Route path="pdf-test" element={<PDFTestPage />} />
               <Route path="workspace/:sessionId" element={<SessionWorkspace />} />
             </Route>
 

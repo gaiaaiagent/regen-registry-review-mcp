@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, Component, type ReactNode } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import {
@@ -18,7 +18,7 @@ interface PDFDocument {
   }>
 }
 import { useHighlights } from '@/hooks/useHighlights'
-import { useWorkspaceContext, type DragData, type ExternalHighlight } from '@/contexts/WorkspaceContext'
+import { useOptionalWorkspaceContext, type DragData, type ExternalHighlight } from '@/contexts/WorkspaceContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -32,6 +32,86 @@ import {
 
 import { GlobalWorkerOptions } from 'pdfjs-dist'
 GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
+
+interface PDFErrorBoundaryState {
+  hasError: boolean
+  error: Error | null
+  retryCount: number
+}
+
+const MAX_AUTO_RETRIES = 3
+const RETRY_DELAY_MS = 200
+
+class PDFErrorBoundary extends Component<{ children: ReactNode; onRetry?: () => void }, PDFErrorBoundaryState> {
+  private retryTimer: ReturnType<typeof setTimeout> | null = null
+
+  constructor(props: { children: ReactNode; onRetry?: () => void }) {
+    super(props)
+    this.state = { hasError: false, error: null, retryCount: 0 }
+  }
+
+  static getDerivedStateFromError(error: Error): Partial<PDFErrorBoundaryState> {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('PDF Viewer error:', error, errorInfo)
+
+    // Auto-retry for getPageView race condition errors
+    if (error.message?.includes('getPageView') && this.state.retryCount < MAX_AUTO_RETRIES) {
+      this.retryTimer = setTimeout(() => {
+        this.setState(prev => ({
+          hasError: false,
+          error: null,
+          retryCount: prev.retryCount + 1
+        }))
+      }, RETRY_DELAY_MS * (this.state.retryCount + 1))
+    }
+  }
+
+  componentWillUnmount() {
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer)
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      // If we're still auto-retrying, show a loading state
+      if (this.state.error?.message?.includes('getPageView') && this.state.retryCount < MAX_AUTO_RETRIES) {
+        return (
+          <div className="flex items-center justify-center h-full">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <span className="ml-2">Initializing viewer...</span>
+          </div>
+        )
+      }
+
+      // Show manual retry option only after auto-retries exhausted
+      return (
+        <div className="flex flex-col items-center justify-center h-full bg-muted/20 p-4">
+          <AlertTriangle className="h-12 w-12 text-amber-500 mb-4" />
+          <p className="text-sm font-medium mb-2">PDF Viewer encountered an error</p>
+          <p className="text-xs text-muted-foreground text-center mb-4">
+            The document is loading but highlighting may not work correctly.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              this.setState({ hasError: false, error: null, retryCount: 0 })
+              this.props.onRetry?.()
+            }}
+          >
+            Retry
+          </Button>
+        </div>
+      )
+    }
+
+    return this.props.children
+  }
+}
 
 interface PDFViewerProps {
   url: string
@@ -50,6 +130,7 @@ interface PDFContentProps {
   onAddHighlight: (position: ScaledPosition, content: Content, comment?: { text: string; emoji: string }) => void
   onRemoveHighlight: (id: string) => void
   onDocumentLoaded: (pageCount: number, hasText: boolean) => void
+  onViewerReady: () => void
   onClipText?: (text: string, pageNumber: number, boundingBox?: { x: number; y: number; width: number; height: number }) => void
   documentId: string
 }
@@ -270,6 +351,30 @@ function ExternalHighlightOverlay({ highlight, containerRef }: ExternalHighlight
   return null
 }
 
+// Wrapper component that delays mounting PDFContent to avoid race condition
+// where PdfHighlighter tries to access viewer.getPageView() before initialization
+function DelayedPDFContent(props: PDFContentProps) {
+  const [shouldMount, setShouldMount] = useState(false)
+
+  useEffect(() => {
+    // Brief delay allows pdf.js viewer to fully initialize before
+    // PdfHighlighter starts trying to create highlight layers
+    const timer = setTimeout(() => setShouldMount(true), 100)
+    return () => clearTimeout(timer)
+  }, [])
+
+  if (!shouldMount) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2">Initializing viewer...</span>
+      </div>
+    )
+  }
+
+  return <PDFContent {...props} />
+}
+
 function PDFContent({
   pdfDocument,
   highlights,
@@ -278,6 +383,7 @@ function PDFContent({
   onAddHighlight,
   onRemoveHighlight,
   onDocumentLoaded,
+  onViewerReady,
   onClipText,
   documentId,
 }: PDFContentProps) {
@@ -336,6 +442,10 @@ function PDFContent({
       onScrollChange={() => {}}
       scrollRef={(scrollTo) => {
         scrollViewerToRef.current = scrollTo
+        // The scrollRef callback is invoked by PdfHighlighter's onDocumentReady,
+        // which fires after the 'pagesinit' event. This is the true signal that
+        // the viewer is fully initialized and getPageView() will work.
+        onViewerReady()
       }}
       onSelectionFinished={(
         position,
@@ -416,7 +526,9 @@ export function PDFViewer({ url, documentId, onHighlightAdded, initialPage, onSc
     clearHighlights,
   } = useHighlights(documentId)
 
-  const { isDragging, externalHighlight } = useWorkspaceContext()
+  const workspaceContext = useOptionalWorkspaceContext()
+  const isDragging = workspaceContext?.isDragging ?? false
+  const externalHighlight = workspaceContext?.externalHighlight ?? null
 
   const [scrollToHighlightId, setScrollToHighlightId] = useState<string | null>(null)
   const [hasTextContent, setHasTextContent] = useState<boolean | null>(null)
@@ -577,9 +689,12 @@ export function PDFViewer({ url, documentId, onHighlightAdded, initialPage, onSc
   const handleDocumentLoaded = useCallback((pages: number, hasText: boolean) => {
     setPageCount(pages)
     setHasTextContent(hasText)
-    // Mark viewer as ready after document is loaded
-    // Delay slightly to allow internal viewer initialization to complete
-    setTimeout(() => setIsViewerReady(true), 200)
+  }, [])
+
+  // Called when the PdfHighlighter's internal viewer is fully initialized
+  // This happens when scrollRef is called, which occurs after 'pagesinit' event
+  const handleViewerReady = useCallback(() => {
+    setIsViewerReady(true)
   }, [])
 
   const scrollToHighlightFn = useCallback((highlightId: string) => {
@@ -667,17 +782,20 @@ export function PDFViewer({ url, documentId, onHighlightAdded, initialPage, onSc
           )}
         >
           {(pdfDocument) => (
-            <PDFContent
-              pdfDocument={pdfDocument}
-              highlights={highlightsForViewer}
-              scrollToHighlightId={scrollToHighlightId}
-              scrollViewerToRef={scrollViewerToRef}
-              onAddHighlight={handleAddHighlight}
-              onRemoveHighlight={removeHighlight}
-              onDocumentLoaded={handleDocumentLoaded}
-              onClipText={onClipText}
-              documentId={documentId}
-            />
+            <PDFErrorBoundary>
+              <DelayedPDFContent
+                pdfDocument={pdfDocument}
+                highlights={highlightsForViewer}
+                scrollToHighlightId={scrollToHighlightId}
+                scrollViewerToRef={scrollViewerToRef}
+                onAddHighlight={handleAddHighlight}
+                onRemoveHighlight={removeHighlight}
+                onDocumentLoaded={handleDocumentLoaded}
+                onViewerReady={handleViewerReady}
+                onClipText={onClipText}
+                documentId={documentId}
+              />
+            </PDFErrorBoundary>
           )}
         </PdfLoader>
       </div>

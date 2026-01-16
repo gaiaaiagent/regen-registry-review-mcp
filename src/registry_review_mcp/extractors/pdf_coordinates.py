@@ -226,10 +226,20 @@ def enrich_snippets_with_coordinates(
     Returns:
         Number of snippets successfully enriched with coordinates
     """
+    # === DEBUG LOGGING: Entry point ===
+    logger.info(f"[COORD-ENRICH] Starting coordinate enrichment for {len(snippets)} snippets")
+    logger.info(f"[COORD-ENRICH] doc_metadata contains {len(doc_metadata)} documents")
+
+    # Log available document IDs and their filepaths
+    for doc_id, doc_info in doc_metadata.items():
+        filepath = doc_info.get("filepath", "NO_FILEPATH")
+        logger.info(f"[COORD-ENRICH] Available doc: {doc_id} -> {filepath}")
+
     try:
         import fitz  # PyMuPDF
+        logger.info(f"[COORD-ENRICH] PyMuPDF version: {fitz.version}")
     except ImportError:
-        logger.warning("PyMuPDF not installed, cannot resolve coordinates")
+        logger.error("[COORD-ENRICH] PyMuPDF not installed, cannot resolve coordinates")
         return 0
 
     # Group snippets by document for efficient processing
@@ -237,38 +247,69 @@ def enrich_snippets_with_coordinates(
     for snippet in snippets:
         if snippet.text and snippet.document_id:
             snippets_by_doc[snippet.document_id].append(snippet)
+        else:
+            logger.warning(f"[COORD-ENRICH] Skipping snippet - missing text or document_id: text={bool(snippet.text)}, doc_id={snippet.document_id}")
+
+    logger.info(f"[COORD-ENRICH] Grouped snippets into {len(snippets_by_doc)} document groups")
 
     enriched_count = 0
     page_mismatch_count = 0
 
     # Process each document's snippets
     for doc_id, doc_snippets in snippets_by_doc.items():
+        logger.info(f"[COORD-ENRICH] Processing document: {doc_id} with {len(doc_snippets)} snippets")
+
         doc = doc_metadata.get(doc_id)
         if not doc:
-            logger.debug(f"No metadata for document {doc_id}")
+            logger.error(f"[COORD-ENRICH] FAILED: No metadata for document '{doc_id}' - available keys: {list(doc_metadata.keys())}")
             continue
 
         filepath = doc.get("filepath")
-        if not filepath or not Path(filepath).exists():
-            logger.debug(f"PDF not found for {doc_id}: {filepath}")
+        logger.info(f"[COORD-ENRICH] Document {doc_id} filepath: {filepath}")
+
+        if not filepath:
+            logger.error(f"[COORD-ENRICH] FAILED: No filepath in metadata for {doc_id} - doc keys: {list(doc.keys())}")
+            continue
+
+        path_obj = Path(filepath)
+        if not path_obj.exists():
+            logger.error(f"[COORD-ENRICH] FAILED: PDF file does not exist: {filepath}")
+            # Try to diagnose path issues
+            parent = path_obj.parent
+            if parent.exists():
+                logger.info(f"[COORD-ENRICH] Parent directory exists: {parent}")
+                logger.info(f"[COORD-ENRICH] Files in parent: {list(parent.iterdir())[:10]}")
+            else:
+                logger.error(f"[COORD-ENRICH] Parent directory does not exist: {parent}")
             continue
 
         # Only process PDFs
         if not filepath.lower().endswith(".pdf"):
+            logger.info(f"[COORD-ENRICH] Skipping non-PDF file: {filepath}")
             continue
+
+        logger.info(f"[COORD-ENRICH] Opening PDF: {filepath}")
 
         try:
             pdf_doc = fitz.open(filepath)
             page_count = len(pdf_doc)
+            logger.info(f"[COORD-ENRICH] PDF opened successfully: {page_count} pages")
+
+            snippets_processed = 0
+            snippets_found = 0
 
             # Process all snippets for this document
             for snippet in doc_snippets:
+                snippets_processed += 1
+
                 # Skip if already has bounding box
                 if snippet.bounding_box is not None:
+                    logger.debug(f"[COORD-ENRICH] Snippet already has bounding box, skipping")
                     continue
 
                 # Prepare search text (first 500 chars, normalized)
                 search_text = " ".join(snippet.text.split())[:500]
+                logger.debug(f"[COORD-ENRICH] Searching for text: '{search_text[:80]}...'")
 
                 # Determine pages to search (hint page first)
                 pages_to_search = list(range(page_count))
@@ -300,7 +341,9 @@ def enrich_snippets_with_coordinates(
                                 page_mismatch_count += 1
                             snippet.page = actual_page
                         enriched_count += 1
+                        snippets_found += 1
                         found = True
+                        logger.debug(f"[COORD-ENRICH] EXACT MATCH found on page {actual_page}")
                         break
 
                     # Try fuzzy matching on page text
@@ -313,6 +356,7 @@ def enrich_snippets_with_coordinates(
                         # Try multiple candidate phrases from the text
                         # PDF tables often split text that LLM concatenates
                         candidates = _extract_search_candidates(search_text)
+                        logger.debug(f"[COORD-ENRICH] Fuzzy match ({similarity:.2f}) on page {page_idx+1}, trying {len(candidates)} candidates")
                         for candidate in candidates:
                             rects = page.search_for(candidate, quads=False)
                             if rects:
@@ -331,21 +375,31 @@ def enrich_snippets_with_coordinates(
                                         page_mismatch_count += 1
                                     snippet.page = actual_page
                                 enriched_count += 1
+                                snippets_found += 1
                                 found = True
+                                logger.debug(f"[COORD-ENRICH] FUZZY MATCH found on page {actual_page} with candidate: '{candidate[:40]}...'")
                                 break
                         if found:
                             break
 
                 if not found:
-                    logger.debug(
-                        f"Text not found in {doc_id}: {search_text[:50]}..."
+                    logger.warning(
+                        f"[COORD-ENRICH] NOT FOUND in {doc_id}: '{search_text[:80]}...'"
                     )
 
             pdf_doc.close()
+            logger.info(f"[COORD-ENRICH] Document {doc_id}: {snippets_found}/{snippets_processed} snippets enriched")
 
         except Exception as e:
-            logger.error(f"Error processing PDF {filepath}: {e}")
+            logger.error(f"[COORD-ENRICH] Exception processing PDF {filepath}: {e}", exc_info=True)
             continue
+
+    # Log comprehensive summary
+    logger.info(f"[COORD-ENRICH] === ENRICHMENT COMPLETE ===")
+    logger.info(f"[COORD-ENRICH] Total snippets: {len(snippets)}")
+    logger.info(f"[COORD-ENRICH] Documents processed: {len(snippets_by_doc)}")
+    logger.info(f"[COORD-ENRICH] Snippets enriched: {enriched_count}")
+    logger.info(f"[COORD-ENRICH] Success rate: {(enriched_count / len(snippets) * 100) if snippets else 0:.1f}%")
 
     # Log summary of page mismatches if any were found
     if page_mismatch_count > 0:

@@ -234,6 +234,11 @@ async def generate_review_report(
 
     report.report_path = str(report_path)
 
+    # Update workflow progress to mark report generation as completed
+    state_manager.update_json("session.json", {
+        "workflow_progress.report_generation": "completed"
+    })
+
     return {
         "session_id": session_id,
         "format": format,

@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api/client'
 
 interface ReportResult {
@@ -14,6 +14,12 @@ interface ReportResult {
     overall_coverage: number
   }
   download_url: string
+}
+
+interface ExistingReportResult {
+  content: string
+  generated_at: string
+  summary?: ReportResult['summary']
 }
 
 export function useGenerateReport(sessionId: string) {
@@ -62,4 +68,45 @@ export function useDownloadReport(sessionId: string) {
   }
 
   return { downloadFile }
+}
+
+/**
+ * Hook to check if a report already exists and fetch its content.
+ * Used to display existing reports when navigating to the Report tab.
+ */
+export function useExistingReport(sessionId: string) {
+  return useQuery({
+    queryKey: ['existing-report', sessionId],
+    queryFn: async (): Promise<ExistingReportResult | null> => {
+      if (!sessionId) return null
+
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8003'
+      const token = localStorage.getItem('auth_token')
+
+      // Try to download existing report
+      const response = await fetch(`${API_URL}/sessions/${sessionId}/report/download`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+
+      if (!response.ok) {
+        // Report doesn't exist yet
+        return null
+      }
+
+      const content = await response.text()
+
+      // Try to extract generated_at from the report metadata
+      // The report typically has a header with generation timestamp
+      const timestampMatch = content.match(/Generated:\s*(.+?)(?:\n|$)/i)
+      const generated_at = timestampMatch?.[1] || new Date().toISOString()
+
+      return {
+        content,
+        generated_at,
+      }
+    },
+    enabled: !!sessionId,
+    staleTime: 30000, // Consider stale after 30 seconds
+    retry: false, // Don't retry if report doesn't exist
+  })
 }

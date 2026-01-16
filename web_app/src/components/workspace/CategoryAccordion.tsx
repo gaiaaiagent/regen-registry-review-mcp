@@ -9,6 +9,7 @@ import { Progress } from '@/components/ui/progress'
 import { RequirementCard } from './RequirementCard'
 import { useWorkspaceContext, type Requirement } from '@/contexts/WorkspaceContext'
 import type { ManualEvidence } from '@/hooks/useManualEvidence'
+import type { RequirementOverride } from '@/hooks/useReviewDecisions'
 import { cn } from '@/lib/utils'
 
 interface CategoryAccordionProps {
@@ -18,6 +19,7 @@ interface CategoryAccordionProps {
   manualEvidence?: ManualEvidence[]
   onUnlinkEvidence?: (evidenceId: string) => void
   sessionId?: string
+  overrides?: Record<string, RequirementOverride>
 }
 
 function getCategoryProgress(requirements: Requirement[]): {
@@ -47,6 +49,7 @@ export function CategoryAccordion({
   manualEvidence = [],
   onUnlinkEvidence,
   sessionId,
+  overrides = {},
 }: CategoryAccordionProps) {
   const { focusedRequirementId, setFocusedRequirementId } = useWorkspaceContext()
   const requirementRefs = useRef<Map<string, HTMLDivElement>>(new Map())
@@ -57,6 +60,9 @@ export function CategoryAccordion({
 
   const getEvidenceForRequirement = (requirementId: string) =>
     manualEvidence.filter((e) => e.requirementId === requirementId)
+
+  const getOverrideForRequirement = (requirementId: string): RequirementOverride | null =>
+    overrides[requirementId] ?? null
 
   useEffect(() => {
     if (!focusedRequirementId) return
@@ -129,6 +135,7 @@ export function CategoryAccordion({
                       manualEvidence={getEvidenceForRequirement(req.id)}
                       onUnlinkEvidence={onUnlinkEvidence}
                       sessionId={sessionId}
+                      override={getOverrideForRequirement(req.id)}
                     />
                   </div>
                 ))}

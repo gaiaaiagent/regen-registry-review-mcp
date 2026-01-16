@@ -17,9 +17,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import { CategoryAccordion } from './CategoryAccordion'
 import { EvidenceScratchpad } from './EvidenceScratchpad'
-import { VerificationProgress } from './VerificationProgress'
-import { useWorkspaceRequirements, useFullWorkflow } from '@/hooks/useWorkspace'
+import { ReviewProgress } from './ReviewProgress'
+import { useWorkspaceRequirements, useFullWorkflow, useCompleteReview } from '@/hooks/useWorkspace'
 import { useManualEvidence, type ScratchpadItem } from '@/hooks/useManualEvidence'
+import { useReviewStatus } from '@/hooks/useReviewDecisions'
 import { cn } from '@/lib/utils'
 
 interface ChecklistPanelProps {
@@ -48,11 +49,14 @@ export function ChecklistPanel({ sessionId: propSessionId }: ChecklistPanelProps
     clearScratchpad,
   } = useManualEvidence(sessionId)
 
-  const { runFullWorkflow, isPending: workflowPending, currentStage } = useFullWorkflow(sessionId)
+  const { data: reviewStatus } = useReviewStatus(sessionId ?? null)
+
+  const { runFullWorkflow, isPending: workflowPending } = useFullWorkflow(sessionId)
+  const { runCompleteReview, isPending: completeReviewPending } = useCompleteReview(sessionId)
   const [progressMessage, setProgressMessage] = useState<string | null>(null)
 
   const handleExtractEvidence = async () => {
-    toast.info('Starting evidence workflow...', { description: 'This runs discover → map → extract.' })
+    toast.info('Starting evidence workflow...', { description: 'This runs discover -> map -> extract.' })
     try {
       await runFullWorkflow((stage) => setProgressMessage(stage))
       setProgressMessage(null)
@@ -65,10 +69,35 @@ export function ChecklistPanel({ sessionId: propSessionId }: ChecklistPanelProps
     }
   }
 
+  const handleCompleteReview = async () => {
+    toast.info('Starting complete review...', {
+      description: 'This runs discover -> map -> extract -> validate -> report.',
+    })
+    try {
+      await runCompleteReview((stage) => setProgressMessage(stage))
+      setProgressMessage(null)
+      toast.success('Review complete!', {
+        description: 'Evidence extracted, validated, and report generated. Check the Report tab.',
+      })
+    } catch (err) {
+      setProgressMessage(null)
+      toast.error('Review workflow failed', {
+        description: err instanceof Error ? err.message : 'Please try again.',
+      })
+    }
+  }
+
+  const isAnyPending = workflowPending || completeReviewPending
+
   const [expandedCategories, setExpandedCategories] = useState<string[]>([])
 
   const allCategories = useMemo(
     () => Object.keys(requirementsByCategory),
+    [requirementsByCategory]
+  )
+
+  const totalRequirements = useMemo(
+    () => Object.values(requirementsByCategory).flat().length,
     [requirementsByCategory]
   )
 
@@ -131,16 +160,17 @@ export function ChecklistPanel({ sessionId: propSessionId }: ChecklistPanelProps
       <div className="h-full flex flex-col">
         <div className="flex-1 flex flex-col items-center justify-center p-4 text-muted-foreground">
           <ClipboardCheck className="h-12 w-12 mb-4 opacity-30" />
-          <p className="text-sm font-medium">No Evidence Yet</p>
-          <p className="text-xs text-center mt-2 max-w-[200px]">
-            Run evidence extraction to populate the requirements checklist with findings from your documents.
+          <p className="text-sm font-medium">Ready to Review</p>
+          <p className="text-xs text-center mt-2 max-w-[280px]">
+            Run the complete review to automatically extract evidence, validate documents, and generate a report.
           </p>
           <Button
-            onClick={handleExtractEvidence}
-            disabled={workflowPending}
+            onClick={handleCompleteReview}
+            disabled={isAnyPending}
             className="mt-4"
+            size="lg"
           >
-            {workflowPending ? (
+            {isAnyPending ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 {progressMessage || 'Processing...'}
@@ -148,10 +178,13 @@ export function ChecklistPanel({ sessionId: propSessionId }: ChecklistPanelProps
             ) : (
               <>
                 <Play className="h-4 w-4 mr-2" />
-                Extract Evidence
+                Run Complete Review
               </>
             )}
           </Button>
+          <p className="text-[10px] text-muted-foreground mt-4 text-center max-w-[280px]">
+            This chains: Discover → Map → Extract → Validate → Report
+          </p>
         </div>
         <EvidenceScratchpad
           items={scratchpadItems}
@@ -220,7 +253,10 @@ export function ChecklistPanel({ sessionId: propSessionId }: ChecklistPanelProps
       </div>
 
       <div className="px-4 py-2">
-        <VerificationProgress sessionId={sessionId ?? null} />
+        <ReviewProgress
+          sessionId={sessionId ?? null}
+          totalRequirements={totalRequirements}
+        />
       </div>
 
       <div className="flex-1 overflow-y-auto p-2">
@@ -231,6 +267,7 @@ export function ChecklistPanel({ sessionId: propSessionId }: ChecklistPanelProps
           manualEvidence={linkedEvidence}
           onUnlinkEvidence={handleUnlinkEvidence}
           sessionId={sessionId}
+          overrides={reviewStatus?.overrides}
         />
       </div>
 
