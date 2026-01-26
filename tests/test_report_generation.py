@@ -286,3 +286,160 @@ class TestCompleteWorkflow:
         content = Path(report["report_path"]).read_text()
         assert "Botany Farm" in content
         assert len(content) > 1000  # Should be substantial
+
+
+class TestBeccaFeedbackItems:
+    """Tests for Becca's feedback items (task-12).
+
+    Issue 1: Section numbers in citations
+    Issue 2: Value vs Evidence distinction
+    Issue 3: Supplementary evidence support
+    Issue 4: Evidence text in Comments column
+    Issue 5: Sentence-boundary truncation
+    Issue 6: Project ID in document references
+    """
+
+    def test_format_citation_with_section_and_page(self):
+        """Issue 1: Citations should include section numbers."""
+        from registry_review_mcp.tools.report_tools import _format_citation
+
+        # Both section and page
+        result = _format_citation("Project Plan.pdf", "3.2", 17)
+        assert result == "Project Plan.pdf (Section 3.2, p.17)"
+
+        # Only section
+        result = _format_citation("Project Plan.pdf", "3.2", None)
+        assert result == "Project Plan.pdf (Section 3.2)"
+
+        # Only page
+        result = _format_citation("Project Plan.pdf", None, 17)
+        assert result == "Project Plan.pdf (p.17)"
+
+        # Neither - just doc name
+        result = _format_citation("Project Plan.pdf", None, None)
+        assert result == "Project Plan.pdf"
+
+    def test_extract_value_from_structured_fields(self):
+        """Issue 2: Value should come from extracted_value or structured_fields."""
+        from registry_review_mcp.tools.report_tools import _extract_value
+
+        # Test with explicit value field
+        snippet = {
+            "text": "Some long evidence text that would normally be truncated.",
+            "structured_fields": {"value": "Nicholas Denman"}
+        }
+        result = _extract_value(snippet)
+        assert result == "Nicholas Denman"
+
+        # Test with extracted_value field
+        snippet = {
+            "text": "Some long evidence text.",
+            "structured_fields": {},
+            "extracted_value": "10 years"
+        }
+        result = _extract_value(snippet)
+        assert result == "10 years"
+
+        # Test with owner_name field
+        snippet = {
+            "text": "Some text.",
+            "structured_fields": {"owner_name": "John Smith"}
+        }
+        result = _extract_value(snippet)
+        assert result == "John Smith"
+
+        # Fallback to first sentence when no structured data
+        snippet = {
+            "text": "The crediting period is 10 years. This is additional detail.",
+            "structured_fields": {}
+        }
+        result = _extract_value(snippet)
+        assert result == "The crediting period is 10 years."
+
+    def test_format_submitted_material_with_supplementary(self):
+        """Issue 3: Supplementary evidence should be included."""
+        from registry_review_mcp.tools.report_tools import _format_submitted_material
+
+        snippets = [
+            {"document_name": "Project Plan.pdf", "page": 5, "section": "1.1",
+             "text": "Primary evidence.", "structured_fields": {"value": "Primary value"}},
+            {"document_name": "Supporting Doc.pdf", "page": 10, "section": "2.3",
+             "text": "Second evidence."},
+            {"document_name": "Third Doc.pdf", "page": 15, "section": None,
+             "text": "Third evidence."},
+        ]
+
+        submitted, evidence = _format_submitted_material(snippets, project_id="C06-123")
+
+        # Check primary documentation
+        assert "**Primary Documentation:**" in submitted
+        assert "[C06-123]" in submitted
+        assert "Section 1.1" in submitted
+
+        # Check supplementary evidence
+        assert "**Supplementary:**" in submitted
+        assert "Supporting Doc.pdf" in submitted
+        assert "Third Doc.pdf" in submitted
+
+        # Check value extracted
+        assert "**Value:** Primary value" in submitted
+
+    def test_format_submitted_material_returns_evidence_separately(self):
+        """Issue 4: Evidence text should be separate for Comments column."""
+        from registry_review_mcp.tools.report_tools import _format_submitted_material
+
+        snippets = [
+            {"document_name": "Doc.pdf", "page": 1, "section": None,
+             "text": "This is the evidence text.", "structured_fields": {}}
+        ]
+
+        submitted, evidence = _format_submitted_material(snippets)
+
+        # Evidence should NOT be in submitted material
+        assert "**Evidence:**" not in submitted
+
+        # Evidence should be returned separately
+        assert evidence == "This is the evidence text."
+
+    def test_truncate_at_sentence_boundary(self):
+        """Issue 5: Truncation should respect sentence boundaries."""
+        from registry_review_mcp.tools.report_tools import _truncate_at_sentence
+
+        # Should truncate at sentence end
+        text = "First sentence. Second sentence. Third sentence is much longer."
+        result = _truncate_at_sentence(text, max_length=35)
+        assert result == "First sentence. Second sentence."
+
+        # Should not truncate mid-sentence
+        assert "Third" not in result
+        assert not result.endswith("...")
+
+        # Short text should not be truncated
+        short = "Short text."
+        assert _truncate_at_sentence(short, max_length=100) == short
+
+    def test_project_id_in_document_references(self):
+        """Issue 6: Project ID should be included in document references."""
+        from registry_review_mcp.tools.report_tools import _format_submitted_material
+
+        snippets = [
+            {"document_name": "Project Plan.pdf", "page": 1, "section": None,
+             "text": "Evidence.", "structured_fields": {}}
+        ]
+
+        # With project ID
+        submitted, _ = _format_submitted_material(snippets, project_id="C06-456")
+        assert "[C06-456] Project Plan.pdf" in submitted
+
+        # Without project ID
+        submitted, _ = _format_submitted_material(snippets, project_id=None)
+        assert "[" not in submitted  # No brackets
+        assert "Project Plan.pdf" in submitted
+
+    def test_no_evidence_returns_placeholder(self):
+        """Test empty snippets case."""
+        from registry_review_mcp.tools.report_tools import _format_submitted_material
+
+        submitted, evidence = _format_submitted_material([])
+        assert submitted == "_No evidence found_"
+        assert evidence == ""
