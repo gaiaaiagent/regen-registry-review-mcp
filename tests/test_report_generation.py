@@ -187,11 +187,12 @@ class TestReportFormatting:
         formatted_text = "\n".join(formatted)
 
         assert "REQ-001" in formatted_text
-        assert "covered" in formatted_text.lower() or "✅" in formatted_text
+        assert "Covered" in formatted_text
         assert "0.95" in formatted_text or "95" in formatted_text
+        assert "✅" not in formatted_text
 
     async def test_format_validation_summary(self, tmp_path):
-        """Test formatting of validation summary."""
+        """Test formatting of validation summary uses text labels, not emojis."""
         validations = {
             "date_alignments": [
                 {"status": "pass", "message": "Test pass"}
@@ -205,13 +206,32 @@ class TestReportFormatting:
         }
 
         formatted = report_tools.format_validation_summary_markdown(validations)
-
-        # format_validation_summary_markdown returns a list of strings
         formatted_text = "\n".join(formatted)
 
-        assert "pass" in formatted_text.lower() or "✅" in formatted_text
-        assert "warning" in formatted_text.lower() or "⚠" in formatted_text
-        assert "fail" in formatted_text.lower() or "❌" in formatted_text
+        # Should use text labels
+        assert "**PASS:**" in formatted_text
+        assert "**WARNING:**" in formatted_text
+        assert "**FAIL:**" in formatted_text
+
+        # Should NOT contain emojis
+        assert "✅" not in formatted_text
+        assert "⚠️" not in formatted_text
+        assert "❌" not in formatted_text
+        assert "🚩" not in formatted_text
+
+    async def test_format_validation_summary_flagged(self, tmp_path):
+        """Test that flagged validations use [Review] label instead of emoji."""
+        validations = {
+            "date_alignments": [
+                {"status": "fail", "message": "Date mismatch", "flagged_for_review": True}
+            ],
+        }
+
+        formatted = report_tools.format_validation_summary_markdown(validations)
+        formatted_text = "\n".join(formatted)
+
+        assert "[Review]" in formatted_text
+        assert "🚩" not in formatted_text
 
 
 @pytest.mark.usefixtures("cleanup_sessions")
@@ -381,8 +401,9 @@ class TestBeccaFeedbackItems:
         assert "Supporting Doc.pdf" in submitted
         assert "Third Doc.pdf" in submitted
 
-        # Check value extracted
-        assert "**Value:** Primary value" in submitted
+        # Check value extracted (no **Value:** label, just the text)
+        assert "Primary value" in submitted
+        assert "**Value:**" not in submitted
 
     def test_format_submitted_material_returns_evidence_separately(self):
         """Issue 4: Evidence text should be separate for Comments column."""
@@ -443,3 +464,123 @@ class TestBeccaFeedbackItems:
         submitted, evidence = _format_submitted_material([])
         assert submitted == "_No evidence found_"
         assert evidence == ""
+
+
+class TestReportOutputQuality:
+    """Tests for report output quality (Phase 1c).
+
+    Ensures reports are professional — no emojis, no confusing labels.
+    """
+
+    def test_no_emojis_in_markdown_report(self):
+        """Verify no emoji Unicode characters appear in markdown report output."""
+        from registry_review_mcp.models.report import ReviewReport, ReportMetadata, ReportSummary, RequirementFinding
+
+        report = ReviewReport(
+            metadata=ReportMetadata(
+                session_id="test-session",
+                project_name="Test Project",
+                methodology="soil-carbon-v1.2.2",
+                generated_at=datetime.now(),
+                report_format="markdown",
+            ),
+            summary=ReportSummary(
+                requirements_total=3,
+                requirements_covered=1,
+                requirements_partial=1,
+                requirements_missing=1,
+                requirements_flagged=0,
+                overall_coverage=0.33,
+                validations_total=2,
+                validations_passed=1,
+                validations_failed=1,
+                validations_warning=0,
+                documents_reviewed=2,
+                total_evidence_snippets=5,
+                items_for_human_review=2,
+            ),
+            requirements=[
+                RequirementFinding(
+                    requirement_id="REQ-001", requirement_text="Test covered",
+                    category="General", status="covered", confidence=0.95,
+                    documents_referenced=1, snippets_found=2,
+                    evidence_summary="Strong evidence", page_citations=[],
+                    human_review_required=False,
+                ),
+                RequirementFinding(
+                    requirement_id="REQ-002", requirement_text="Test partial",
+                    category="General", status="partial", confidence=0.6,
+                    documents_referenced=1, snippets_found=1,
+                    evidence_summary="Partial evidence", page_citations=[],
+                    human_review_required=True,
+                ),
+                RequirementFinding(
+                    requirement_id="REQ-003", requirement_text="Test missing",
+                    category="General", status="missing", confidence=0.0,
+                    documents_referenced=0, snippets_found=0,
+                    evidence_summary="No evidence", page_citations=[],
+                    human_review_required=True,
+                ),
+            ],
+            validations=[],
+            items_for_review=["REQ-002: Test partial..."],
+            next_steps=["Review flagged items"],
+        )
+
+        content = report_tools.format_markdown_report(report)
+
+        # These specific emojis must not appear anywhere in report output
+        forbidden_emojis = ["✅", "❌", "⚠️", "🚩", "❓"]
+        for emoji in forbidden_emojis:
+            assert emoji not in content, f"Found forbidden emoji {emoji!r} in report output"
+
+    def test_submitted_material_no_value_label(self):
+        """Verify _format_submitted_material() does not prefix with **Value:**."""
+        from registry_review_mcp.tools.report_tools import _format_submitted_material
+
+        snippets = [
+            {"document_name": "Doc.pdf", "page": 5, "section": "2.1",
+             "text": "The project covers 500 hectares.",
+             "structured_fields": {"value": "500 hectares"}}
+        ]
+
+        submitted, _ = _format_submitted_material(snippets)
+
+        assert "**Value:**" not in submitted
+        assert "500 hectares" in submitted
+
+    def test_section_headers_no_emojis(self):
+        """Verify section headers use plain text, not emoji prefixes."""
+        from registry_review_mcp.models.report import ReviewReport, ReportMetadata, ReportSummary, RequirementFinding
+
+        report = ReviewReport(
+            metadata=ReportMetadata(
+                session_id="test", project_name="Test",
+                methodology="test", generated_at=datetime.now(),
+                report_format="markdown",
+            ),
+            summary=ReportSummary(
+                requirements_total=1, requirements_covered=1,
+                requirements_partial=0, requirements_missing=0,
+                requirements_flagged=0, overall_coverage=1.0,
+                validations_total=0, validations_passed=0,
+                validations_failed=0, validations_warning=0,
+                documents_reviewed=1, total_evidence_snippets=1,
+                items_for_human_review=0,
+            ),
+            requirements=[
+                RequirementFinding(
+                    requirement_id="REQ-001", requirement_text="Test",
+                    category="General", status="covered", confidence=0.95,
+                    documents_referenced=1, snippets_found=1,
+                    evidence_summary="Found", page_citations=[],
+                    human_review_required=False,
+                ),
+            ],
+            validations=[], items_for_review=[], next_steps=[],
+        )
+
+        content = report_tools.format_markdown_report(report)
+
+        assert "## Covered Requirements" in content
+        assert "## ✅" not in content

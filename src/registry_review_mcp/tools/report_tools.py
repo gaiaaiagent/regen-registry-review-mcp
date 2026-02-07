@@ -275,18 +275,18 @@ def format_markdown_report(report: ReviewReport) -> str:
     lines.append("")
     lines.append("### Requirements Coverage")
     lines.append(f"- **Total Requirements:** {report.summary.requirements_total}")
-    lines.append(f"- ✅ **Covered:** {report.summary.requirements_covered} ({report.summary.requirements_covered/report.summary.requirements_total*100:.1f}%)" if report.summary.requirements_total > 0 else "- ✅ **Covered:** 0 (0.0%)")
-    lines.append(f"- ⚠️  **Partial:** {report.summary.requirements_partial} ({report.summary.requirements_partial/report.summary.requirements_total*100:.1f}%)" if report.summary.requirements_total > 0 else "- ⚠️  **Partial:** 0 (0.0%)")
-    lines.append(f"- ❌ **Missing:** {report.summary.requirements_missing} ({report.summary.requirements_missing/report.summary.requirements_total*100:.1f}%)" if report.summary.requirements_total > 0 else "- ❌ **Missing:** 0 (0.0%)")
+    lines.append(f"- **Covered:** {report.summary.requirements_covered} ({report.summary.requirements_covered/report.summary.requirements_total*100:.1f}%)" if report.summary.requirements_total > 0 else "- **Covered:** 0 (0.0%)")
+    lines.append(f"- **Partial:** {report.summary.requirements_partial} ({report.summary.requirements_partial/report.summary.requirements_total*100:.1f}%)" if report.summary.requirements_total > 0 else "- **Partial:** 0 (0.0%)")
+    lines.append(f"- **Missing:** {report.summary.requirements_missing} ({report.summary.requirements_missing/report.summary.requirements_total*100:.1f}%)" if report.summary.requirements_total > 0 else "- **Missing:** 0 (0.0%)")
     lines.append(f"- **Overall Coverage:** {report.summary.overall_coverage*100:.1f}%")
     lines.append("")
 
     if report.summary.validations_total > 0:
         lines.append("### Cross-Document Validation")
         lines.append(f"- **Total Checks:** {report.summary.validations_total}")
-        lines.append(f"- ✅ **Passed:** {report.summary.validations_passed}")
-        lines.append(f"- ⚠️  **Warnings:** {report.summary.validations_warning}")
-        lines.append(f"- ❌ **Failed:** {report.summary.validations_failed}")
+        lines.append(f"- **Passed:** {report.summary.validations_passed}")
+        lines.append(f"- **Warnings:** {report.summary.validations_warning}")
+        lines.append(f"- **Failed:** {report.summary.validations_failed}")
         lines.append("")
 
     lines.append(f"### Review Statistics")
@@ -302,28 +302,28 @@ def format_markdown_report(report: ReviewReport) -> str:
     flagged = [r for r in report.requirements if r.status == "flagged"]
 
     if covered:
-        lines.append("## ✅ Covered Requirements")
+        lines.append("## Covered Requirements")
         lines.append("")
         for req in covered:
             lines.extend(format_requirement_markdown(req))
             lines.append("")
 
     if partial:
-        lines.append("## ⚠️  Partially Covered Requirements")
+        lines.append("## Partially Covered Requirements")
         lines.append("")
         for req in partial:
             lines.extend(format_requirement_markdown(req))
             lines.append("")
 
     if missing:
-        lines.append("## ❌ Missing Requirements")
+        lines.append("## Missing Requirements")
         lines.append("")
         for req in missing:
             lines.extend(format_requirement_markdown(req))
             lines.append("")
 
     if flagged:
-        lines.append("## 🚩 Flagged Requirements")
+        lines.append("## Flagged Requirements")
         lines.append("")
         for req in flagged:
             lines.extend(format_requirement_markdown(req))
@@ -390,15 +390,7 @@ def format_requirement_markdown(req: dict | RequirementFinding) -> list[str]:
         evidence_summary = req.evidence_summary
         page_citations = req.page_citations
 
-    # Status icon
-    status_icon = {
-        "covered": "✅",
-        "partial": "⚠️",
-        "missing": "❌",
-        "flagged": "🚩"
-    }.get(status, "❓")
-
-    lines.append(f"### {status_icon} {req_id}: {req_text[:80]}{'...' if len(req_text) > 80 else ''}")
+    lines.append(f"### {req_id}: {req_text[:80]}{'...' if len(req_text) > 80 else ''}")
     lines.append(f"**Status:** {status.title()}")
     lines.append(f"**Confidence:** {confidence:.2f} ({confidence*100:.0f}%)")
     lines.append(f"**Evidence:** {snippets} snippet(s) from {docs_ref} document(s)")
@@ -445,14 +437,14 @@ def format_validation_summary_markdown(validations: dict) -> list[str]:
                 message = val.message
                 flagged = val.flagged_for_review
 
-            status_icon = {
-                "pass": "✅",
-                "warning": "⚠️",
-                "fail": "❌"
-            }.get(status, "❓")
+            status_label = {
+                "pass": "PASS:",
+                "warning": "WARNING:",
+                "fail": "FAIL:"
+            }.get(status, "")
 
-            flag_icon = " 🚩" if flagged else ""
-            lines.append(f"{status_icon}{flag_icon} {message}")
+            flag_label = " [Review]" if flagged else ""
+            lines.append(f"- **{status_label}**{flag_label} {message}")
 
         lines.append("")
 
@@ -667,7 +659,7 @@ def _format_submitted_material(
         Tuple of (submitted_material_text, evidence_text)
 
     Submitted Material format:
-    **Value:** [concise extracted value from structured_fields or extracted_value]
+    [concise extracted value from structured_fields or extracted_value]
     **Primary Documentation:** [project_id] Doc.pdf (Section X.Y, p.Z)
     **Supplementary:** [additional sources]
 
@@ -695,8 +687,8 @@ def _format_submitted_material(
     # Format citation with section and page
     citation = _format_citation(doc_ref, section, page) or doc_ref
 
-    # Build submitted material (Value + Primary + Supplementary)
-    result_parts = [f"**Value:** {value_text}"]
+    # Build submitted material (extracted value + Primary + Supplementary)
+    result_parts = [value_text]
     result_parts.append(f"**Primary Documentation:** {citation}")
 
     # Add supplementary evidence (up to 3 additional sources)
@@ -928,10 +920,7 @@ def _set_cell_evidence_formatted(
     # Format citation with section and page (Issue 1)
     citation = _format_citation(doc_ref, section, page) or doc_ref
 
-    # Value: label (bold) + text
-    run = para.add_run("Value: ")
-    run.font.bold = True
-    run.font.color.rgb = blue
+    # Extracted value text (no label prefix)
     run = para.add_run(value + "\n")
     run.font.color.rgb = blue
 
