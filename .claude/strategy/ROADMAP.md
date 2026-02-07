@@ -8,14 +8,14 @@ This roadmap sequences work into phases based on urgency and dependency. Each ph
 
 **Goal:** Establish ground truth about what's deployed and working.
 
-- [ ] SSH to production server, verify running version against `main`
-- [ ] Confirm whether task-12 (Jan 26) changes are deployed
-- [ ] Run health check: hit `/sessions` endpoint, verify response
-- [ ] Check systemd service status and recent logs
-- [ ] Document any drift between dev and production in `runbooks/deploy.md`
-- [ ] Run fast test suite locally: `pytest` (should see 229+ passing, expensive deselected)
+- [x] SSH to production server, verify running version against `main`
+- [x] Confirm whether task-12 (Jan 26) changes are deployed — YES, `0513c8b` is live
+- [x] Run health check: hit `/sessions` endpoint, verify response — 7 active sessions, API healthy
+- [x] Check service status and recent logs — PM2 (not systemd), online 11 days, last restart Jan 27
+- [x] Document any drift between dev and production in `runbooks/deploy.md` — Updated for PM2
+- [x] Run fast test suite locally: 229 passed, 56 deselected, 8.95s. 23 Pydantic deprecation warnings (json_encoders).
 
-**Acceptance:** STATUS.md updated with verified production state. Any drift documented and remediation plan in place.
+**Acceptance:** Complete. STATUS.md updated, runbooks corrected for PM2, test suite green. Phase 0 done on 2026-02-07.
 
 ## Phase 1: Carbon Egg Registration Readiness
 

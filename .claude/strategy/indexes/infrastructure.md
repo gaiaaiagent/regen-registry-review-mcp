@@ -35,29 +35,37 @@ Clients:
 
 ## Production Server
 
-- **Host:** GAIA server (SSH access required)
-- **Service:** `registry-review-api.service` (systemd)
+- **Host:** `202.61.196.119` (SSH as `shawn`)
+- **Service:** `registry-review-api` managed by **PM2** (ID 0)
 - **Port:** 8003 (HTTP, proxied through nginx to HTTPS)
-- **User:** `shawn:shawn`
+- **User:** `shawn`
+- **Code path:** `/opt/projects/registry-eliza/regen-registry-review-mcp`
 - **Endpoint:** `https://regen.gaiaai.xyz/api/registry`
 - **Web App:** `https://regen.gaiaai.xyz/registry-review/`
-- **Logs:** `/opt/projects/registry-eliza/regen-registry-review-mcp/logs/rest-api.log`
+- **Logs:** `/opt/projects/registry-eliza/regen-registry-review-mcp/logs/pm2-out.log.*` and `pm2-error.log.*`
 - **Python:** UV-managed virtual environment
+
+Other PM2 services on this server: koi-api, koi-mcp-knowledge, regen-koi-mcp, regen-network-api, regenai-agents, koi-event-bridge.
 
 ## Service Management
 
 ```bash
+# SSH to server
+ssh shawn@202.61.196.119
+
 # Status
-sudo systemctl status registry-review-api
+pm2 list
+pm2 show registry-review-api
 
 # Restart (after deploying new code)
-sudo systemctl restart registry-review-api
+pm2 restart registry-review-api
 
 # Logs (follow)
-sudo journalctl -u registry-review-api -f
+pm2 logs registry-review-api
 
-# Application logs
-tail -f /opt/projects/registry-eliza/regen-registry-review-mcp/logs/rest-api.log
+# Application logs (rotated by PM2)
+tail -f /opt/projects/registry-eliza/regen-registry-review-mcp/logs/pm2-out.log.1
+tail -f /opt/projects/registry-eliza/regen-registry-review-mcp/logs/pm2-error.log.1
 ```
 
 ## Data Storage

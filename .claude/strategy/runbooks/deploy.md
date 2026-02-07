@@ -4,8 +4,9 @@ Last updated: 2026-02-07
 
 ## Prerequisites
 
-- SSH access to the GAIA production server
-- The production server has the repo cloned at `/opt/projects/registry-eliza/regen-registry-review-mcp`
+- SSH access: `ssh shawn@202.61.196.119`
+- Repo on server: `/opt/projects/registry-eliza/regen-registry-review-mcp`
+- Process manager: PM2 (service name: `registry-review-api`, ID 0)
 - A `.env` file on the production server with `REGISTRY_REVIEW_ENVIRONMENT=production` and the Anthropic API key
 - UV installed on the production server
 
@@ -17,7 +18,7 @@ git status        # verify clean working tree
 git push origin main
 
 # 2. SSH to production
-ssh <production-server>
+ssh shawn@202.61.196.119
 
 # 3. Pull latest code
 cd /opt/projects/registry-eliza/regen-registry-review-mcp
@@ -27,33 +28,36 @@ git pull origin main
 uv sync
 
 # 5. Restart the service
-sudo systemctl restart registry-review-api
+pm2 restart registry-review-api
 
 # 6. Verify
-sudo systemctl status registry-review-api
+pm2 show registry-review-api
 curl -s http://localhost:8003/ | head
 curl -s http://localhost:8003/sessions | head
 
 # 7. Check logs for errors
-sudo journalctl -u registry-review-api --since "1 minute ago"
+pm2 logs registry-review-api --lines 20
 ```
 
-## First-Time Setup
+## One-Liner Deploy (from dev machine)
 
-If the systemd service doesn't exist yet:
+For docs-only or low-risk changes where you just need to pull and don't need to restart:
 
 ```bash
-# On the production server
-cd /opt/projects/registry-eliza/regen-registry-review-mcp
-sudo bash install-systemd-service.sh
+ssh shawn@202.61.196.119 "cd /opt/projects/registry-eliza/regen-registry-review-mcp && git pull origin main"
 ```
 
-This creates the service file, enables auto-start on boot, and starts the service.
+For code changes that require a restart:
+
+```bash
+ssh shawn@202.61.196.119 "cd /opt/projects/registry-eliza/regen-registry-review-mcp && git pull origin main && pm2 restart registry-review-api"
+```
 
 ## Rollback
 
 ```bash
-# SSH to production
+ssh shawn@202.61.196.119
+
 cd /opt/projects/registry-eliza/regen-registry-review-mcp
 
 # Find the previous working commit
@@ -63,7 +67,7 @@ git log --oneline -10
 git checkout <commit-hash>
 
 # Restart
-sudo systemctl restart registry-review-api
+pm2 restart registry-review-api
 
 # Verify
 curl -s http://localhost:8003/sessions
@@ -73,26 +77,14 @@ After stabilizing, investigate the issue on dev, fix, and redeploy.
 
 ## Checking Production State
 
-To verify what version is deployed:
-
 ```bash
-# On production server
-cd /opt/projects/registry-eliza/regen-registry-review-mcp
-git log --oneline -5
-git diff HEAD   # check for any uncommitted local changes
+# From dev machine — quick status check
+ssh shawn@202.61.196.119 "cd /opt/projects/registry-eliza/regen-registry-review-mcp && git log --oneline -3 && echo '---' && pm2 show registry-review-api | grep -E 'status|uptime|restart' && echo '---' && curl -s http://localhost:8003/"
 ```
-
-Compare with local dev:
-
-```bash
-# On dev machine
-git log --oneline -5
-```
-
-If they diverge, document the drift in `STATUS.md` before reconciling.
 
 ## Known Issues
 
 - The production path is `/opt/projects/registry-eliza/regen-registry-review-mcp` — the "registry-eliza" directory name is historical and predates the current project structure.
-- PM2 was used historically (logs exist in `logs/pm2-*.log`). The current deployment uses systemd. Do not start both simultaneously.
+- PM2 manages the service. The `install-systemd-service.sh` script in the repo is not used in production. Do not start a systemd service alongside PM2.
 - The nginx proxy maps `https://regen.gaiaai.xyz/api/registry/*` to `http://localhost:8003/*`. If the URL prefix changes, both nginx config and the GPT instructions need updating.
+- PM2 has logged 8743 restarts total on the registry-review-api process. This warrants investigation if the number grows rapidly.

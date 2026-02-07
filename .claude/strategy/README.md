@@ -41,6 +41,8 @@ strategy/
   runbooks/
     deploy.md            production deployment procedures
     testing.md           testing procedures and cost management
+  architecture/
+    first-principles-redesign.md   from-scratch architectural rethinking
   insights/
     decisions.md         architectural and product decision log
 ```

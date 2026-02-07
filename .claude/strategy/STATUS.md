@@ -4,11 +4,13 @@ Last updated: 2026-02-07
 
 ## Production State
 
-The Registry Review MCP runs on the GAIA server as a systemd service (`registry-review-api.service`) on port 8003, proxied through nginx at `https://regen.gaiaai.xyz/api/registry`. A Custom GPT and Darren's web app (`https://regen.gaiaai.xyz/registry-review/`) both consume this REST API. The MCP server is also available for direct Claude Desktop/Code integration via stdio.
+The Registry Review MCP runs on the GAIA server (`202.61.196.119`) managed by **PM2** (not systemd) on port 8003, proxied through nginx at `https://regen.gaiaai.xyz/api/registry`. A Custom GPT and Darren's web app (`https://regen.gaiaai.xyz/registry-review/`) both consume this REST API. The MCP server is also available for direct Claude Desktop/Code integration via stdio.
 
-**Last known deployment:** Commits through approximately Jan 13 (the `/api/registry` URL prefix fixes). The Jan 26 commits (task-12, Becca's 6 feedback items) are in `main` locally but deployment to production is unverified. There has been no development activity on this repo since Jan 26.
+**Deployed version:** `0513c8b` (task-12, Jan 26) — confirmed via SSH on Feb 7. All of Becca's 6 feedback items are live in production. The strategy directory commit (`c53aebf`) has also been pulled to production.
 
-**Production health:** Unknown. Needs verification via SSH. Becca reported a mapping bug on Feb 3 that may or may not be related to what's deployed.
+**Production health:** Verified healthy on Feb 7. API responds on port 8003. PM2 shows `registry-review-api` online for 11 days (PID 502414), 46MB memory, 8743 restarts total. Last service restart was Jan 27. Seven active sessions on the server including Clackson and Blaston Soil Carbon projects. Server uptime: 163 days.
+
+**Other services on this server:** koi-api, koi-mcp-knowledge, regen-koi-mcp, regen-network-api, regenai-agents, koi-event-bridge. All managed via PM2 under the `shawn` user.
 
 ## What Works
 
