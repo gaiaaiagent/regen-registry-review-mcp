@@ -88,6 +88,117 @@ class TestDocumentDiscovery:
         assert confidence <= 0.6
 
 
+class TestMappingConventionConsistency:
+    """Regression tests for the classifier ↔ mapping naming convention bug.
+
+    The classifier (classify_document_by_filename) produces classification labels.
+    The mapper (_infer_document_types) expects those same labels when looking up
+    documents by type. If the conventions diverge, requirements silently fail to
+    match their correct documents and fall back to the project plan.
+
+    Diagnosed 2026-02-07: land_tenure, ghg_emissions, and gis_shapefile were
+    missed because the mapper used hyphens while the classifier used underscores.
+    """
+
+    def test_all_classifier_labels_recognized_by_mapper(self):
+        """Every label the classifier can produce must appear in at least one
+        mapper category's expected types."""
+        from registry_review_mcp.tools.mapping_tools import _infer_document_types
+
+        # All labels the classifier can produce (from classify_document_by_filename)
+        classifier_labels = {
+            "project_plan", "baseline_report", "monitoring_report",
+            "ghg_emissions", "land_tenure", "gis_shapefile",
+            "land_cover_map", "registry_review", "methodology_reference",
+            "unknown",
+        }
+
+        # Collect every label the mapper can return across all checklist categories
+        # Use the actual checklist categories from soil-carbon-v1.2.2
+        import json
+        from registry_review_mcp.config.settings import settings
+        checklist_path = settings.get_checklist_path("soil-carbon-v1.2.2")
+        with open(checklist_path) as f:
+            checklist = json.load(f)
+
+        mapper_labels = set()
+        for req in checklist["requirements"]:
+            category = req.get("category", "")
+            evidence = req.get("accepted_evidence", "")
+            types = _infer_document_types(category, evidence)
+            mapper_labels.update(types)
+
+        # These labels are informational (not evidence sources), so we don't
+        # expect the mapper to reference them
+        non_evidence_labels = {"unknown", "registry_review", "methodology_reference"}
+
+        # Every evidence-producing classifier label should appear in mapper output
+        evidence_labels = classifier_labels - non_evidence_labels
+        missing = evidence_labels - mapper_labels
+        assert not missing, (
+            f"Classifier labels not recognized by mapper: {missing}. "
+            f"Add these to _infer_document_types() in mapping_tools.py."
+        )
+
+    @pytest.mark.asyncio
+    async def test_land_tenure_document_maps_to_land_tenure_requirement(self):
+        """A document classified as land_tenure should map to REQ-002 (Land Tenure),
+        not fall back to the project plan."""
+        from registry_review_mcp.tools.mapping_tools import _infer_document_types
+
+        types = _infer_document_types("Land Tenure", "Deeds, lease agreements")
+        assert "land_tenure" in types, (
+            f"Land Tenure requirement should look for 'land_tenure' documents, got: {types}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_ghg_emissions_document_maps_to_emissions_requirement(self):
+        """A document classified as ghg_emissions should map to GHG Accounting requirements."""
+        from registry_review_mcp.tools.mapping_tools import _infer_document_types
+
+        types = _infer_document_types("GHG Accounting", "Proof of additionality")
+        assert "ghg_emissions" in types or "project_plan" in types, (
+            f"GHG Accounting should look for ghg_emissions or project_plan, got: {types}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_gis_shapefile_maps_to_gis_requirement(self):
+        """A document classified as gis_shapefile should map to Project Area requirements."""
+        from registry_review_mcp.tools.mapping_tools import _infer_document_types
+
+        types = _infer_document_types(
+            "Project Area",
+            "GIS shapefiles and maps, with delineations of eligible and ineligible land",
+        )
+        assert "gis_shapefile" in types, (
+            f"Project Area requirement should look for 'gis_shapefile' documents, got: {types}"
+        )
+
+    def test_no_hyphenated_labels_in_mapper(self):
+        """The mapper should never return hyphenated labels. All labels must use
+        underscores to match the classifier convention."""
+        from registry_review_mcp.tools.mapping_tools import _infer_document_types
+
+        # Test every checklist category
+        import json
+        from registry_review_mcp.config.settings import settings
+        checklist_path = settings.get_checklist_path("soil-carbon-v1.2.2")
+        with open(checklist_path) as f:
+            checklist = json.load(f)
+
+        for req in checklist["requirements"]:
+            types = _infer_document_types(
+                req.get("category", ""),
+                req.get("accepted_evidence", ""),
+            )
+            for t in types:
+                assert "-" not in t, (
+                    f"Mapper returned hyphenated label '{t}' for requirement "
+                    f"{req['requirement_id']} ({req['category']}). "
+                    f"Use underscores to match classifier convention."
+                )
+
+
 class TestPDFExtraction:
     """Test PDF text extraction."""
 

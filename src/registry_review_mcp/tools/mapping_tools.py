@@ -93,10 +93,9 @@ async def map_all_requirements(session_id: str) -> dict[str, Any]:
             mapping_status = "suggested"
             mapped_count += 1
         else:
-            # Try fallback: any document might contain relevant info
-            if "project_plan" in docs_by_type or "project-plan" in docs_by_type:
-                # Project plan often contains most information
-                project_plans = docs_by_type.get("project_plan", docs_by_type.get("project-plan", []))
+            # Try fallback: project plan often contains most information
+            if "project_plan" in docs_by_type:
+                project_plans = docs_by_type.get("project_plan", [])
                 if project_plans:
                     matched_docs = [project_plans[0]["document_id"]]
                     confidence = 0.50  # Lower confidence for fallback
@@ -257,6 +256,9 @@ async def map_all_requirements(session_id: str) -> dict[str, Any]:
 def _infer_document_types(category: str, accepted_evidence: str) -> list[str]:
     """Infer expected document types from requirement category and evidence description.
 
+    Classification labels use underscores (e.g., "project_plan", "land_tenure")
+    to match the output of classify_document_by_filename() in document_tools.py.
+
     Args:
         category: Requirement category (e.g., "Land Tenure", "Baseline")
         accepted_evidence: Description of accepted evidence
@@ -267,17 +269,30 @@ def _infer_document_types(category: str, accepted_evidence: str) -> list[str]:
     category_lower = category.lower()
     evidence_lower = accepted_evidence.lower()
 
-    # Map categories to document types
+    # Map requirement categories to classifier output labels.
+    # Labels must match classify_document_by_filename() in document_tools.py.
     type_mapping = {
-        "land tenure": ["land-tenure", "legal-document", "project-plan", "project_plan"],
-        "land eligibility": ["land-tenure", "land-eligibility", "project-plan", "project_plan"],
-        "baseline": ["baseline-report", "baseline_report", "project-plan", "project_plan"],
-        "monitoring": ["monitoring-report", "monitoring_report"],
-        "sampling": ["sampling-plan", "sampling_plan", "monitoring-report", "monitoring_report"],
-        "gis": ["gis-data", "geospatial", "shapefile", "project-plan", "project_plan"],
-        "emissions": ["emissions-report", "monitoring-report", "monitoring_report"],
-        "project details": ["project-plan", "project_plan"],
-        "safeguards": ["project-plan", "project_plan", "safeguards-report"],
+        "land tenure": ["land_tenure", "project_plan"],
+        "land eligibility": ["land_tenure", "project_plan"],
+        "baseline": ["baseline_report", "project_plan"],
+        "monitoring": ["monitoring_report"],
+        "sampling": ["monitoring_report"],
+        "gis": ["gis_shapefile", "land_cover_map", "project_plan"],
+        "emissions": ["ghg_emissions", "monitoring_report"],
+        "project details": ["project_plan"],
+        "project area": ["project_plan", "gis_shapefile", "land_cover_map"],
+        "project boundary": ["project_plan", "gis_shapefile"],
+        "project ownership": ["project_plan", "land_tenure"],
+        "project start date": ["project_plan"],
+        "ecosystem type": ["project_plan", "baseline_report"],
+        "crediting period": ["project_plan"],
+        "ghg accounting": ["project_plan", "ghg_emissions", "monitoring_report"],
+        "regulatory compliance": ["project_plan"],
+        "registration on other registries": ["project_plan"],
+        "project plan deviations": ["project_plan"],
+        "monitoring plan": ["project_plan", "monitoring_report"],
+        "risk management": ["project_plan"],
+        "safeguards": ["project_plan"],
     }
 
     # Check category matches
@@ -287,18 +302,18 @@ def _infer_document_types(category: str, accepted_evidence: str) -> list[str]:
 
     # Check evidence description keywords
     if "deed" in evidence_lower or "title" in evidence_lower or "ownership" in evidence_lower:
-        return ["land-tenure", "legal-document", "project-plan", "project_plan"]
+        return ["land_tenure", "project_plan"]
     elif "map" in evidence_lower or "shapefile" in evidence_lower or "gis" in evidence_lower:
-        return ["gis-data", "geospatial", "shapefile"]
+        return ["gis_shapefile", "land_cover_map", "project_plan"]
     elif "baseline" in evidence_lower:
-        return ["baseline-report", "baseline_report", "project-plan", "project_plan"]
+        return ["baseline_report", "project_plan"]
     elif "monitoring" in evidence_lower or "sampling" in evidence_lower:
-        return ["monitoring-report", "monitoring_report", "sampling-plan", "sampling_plan"]
+        return ["monitoring_report"]
     elif "emission" in evidence_lower or "ghg" in evidence_lower:
-        return ["emissions-report", "monitoring-report", "monitoring_report"]
+        return ["ghg_emissions", "monitoring_report"]
 
-    # Default: project plan is most comprehensive
-    return ["project-plan", "project_plan"]
+    # Default: project plan is the most comprehensive document
+    return ["project_plan"]
 
 
 async def confirm_mapping(
