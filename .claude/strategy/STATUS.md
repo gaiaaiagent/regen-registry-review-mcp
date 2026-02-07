@@ -28,15 +28,15 @@ Specifically verified:
 - Human review flagged only where needed
 - Session persistence and recovery
 - File upload via signed URLs and path-based ingestion
-- 229 tests passing (fast suite)
+- 241 tests passing (fast suite)
 
 ## What's Broken or Missing
 
 ### Blocking for Carbon Egg (registration imminent)
 
-1. **Mapping bug** — Becca encounters errors where the system confuses document names. Different variant from the earlier cross-validation bug. Occurs at the mapping step. Needs reproduction and diagnosis. (See: review-agent-readiness.md, item 2.1)
+1. **Mapping bug** — Diagnosed (Feb 7): naming convention split between classifier (underscores: `land_tenure`) and mapping lookup (hyphens: `land-tenure`). Three document types missed: `land_tenure`, `ghg_emissions`, `gis_shapefile`. Fixed in commit `467695e` with regression tests. (See: review-agent-readiness.md, item 2.1)
 
-2. **Spreadsheet ingestion** — System only processes PDFs. Carbon Egg has 100+ farms with land tenure records in spreadsheets (.xlsx, .csv). Described as "straightforward to add" but not implemented. (See: Jan 20 standup, Jan 27 standup)
+2. **Spreadsheet ingestion** — Implemented (Feb 7). System now processes .xlsx, .xls, .csv, .tsv alongside PDFs. New `spreadsheet_extractor.py` converts tabular data to markdown tables with sheet markers. Integrated into discovery, classification, extraction, and requirement mapping. 7 new tests added. (See: Jan 20 standup, Jan 27 standup)
 
 3. **Meta-project architecture** — Carbon Egg has 100+ individual farms plus a meta-project. Decision made (Feb 3): treat each farm as an independent project. Needs implementation guidance: auxiliary knowledge explaining the multi-project structure, differentiated checklists for farms vs meta-project. (See: review-agent-readiness.md, item 2.2)
 
@@ -75,8 +75,9 @@ Specifically verified:
 ## Immediate Next Actions
 
 See ROADMAP.md for the phased plan. The critical path is:
-1. Verify production deployment state (SSH to server)
-2. Reproduce and fix the mapping bug
-3. Add spreadsheet ingestion (.xlsx, .csv)
+1. ~~Verify production deployment state (SSH to server)~~ — Done (Feb 7)
+2. ~~Reproduce and fix the mapping bug~~ — Done (Feb 7, commit `467695e`)
+3. ~~Add spreadsheet ingestion (.xlsx, .csv)~~ — Done (Feb 7)
 4. Clean up report output formatting
 5. Test with Carbon Egg data
+6. Deploy latest changes to production

@@ -4,6 +4,21 @@ This log captures significant architectural, product, and process decisions with
 
 ---
 
+## 2026-02-07: Spreadsheet Ingestion — One Pass, No Dual-Track
+
+**Context:** PDFs use a dual-track extraction model (fast PyMuPDF for immediate use, slow Marker for high quality). The question arose whether spreadsheets should follow the same pattern.
+
+**Decision:** Single extraction pass for spreadsheets, with `hq_status = "not_applicable"`. Sheet markers (`--- Sheet "name" (N of M) ---`) mirror PDF page markers for uniform citation extraction.
+
+**Rationale:** Spreadsheets are already structured data. There is no quality tradeoff to make — openpyxl reads cells exactly. A second "high-quality" pass would be redundant. The sheet marker format ensures downstream citation extraction works identically regardless of whether evidence came from a PDF page or a spreadsheet sheet.
+
+**Design choices documented:**
+- Filename patterns (land_tenure, monitoring, etc.) take priority over file type, so `land_tenure_records.xlsx` classifies as `land_tenure`, not generic `spreadsheet_data`
+- 10,000-row cap per sheet prevents memory blowout on large farm datasets
+- `page_count = sheet_count` for compatibility with existing page-count-based code
+
+---
+
 ## 2026-02-07: Strategy Directory Created
 
 **Context:** The project had accumulated substantial planning context across transcripts, Notion docs, Slack history, and developer memory, but lacked a single coherent reference point for project state, priorities, and procedures.

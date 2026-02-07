@@ -73,16 +73,17 @@ Each tool module exposes async functions that become MCP tools or REST API endpo
 
 ```
   services/
-    document_processor.py        Document scanning, classification, PDF conversion
+    document_processor.py        Document scanning, classification, PDF + spreadsheet extraction
     background_jobs.py           Async job orchestration for long-running tasks
 ```
 
-### Extractors (PDF and data extraction)
+### Extractors (PDF, spreadsheet, and data extraction)
 
 ```
   extractors/
-    fast_extractor.py            PyMuPDF fast text extraction (default)
+    fast_extractor.py            PyMuPDF fast text extraction (default for PDFs)
     marker_extractor.py          Marker PDF extraction (high-quality fallback, 8GB+ RAM)
+    spreadsheet_extractor.py     .xlsx/.xls/.csv/.tsv → markdown tables with sheet markers
     llm_extractors.py            LLM-powered field extraction (dates, land tenure, project IDs)
     verification.py              Extraction quality verification
 ```

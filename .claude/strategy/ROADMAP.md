@@ -13,7 +13,7 @@ This roadmap sequences work into phases based on urgency and dependency. Each ph
 - [x] Run health check: hit `/sessions` endpoint, verify response — 7 active sessions, API healthy
 - [x] Check service status and recent logs — PM2 (not systemd), online 11 days, last restart Jan 27
 - [x] Document any drift between dev and production in `runbooks/deploy.md` — Updated for PM2
-- [x] Run fast test suite locally: 229 passed, 56 deselected, 8.95s. 23 Pydantic deprecation warnings (json_encoders).
+- [x] Run fast test suite locally: 241 passed, 56 deselected, 12.84s. 23 Pydantic deprecation warnings (json_encoders).
 
 **Acceptance:** Complete. STATUS.md updated, runbooks corrected for PM2, test suite green. Phase 0 done on 2026-02-07.
 
@@ -21,22 +21,26 @@ This roadmap sequences work into phases based on urgency and dependency. Each ph
 
 **Goal:** The system can process Carbon Egg's registration documents end-to-end without errors and produce a clean, professional report.
 
-### 1a. Fix Mapping Bug
+### 1a. Fix Mapping Bug — DONE (Feb 7)
 
-- [ ] Reproduce Becca's mapping error with available test data
-- [ ] Diagnose: is this a document naming issue, a mapping logic issue, or a cross-validation variant?
-- [ ] Fix and add regression test
-- [ ] Verify with Botany Farm test project (existing tests pass)
+- [x] Reproduce Becca's mapping error with available test data
+- [x] Diagnose: naming convention split — classifier uses underscores (`land_tenure`), mapper used hyphens (`land-tenure`)
+- [x] Fix: normalized all mapper labels to underscores (commit `467695e`)
+- [x] Added 5 regression tests in `TestMappingConventionConsistency`
+- [x] Verify with Botany Farm test project — all tests pass
 
 Sources: review-agent-readiness.md item 2.1, Becca's Slack screenshots
 
-### 1b. Spreadsheet Ingestion
+### 1b. Spreadsheet Ingestion — DONE (Feb 7)
 
-- [ ] Add .xlsx and .csv support to document processor (`services/document_processor.py`)
-- [ ] Integrate with document discovery stage (Stage B)
-- [ ] Handle tabular data extraction for evidence mapping
-- [ ] Test with sample land tenure spreadsheet data
-- [ ] Add unit tests for spreadsheet processing
+- [x] Add `openpyxl>=3.1.0` dependency
+- [x] Add `SPREADSHEET_EXTENSIONS` and `is_spreadsheet_file()` to `utils/patterns.py`
+- [x] Create `extractors/spreadsheet_extractor.py` (.xlsx/.xls/.csv/.tsv → markdown tables)
+- [x] Integrate with document discovery (Stage B) — spreadsheet extensions in `supported_extensions`
+- [x] Classification: filename patterns take priority, generic `spreadsheet_data` as fallback
+- [x] Integrate into `document_processor.py` fast extraction path (spreadsheets skip HQ dual-track)
+- [x] Add `spreadsheet_data` to relevant mapping categories (land tenure, monitoring, emissions, project details)
+- [x] 7 new tests: discovery, xlsx extraction, csv extraction, classification (domain + generic), mapper coverage, pattern helper
 
 Sources: Jan 20 standup, Jan 27 standup, data-types-for-registry-protocols.md
 
@@ -62,6 +66,8 @@ Sources: review-agent-readiness.md items 2.3 and 3.1-3.2, Feb 3 standup
 Sources: review-agent-readiness.md item 2.2, Feb 3 standup (Darren's recommendation)
 
 **Acceptance:** Carbon Egg's test documents (when available) process cleanly. Report is professional. No mapping errors. Spreadsheets are handled. Becca can run a review and get a result she'd show to a partner.
+
+**Progress:** 1a and 1b complete. 1c (report quality) and 1d (multi-project) remain.
 
 ## Phase 2: Demo Readiness and BizDev Support
 

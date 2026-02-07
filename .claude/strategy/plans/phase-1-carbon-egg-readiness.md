@@ -1,7 +1,8 @@
 # Phase 1: Carbon Egg Registration Readiness
 
-Status: Not Started
+Status: In Progress (1a, 1b complete — 1c, 1d remain)
 Created: 2026-02-07
+Updated: 2026-02-07
 Target: Before next team check-in (Feb 11)
 
 ## Objective
@@ -20,40 +21,28 @@ Before starting implementation work:
 
 ## Work Items
 
-### 1a. Fix Mapping Bug
+### 1a. Fix Mapping Bug — DONE
 
-**Problem:** System confuses document names during the mapping stage (Stage C). Different from the earlier cross-validation bug that was fixed. Becca has a screenshot.
+**Problem:** System confuses document names during the mapping stage (Stage C).
 
-**Investigation approach:**
-- Check `tools/mapping_tools.py` for how document names are resolved
-- Check `prompts/C_requirement_mapping.py` for how documents are presented to the LLM
-- Look at `services/document_processor.py` for document classification logic
-- Run the Botany Farm example through stages A-C and inspect the mapping output
+**Root cause:** Naming convention split. The classifier (`classify_document_by_filename`) produces underscore labels (`land_tenure`, `ghg_emissions`, `gis_shapefile`), but the mapper (`_infer_document_types`) was looking for hyphenated labels (`land-tenure`). Three document types silently fell through to the project plan fallback.
 
-**Files likely involved:**
-- `src/registry_review_mcp/tools/mapping_tools.py`
-- `src/registry_review_mcp/prompts/C_requirement_mapping.py`
-- `src/registry_review_mcp/services/document_processor.py`
+**Fix:** Normalized all mapper labels to underscores (commit `467695e`). Added 5 regression tests in `TestMappingConventionConsistency` that verify: all classifier labels appear in mapper output, no hyphenated labels exist anywhere in mapper, and specific document types map to their correct requirements.
 
-**Test:** Add a regression test to `tests/test_document_processing.py` or create a new `tests/test_mapping_bug.py`.
-
-### 1b. Spreadsheet Ingestion
+### 1b. Spreadsheet Ingestion — DONE
 
 **Problem:** System only processes PDFs. Carbon Egg has land tenure records in .xlsx and .csv files.
 
-**Implementation approach:**
-- Add spreadsheet reading capability to `services/document_processor.py`
-- Use `openpyxl` (for .xlsx) or the existing pandas/csv stdlib for parsing
-- Integrate with document discovery (Stage B) so spreadsheets appear in the document inventory
-- Extract tabular data into a text representation suitable for evidence mapping
-- Handle multi-sheet workbooks (each sheet may represent a different farm)
+**Implementation (7 files modified/created):**
+- `pyproject.toml` — added `openpyxl>=3.1.0`
+- `utils/patterns.py` — added `SPREADSHEET_EXTENSIONS`, `is_spreadsheet_file()`
+- `extractors/spreadsheet_extractor.py` — new file, converts .xlsx/.xls/.csv/.tsv → markdown tables with `--- Sheet "name" (N of M) ---` markers
+- `tools/document_tools.py` — spreadsheet extensions in discovery, classification branch (pattern-first, then generic `spreadsheet_data`), metadata extraction (sheet count)
+- `services/document_processor.py` — `run_fast_extraction()` handles spreadsheets alongside PDFs; `hq_status = "not_applicable"` for spreadsheets
+- `tools/mapping_tools.py` — `spreadsheet_data` added to land tenure, monitoring, emissions, project details, ownership categories
+- `tests/conftest.py` + `test_document_processing.py` — 3 fixtures + 7 tests
 
-**Files to modify:**
-- `src/registry_review_mcp/services/document_processor.py` — add spreadsheet detection and extraction
-- `src/registry_review_mcp/prompts/B_document_discovery.py` — update if needed for spreadsheet classification
-- `pyproject.toml` — add dependency if needed (check if openpyxl is already available)
-
-**Test:** Create `tests/test_spreadsheet_ingestion.py` with sample .xlsx and .csv files.
+**Design decisions:** Filename patterns take priority over file type (so `land_tenure_records.xlsx` classifies as `land_tenure`, not `spreadsheet_data`). Sheet markers mirror PDF page markers for uniform citation extraction. 10,000-row cap per sheet. No HQ dual-track (spreadsheets are already structured). `page_count = sheet_count` for compatibility.
 
 ### 1c. Report Output Quality
 
@@ -107,9 +96,9 @@ This is primarily a workflow and knowledge problem, not a code problem. The syst
 
 ## Acceptance Criteria
 
-- [ ] Fast test suite passes (`pytest` — 229+ passing)
-- [ ] Botany Farm example processes without mapping errors
-- [ ] A .xlsx file can be uploaded and appears in document discovery
+- [x] Fast test suite passes (`pytest` — 241 passing)
+- [x] Botany Farm example processes without mapping errors
+- [x] A .xlsx file can be uploaded and appears in document discovery
 - [ ] Report output has no duplicate "value" field
 - [ ] Report output has no emojis
 - [ ] Report tables render as structured data, not chat prose
