@@ -28,7 +28,7 @@ Specifically verified:
 - Human review flagged only where needed
 - Session persistence and recovery
 - File upload via signed URLs and path-based ingestion
-- 241 tests passing (fast suite)
+- 246 tests passing (fast suite)
 
 ## What's Broken or Missing
 
@@ -44,11 +44,11 @@ Specifically verified:
 
 ### Blocking for demos and BizDev
 
-5. **Report formatting** — Output still looks like ChatGPT. Needs containerization, emoji removal, and professional formatting. (See: review-agent-readiness.md, item 3.1)
+5. **~~Report formatting~~** — Fixed (Feb 7). Emojis removed from all report prose (summary stats, section headers, requirement headings, validation summaries). Text labels (`PASS:/WARNING:/FAIL:`, `[Review]`) replace emoji status indicators. Dead code with old patterns removed.
 
-6. **PDF download** — Not working from the web app. Markdown download works. (See: review-agent-readiness.md, item 3.2)
+6. **PDF download** — Not implemented (raises `NotImplementedError`). Requires a rendering library (e.g., weasyprint). Deferred — markdown and DOCX downloads work correctly.
 
-7. **Duplicate value field** — A spurious "value" field appears before "Primary Documentation" in the output table. Needs removal. (See: Feb 3 standup, Shawn checking deployment)
+7. **~~Duplicate value field~~** — Fixed (Feb 7). The `**Value:**` label removed from Submitted Material in both markdown and DOCX paths. Extracted value now stands alone before "Primary Documentation:".
 
 8. **Supplementary evidence quality** — Unclear how well the system pulls supplementary evidence beyond primary documentation. Needs testing. (See: review-agent-readiness.md, item 2.3)
 
@@ -70,7 +70,7 @@ Specifically verified:
 - ETHDenver/Boulder hackathon: starting around Feb 7 (Shawn, Darren, Eve attending)
 - Next team check-in target: Wednesday Feb 11
 - BizDev calls potentially starting as early as first week of Feb
-- Last code change: Jan 26 (12 days ago as of Feb 7)
+- Last code change: Feb 7 (Phases 1a, 1b, 1c)
 
 ## Immediate Next Actions
 
@@ -78,6 +78,6 @@ See ROADMAP.md for the phased plan. The critical path is:
 1. ~~Verify production deployment state (SSH to server)~~ — Done (Feb 7)
 2. ~~Reproduce and fix the mapping bug~~ — Done (Feb 7, commit `467695e`)
 3. ~~Add spreadsheet ingestion (.xlsx, .csv)~~ — Done (Feb 7)
-4. Clean up report output formatting
+4. ~~Clean up report output formatting~~ — Done (Feb 7, Phase 1c)
 5. Test with Carbon Egg data
 6. Deploy latest changes to production

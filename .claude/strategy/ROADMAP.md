@@ -44,14 +44,16 @@ Sources: review-agent-readiness.md item 2.1, Becca's Slack screenshots
 
 Sources: Jan 20 standup, Jan 27 standup, data-types-for-registry-protocols.md
 
-### 1c. Report Output Quality
+### 1c. Report Output Quality — DONE (Feb 7)
 
-- [ ] Remove duplicate "value" field from output table
-- [ ] Remove emojis from generated report content
-- [ ] Containerize report sections (structured tables, not chat-style prose)
-- [ ] Verify tables render cleanly when exported from the web app
-- [ ] Fix PDF download (currently broken in web app)
-- [ ] Test DOCX download with the cleaned-up formatting
+- [x] Remove duplicate "Value:" label from Submitted Material column (markdown and DOCX)
+- [x] Remove emojis from generated report content (summary stats, section headers, requirement headings, validation summaries)
+- [x] Replace emoji status indicators with text labels (PASS/WARNING/FAIL, [Review] flag)
+- [x] Remove dead code (`_get_docx_submitted_material`, `_get_docx_comments`) that still had old patterns
+- [x] 5 new tests: no-emojis-in-report, no-value-label, section-headers, validation-flagged, checklist-row-approved
+- [x] Full test suite: 246 passed, 56 deselected
+- [ ] PDF download — not implemented (raises `NotImplementedError`); requires a rendering library. Deferred.
+- [ ] Verify tables render cleanly in web app export — needs manual check after deployment
 
 Sources: review-agent-readiness.md items 2.3 and 3.1-3.2, Feb 3 standup
 
@@ -67,7 +69,7 @@ Sources: review-agent-readiness.md item 2.2, Feb 3 standup (Darren's recommendat
 
 **Acceptance:** Carbon Egg's test documents (when available) process cleanly. Report is professional. No mapping errors. Spreadsheets are handled. Becca can run a review and get a result she'd show to a partner.
 
-**Progress:** 1a and 1b complete. 1c (report quality) and 1d (multi-project) remain.
+**Progress:** 1a, 1b, and 1c complete. 1d (multi-project) remains. PDF export deferred (separate feature).
 
 ## Phase 2: Demo Readiness and BizDev Support
 

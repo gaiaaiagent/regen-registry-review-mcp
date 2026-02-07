@@ -584,3 +584,23 @@ class TestReportOutputQuality:
 
         assert "## Covered Requirements" in content
         assert "## ✅" not in content
+
+    def test_checklist_row_approved_no_emoji(self):
+        """Verify _format_checklist_row uses plain ⚠ (not ⚠️ emoji) in Approved column."""
+        from registry_review_mcp.tools.report_tools import _format_checklist_row
+
+        # Partial status triggers the warning symbol
+        req = RequirementFinding(
+            requirement_id="REQ-001", requirement_text="Test partial requirement",
+            category="General", status="partial", confidence=0.6,
+            documents_referenced=1, snippets_found=1,
+            evidence_summary="Partial evidence", page_citations=[],
+            human_review_required=True,
+        )
+        row = _format_checklist_row(req, {})
+
+        # Should use plain Unicode ⚠ (U+26A0), not emoji ⚠️ (U+26A0 + U+FE0F)
+        assert "⚠" in row
+        assert "⚠️" not in row
+        assert "✅" not in row
+        assert "❌" not in row

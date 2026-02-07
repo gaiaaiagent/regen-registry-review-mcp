@@ -812,7 +812,7 @@ def _format_checklist_row(
     - Requirement
     - Accepted Evidence (from requirement spec)
     - Submitted Material (Value + Primary/Supplementary docs)
-    - Approved (✓/✗/⚠️)
+    - Approved (✓/✗/⚠)
     - Comments (Confidence + Evidence text + notes)
     """
     snippets = evidence_item.get("evidence_snippets", [])
@@ -824,7 +824,7 @@ def _format_checklist_row(
     elif req.status == "missing":
         approved = "✗"
     else:
-        approved = "⚠️"
+        approved = "⚠"
 
     # Generate comments: Confidence + Evidence + Notes
     comments_parts = []
@@ -1129,59 +1129,6 @@ def format_docx_report(
     # Save the populated document
     doc.save(output_path)
     return output_path
-
-
-def _get_docx_submitted_material(evidence_item: dict[str, Any]) -> str:
-    """Extract submitted material text for DOCX from evidence item.
-
-    Format (with newlines):
-    Value: [concise extracted value]
-    Primary Documentation: [doc name] (p.X)
-    Evidence: [full context text]
-    """
-    snippets = evidence_item.get("evidence_snippets", [])
-    if not snippets:
-        return "No evidence found"
-
-    # Use first snippet as primary evidence
-    primary = snippets[0]
-    doc_name = primary.get("document_name", "Unknown")
-    page = primary.get("page", "?")
-    text = primary.get("text", "")
-
-    if text:
-        clean_text = " ".join(text.split())  # Normalize whitespace
-
-        # Extract value (first sentence or up to 200 chars)
-        first_sentence_end = min(
-            clean_text.find(". ") + 1 if ". " in clean_text else len(clean_text),
-            200
-        )
-        value_text = clean_text[:first_sentence_end].strip()
-        if len(value_text) < len(clean_text) and not value_text.endswith("."):
-            value_text += "..."
-
-        # Full evidence text (up to 500 chars for DOCX)
-        if len(clean_text) > 500:
-            evidence_text = clean_text[:500] + "..."
-        else:
-            evidence_text = clean_text
-    else:
-        value_text = "No value extracted"
-        evidence_text = "No text extracted"
-
-    return f"Value: {value_text}\n\nPrimary Documentation: {doc_name} (p.{page})\n\nEvidence: {evidence_text}"
-
-
-def _get_docx_comments(req: RequirementFinding) -> str:
-    """Generate comments text for DOCX from requirement finding (without evidence)."""
-    parts = []
-    parts.append(f"Confidence: {req.confidence:.0%}")
-    if req.human_review_required:
-        parts.append("Human review needed")
-    if req.notes:
-        parts.append(req.notes)
-    return "; ".join(parts) if parts else ""
 
 
 def _get_docx_comments_with_evidence(req: RequirementFinding, evidence_text: str) -> str:
