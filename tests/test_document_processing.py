@@ -5,6 +5,7 @@ from pathlib import Path
 
 from registry_review_mcp.tools import session_tools, document_tools
 from registry_review_mcp.utils.state import StateManager
+from registry_review_mcp.utils.patterns import is_spreadsheet_file
 
 
 class TestDocumentDiscovery:
@@ -312,3 +313,106 @@ class TestEndToEnd:
         finally:
             # Cleanup
             await session_tools.delete_session(session_id)
+
+
+class TestSpreadsheetIngestion:
+    """Tests for spreadsheet (.xlsx, .csv) discovery, classification, and extraction."""
+
+    @pytest.mark.asyncio
+    async def test_spreadsheet_discovery(self, sample_xlsx, sample_csv, tmp_path):
+        """Verify .xlsx and .csv files are found during document discovery."""
+        session = await session_tools.create_session(
+            project_name="Spreadsheet Discovery Test",
+            documents_path=str(tmp_path),
+            methodology="soil-carbon-v1.2.2",
+        )
+        session_id = session["session_id"]
+
+        try:
+            results = await document_tools.discover_documents(session_id)
+            filenames = {doc["filename"] for doc in results["documents"]}
+
+            assert "farm_data.xlsx" in filenames, "Should discover .xlsx files"
+            assert "monitoring_data.csv" in filenames, "Should discover .csv files"
+            assert results["documents_found"] >= 2
+        finally:
+            await session_tools.delete_session(session_id)
+
+    @pytest.mark.asyncio
+    async def test_spreadsheet_extraction_xlsx(self, sample_xlsx):
+        """Verify .xlsx extraction produces well-structured markdown."""
+        from registry_review_mcp.extractors.spreadsheet_extractor import extract_spreadsheet
+
+        result = await extract_spreadsheet(str(sample_xlsx))
+
+        assert result["sheet_count"] == 2
+        assert result["page_count"] == 2  # compatibility alias
+        assert result["row_count"] == 8  # 5 farm + 3 tenure
+        assert result["tables_found"] == 2
+        assert result["extraction_method"] == "openpyxl"
+        assert result["total_chars"] > 0
+
+        md = result["markdown"]
+        assert '--- Sheet "Farm Data" (1 of 2) ---' in md
+        assert '--- Sheet "Land Tenure" (2 of 2) ---' in md
+        assert "CE-001" in md
+        assert "Alice" in md
+
+    @pytest.mark.asyncio
+    async def test_spreadsheet_extraction_csv(self, sample_csv):
+        """Verify .csv extraction produces well-structured markdown."""
+        from registry_review_mcp.extractors.spreadsheet_extractor import extract_spreadsheet
+
+        result = await extract_spreadsheet(str(sample_csv))
+
+        assert result["sheet_count"] == 1
+        assert result["page_count"] == 1
+        assert result["row_count"] == 3
+        assert result["extraction_method"] == "csv"
+
+        md = result["markdown"]
+        assert '--- Sheet "monitoring_data.csv" (1 of 1) ---' in md
+        assert "SOC (g/kg)" in md
+        assert "23.4" in md
+
+    @pytest.mark.asyncio
+    async def test_spreadsheet_classification(self, sample_land_tenure_xlsx):
+        """Verify land_tenure_records.xlsx classifies as land_tenure, not generic spreadsheet_data."""
+        classification, confidence, method = await document_tools.classify_document_by_filename(
+            str(sample_land_tenure_xlsx)
+        )
+        assert classification == "land_tenure", (
+            f"Expected 'land_tenure' for land_tenure_records.xlsx, got '{classification}'"
+        )
+        assert confidence >= 0.80
+        assert method == "filename"
+
+    @pytest.mark.asyncio
+    async def test_generic_spreadsheet_classification(self, sample_xlsx):
+        """Verify a generically-named spreadsheet gets spreadsheet_data classification."""
+        classification, confidence, method = await document_tools.classify_document_by_filename(
+            str(sample_xlsx)
+        )
+        assert classification == "spreadsheet_data"
+        assert method == "file_type"
+
+    def test_spreadsheet_data_in_mapper(self):
+        """Verify spreadsheet_data appears in mapper for relevant requirement categories."""
+        from registry_review_mcp.tools.mapping_tools import _infer_document_types
+
+        # Land tenure requirements should look for spreadsheet data
+        types = _infer_document_types("Land Tenure", "Deeds, lease agreements")
+        assert "spreadsheet_data" in types
+
+        # Monitoring requirements should look for spreadsheet data
+        types = _infer_document_types("Monitoring", "Sampling records")
+        assert "spreadsheet_data" in types
+
+    def test_is_spreadsheet_file_helper(self):
+        """Verify the is_spreadsheet_file pattern helper."""
+        assert is_spreadsheet_file("data.xlsx")
+        assert is_spreadsheet_file("records.csv")
+        assert is_spreadsheet_file("report.tsv")
+        assert is_spreadsheet_file("DATA.XLSX")  # case insensitive
+        assert not is_spreadsheet_file("report.pdf")
+        assert not is_spreadsheet_file("map.shp")

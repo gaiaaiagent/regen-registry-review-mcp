@@ -272,17 +272,17 @@ def _infer_document_types(category: str, accepted_evidence: str) -> list[str]:
     # Map requirement categories to classifier output labels.
     # Labels must match classify_document_by_filename() in document_tools.py.
     type_mapping = {
-        "land tenure": ["land_tenure", "project_plan"],
-        "land eligibility": ["land_tenure", "project_plan"],
+        "land tenure": ["land_tenure", "spreadsheet_data", "project_plan"],
+        "land eligibility": ["land_tenure", "spreadsheet_data", "project_plan"],
         "baseline": ["baseline_report", "project_plan"],
-        "monitoring": ["monitoring_report"],
-        "sampling": ["monitoring_report"],
+        "monitoring": ["monitoring_report", "spreadsheet_data"],
+        "sampling": ["monitoring_report", "spreadsheet_data"],
         "gis": ["gis_shapefile", "land_cover_map", "project_plan"],
-        "emissions": ["ghg_emissions", "monitoring_report"],
-        "project details": ["project_plan"],
+        "emissions": ["ghg_emissions", "monitoring_report", "spreadsheet_data"],
+        "project details": ["project_plan", "spreadsheet_data"],
         "project area": ["project_plan", "gis_shapefile", "land_cover_map"],
         "project boundary": ["project_plan", "gis_shapefile"],
-        "project ownership": ["project_plan", "land_tenure"],
+        "project ownership": ["project_plan", "land_tenure", "spreadsheet_data"],
         "project start date": ["project_plan"],
         "ecosystem type": ["project_plan", "baseline_report"],
         "crediting period": ["project_plan"],
@@ -302,7 +302,7 @@ def _infer_document_types(category: str, accepted_evidence: str) -> list[str]:
 
     # Check evidence description keywords
     if "deed" in evidence_lower or "title" in evidence_lower or "ownership" in evidence_lower:
-        return ["land_tenure", "project_plan"]
+        return ["land_tenure", "spreadsheet_data", "project_plan"]
     elif "map" in evidence_lower or "shapefile" in evidence_lower or "gis" in evidence_lower:
         return ["gis_shapefile", "land_cover_map", "project_plan"]
     elif "baseline" in evidence_lower:

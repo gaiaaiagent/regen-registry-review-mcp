@@ -373,3 +373,66 @@ def example_documents_path():
         Absolute path to examples/22-23 directory
     """
     return (Path(__file__).parent.parent / "examples" / "22-23").absolute()
+
+
+@pytest.fixture
+def sample_xlsx(tmp_path):
+    """Create a small test .xlsx with two sheets for spreadsheet ingestion tests.
+
+    Sheet 1 — "Farm Data": 5 data rows of farm records.
+    Sheet 2 — "Land Tenure": 3 data rows of tenure records.
+    """
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+    ws1 = wb.active
+    ws1.title = "Farm Data"
+    ws1.append(["Farm ID", "Owner", "Hectares", "Status"])
+    for i, (owner, ha, status) in enumerate(
+        [("Alice", 45.2, "Active"), ("Bob", 32.1, "Active"), ("Carol", 18.7, "Pending"),
+         ("Dan", 55.0, "Active"), ("Eve", 27.3, "Inactive")], start=1
+    ):
+        ws1.append([f"CE-{i:03d}", owner, ha, status])
+
+    ws2 = wb.create_sheet("Land Tenure")
+    ws2.append(["Farm ID", "Deed Number", "Registry", "Date"])
+    ws2.append(["CE-001", "D-10234", "County A", "2024-01-15"])
+    ws2.append(["CE-002", "D-10235", "County B", "2024-02-20"])
+    ws2.append(["CE-003", "D-10236", "County A", "2024-03-10"])
+
+    xlsx_path = tmp_path / "farm_data.xlsx"
+    wb.save(str(xlsx_path))
+    wb.close()
+    return xlsx_path
+
+
+@pytest.fixture
+def sample_csv(tmp_path):
+    """Create a small test .csv with monitoring data."""
+    import csv as csv_mod
+
+    csv_path = tmp_path / "monitoring_data.csv"
+    with open(csv_path, "w", newline="") as f:
+        writer = csv_mod.writer(f)
+        writer.writerow(["Date", "Plot ID", "SOC (g/kg)", "pH", "Moisture (%)"])
+        writer.writerow(["2024-06-01", "P-01", "23.4", "6.8", "31.2"])
+        writer.writerow(["2024-06-01", "P-02", "19.7", "7.1", "28.5"])
+        writer.writerow(["2024-06-15", "P-01", "24.1", "6.7", "33.0"])
+    return csv_path
+
+
+@pytest.fixture
+def sample_land_tenure_xlsx(tmp_path):
+    """Create a .xlsx named to trigger land_tenure classification."""
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Tenure Records"
+    ws.append(["Farm ID", "Deed Number", "Type"])
+    ws.append(["CE-001", "D-10234", "Freehold"])
+
+    xlsx_path = tmp_path / "land_tenure_records.xlsx"
+    wb.save(str(xlsx_path))
+    wb.close()
+    return xlsx_path

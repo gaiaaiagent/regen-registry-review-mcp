@@ -31,6 +31,7 @@ from ..utils.patterns import (
     is_pdf_file,
     is_gis_file,
     is_image_file,
+    is_spreadsheet_file,
     match_any,
 )
 from ..utils.state import StateManager, get_session_or_raise
@@ -473,7 +474,7 @@ async def discover_documents(session_id: str) -> dict[str, Any]:
     classification_summary = {}
 
     # Supported extensions
-    supported_extensions = {".pdf", ".shp", ".geojson", ".tif", ".tiff"}
+    supported_extensions = {".pdf", ".shp", ".geojson", ".tif", ".tiff", ".xlsx", ".xls", ".csv", ".tsv"}
 
     # Recursive scan with progress
     print(f"🔍 Scanning {len(paths_to_scan)} source(s)", flush=True)
@@ -591,10 +592,16 @@ async def discover_documents(session_id: str) -> dict[str, Any]:
                     f"Verify all shapefile components are present in {file_path.parent}",
                     "Try re-exporting the shapefile from GIS software"
                 ]
+            elif is_spreadsheet_file(str(file_path)):
+                recovery_steps = [
+                    "The spreadsheet may be corrupted or password-protected",
+                    f"Try opening {file_path.name} in Excel or LibreOffice to verify",
+                    "Re-export as .xlsx or .csv if the file is damaged"
+                ]
             else:
                 recovery_steps = [
                     f"Verify the file is not corrupted: {file_path.name}",
-                    "Check file format is supported (.pdf, .shp, .geojson, .tif)",
+                    "Check file format is supported (.pdf, .shp, .geojson, .tif, .xlsx, .csv)",
                     "Try re-processing the file or contact support"
                 ]
 
@@ -691,6 +698,9 @@ async def classify_document_by_filename(filepath: str) -> tuple[str, float, str]
     if is_image_file(filename):
         return ("land_cover_map", 0.70, "file_type")
 
+    if is_spreadsheet_file(filename):
+        return ("spreadsheet_data", 0.75, "file_type")
+
     # Default
     return ("unknown", 0.50, "default")
 
@@ -717,6 +727,24 @@ async def extract_document_metadata(file_path: Path) -> DocumentMetadata:
         # Defer all PDF content inspection to Phase 4
         metadata.page_count = None  # Will be set during conversion in Stage 4
         metadata.has_tables = False  # Will be detected during conversion in Stage 4
+
+    # Spreadsheet-specific metadata: lightweight header check during discovery
+    if is_spreadsheet_file(file_path.name):
+        suffix = file_path.suffix.lower()
+        try:
+            if suffix in (".xlsx", ".xls"):
+                import openpyxl
+
+                wb = openpyxl.load_workbook(str(file_path), read_only=True, data_only=True)
+                metadata.page_count = len(wb.sheetnames)
+                metadata.has_tables = True
+                wb.close()
+            elif suffix in (".csv", ".tsv"):
+                metadata.page_count = 1
+                metadata.has_tables = True
+        except Exception:
+            metadata.page_count = None
+            metadata.has_tables = False
 
     return metadata
 

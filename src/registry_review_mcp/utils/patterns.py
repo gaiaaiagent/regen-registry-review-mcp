@@ -78,6 +78,7 @@ METHODOLOGY_PATTERNS = [
 GIS_EXTENSIONS = {".shp", ".shx", ".dbf", ".prj", ".geojson", ".kml", ".kmz"}
 IMAGE_EXTENSIONS = {".tif", ".tiff", ".jpg", ".jpeg", ".png", ".gif"}
 PDF_EXTENSION = {".pdf"}
+SPREADSHEET_EXTENSIONS = {".xlsx", ".xls", ".csv", ".tsv"}
 
 # ============================================================================
 # Validation Patterns
@@ -178,3 +179,17 @@ def is_pdf_file(filename: str) -> bool:
     from pathlib import Path
 
     return Path(filename).suffix.lower() in PDF_EXTENSION
+
+
+def is_spreadsheet_file(filename: str) -> bool:
+    """Check if filename is a spreadsheet file.
+
+    Args:
+        filename: Name of file
+
+    Returns:
+        True if spreadsheet file, False otherwise
+    """
+    from pathlib import Path
+
+    return Path(filename).suffix.lower() in SPREADSHEET_EXTENSIONS

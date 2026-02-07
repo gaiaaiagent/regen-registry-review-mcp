@@ -98,25 +98,33 @@ class DocumentProcessor:
     async def run_fast_extraction(self, document_ids: list[str] | None = None) -> dict[str, Any]:
         """Run fast extraction on documents.
 
+        Processes PDFs (via PyMuPDF4LLM) and spreadsheets (via openpyxl/csv).
+        Spreadsheets are already structured data so they only need one
+        extraction pass — no HQ conversion is applicable.
+
         Args:
-            document_ids: Specific documents to process. If None, process all PDFs.
+            document_ids: Specific documents to process. If None, process all extractable files.
 
         Returns:
             Summary of extraction results
         """
         from ..extractors.fast_extractor import fast_extract_pdf
+        from ..extractors.spreadsheet_extractor import extract_spreadsheet
+        from ..utils.patterns import SPREADSHEET_EXTENSIONS
 
         # Get fresh state for this operation
         state = get_session_or_raise(self.session_id)
         docs_data = state.read_json("documents.json")
         documents = docs_data.get("documents", [])
 
-        # Filter to specified documents or all PDFs
+        # Filter to specified documents or all extractable files (PDFs + spreadsheets)
+        extractable_suffixes = {".pdf"} | SPREADSHEET_EXTENSIONS
         to_process = []
         for doc in documents:
             if document_ids and doc["document_id"] not in document_ids:
                 continue
-            if not doc["filepath"].lower().endswith(".pdf"):
+            suffix = Path(doc["filepath"]).suffix.lower()
+            if suffix not in extractable_suffixes:
                 continue
             if doc.get("fast_status") == "complete":
                 continue
@@ -130,7 +138,7 @@ class DocumentProcessor:
             }
 
         logger.info(f"Running fast extraction on {len(to_process)} documents")
-        print(f"⚡ Fast extracting {len(to_process)} PDF(s)...", flush=True)
+        print(f"⚡ Fast extracting {len(to_process)} document(s)...", flush=True)
 
         results = {"successful": 0, "failed": 0, "documents": []}
 
@@ -138,15 +146,19 @@ class DocumentProcessor:
             doc_id = doc["document_id"]
             filepath = doc["filepath"]
             filename = Path(filepath).name
+            suffix = Path(filepath).suffix.lower()
 
             print(f"  [{i}/{len(to_process)}] {filename}...", flush=True, end=" ")
 
             try:
-                result = await fast_extract_pdf(filepath)
+                if suffix in SPREADSHEET_EXTENSIONS:
+                    result = await extract_spreadsheet(filepath)
+                else:
+                    result = await fast_extract_pdf(filepath)
 
-                # Save markdown next to PDF
-                pdf_path = Path(filepath)
-                fast_md_path = pdf_path.with_suffix(".fast.md")
+                # Save markdown alongside the source file
+                src_path = Path(filepath)
+                fast_md_path = src_path.with_suffix(".fast.md")
                 fast_md_path.write_text(result["markdown"], encoding="utf-8")
 
                 # Update document record
@@ -156,14 +168,16 @@ class DocumentProcessor:
                 doc["fast_page_count"] = result["page_count"]
                 doc["fast_char_count"] = result["total_chars"]
 
-                # Set as active markdown if no HQ available
+                # Set as active markdown
                 if not doc.get("hq_status") == "complete":
                     doc["has_markdown"] = True
                     doc["markdown_path"] = str(fast_md_path)
                     doc["active_quality"] = "fast"
 
-                # Initialize HQ status
-                if "hq_status" not in doc:
+                # Spreadsheets don't need HQ conversion — they're already structured
+                if suffix in SPREADSHEET_EXTENSIONS:
+                    doc["hq_status"] = "not_applicable"
+                elif "hq_status" not in doc:
                     doc["hq_status"] = "pending"
 
                 results["successful"] += 1
