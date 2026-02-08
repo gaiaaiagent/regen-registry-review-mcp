@@ -38,9 +38,9 @@ Specifically verified:
 
 2. **Spreadsheet ingestion** — Implemented (Feb 7). System now processes .xlsx, .xls, .csv, .tsv alongside PDFs. New `spreadsheet_extractor.py` converts tabular data to markdown tables with sheet markers. Integrated into discovery, classification, extraction, and requirement mapping. 7 new tests added. (See: Jan 20 standup, Jan 27 standup)
 
-3. **Meta-project architecture** — Carbon Egg has 100+ individual farms plus a meta-project. Decision made (Feb 3): treat each farm as an independent project. Needs implementation guidance: auxiliary knowledge explaining the multi-project structure, differentiated checklists for farms vs meta-project. (See: review-agent-readiness.md, item 2.2)
+3. **~~Meta-project architecture~~** — Implemented (Feb 7). Scope-based filtering: `scope="farm"` loads 4 per-farm requirements (REQ-002/003/004/009), `scope="meta"` loads 19 meta-project requirements. Centralized `load_checklist()` utility replaces 5 scattered `json.load` patterns. Knowledge doc at `data/knowledge/carbon-egg-multi-project.md`. 11 new tests. (See: review-agent-readiness.md, item 2.2)
 
-4. **CarbonEg-specific requirements** — Not pre-loaded. The checklist currently only has soil-carbon-v1.2.2. May need a Carbon Egg specific variant or additional protocol support.
+4. **CarbonEg-specific requirements** — Addressed via scope filtering. The soil-carbon-v1.2.2 checklist now has scope tags on every requirement. No separate Carbon Egg variant needed.
 
 ### Blocking for demos and BizDev
 
@@ -70,7 +70,7 @@ Specifically verified:
 - ETHDenver/Boulder hackathon: starting around Feb 7 (Shawn, Darren, Eve attending)
 - Next team check-in target: Wednesday Feb 11
 - BizDev calls potentially starting as early as first week of Feb
-- Last code change: Feb 7 (Phases 1a, 1b, 1c)
+- Last code change: Feb 7 (Phases 1a, 1b, 1c, 1d)
 
 ## Immediate Next Actions
 

@@ -12,7 +12,8 @@
       "source": "Program Guide, Section 8.1.3",
       "accepted_evidence": "Project plan, methodology and credit class version are up to date",
       "mandatory": true,
-      "validation_type": "document_presence"
+      "validation_type": "document_presence",
+      "scope": "meta"
     },
     {
       "requirement_id": "REQ-002",
@@ -21,7 +22,8 @@
       "source": "Program Guide, Section 8.2; Credit Class, Section 3.4, 3.5",
       "accepted_evidence": "Deeds, lease agreements, land use agreements, or legal attestations confirming long-term control and ownership",
       "mandatory": true,
-      "validation_type": "cross_document"
+      "validation_type": "cross_document",
+      "scope": "farm"
     },
     {
       "requirement_id": "REQ-003",
@@ -30,7 +32,8 @@
       "source": "Program Guide, Section 8.3.1, Methodology, Section 2.1",
       "accepted_evidence": "Timestamped image from sentinel color composite, NDVI, Google earth historical data, legal proof or attestation of land use history or similarly rigorous proof",
       "mandatory": true,
-      "validation_type": "document_presence"
+      "validation_type": "document_presence",
+      "scope": "farm"
     },
     {
       "requirement_id": "REQ-004",
@@ -39,7 +42,8 @@
       "source": "Program Guide, Section 8.3.2",
       "accepted_evidence": "GIS shapefiles and maps, with delineations of eligible and ineligible land",
       "mandatory": true,
-      "validation_type": "document_presence"
+      "validation_type": "document_presence",
+      "scope": "farm"
     },
     {
       "requirement_id": "REQ-005",
@@ -48,7 +52,8 @@
       "source": "Program Guide, Section 8.4.1",
       "accepted_evidence": "Project Plan section describing relevant GHG sinks, sources, reservoirs, and relevant indicators",
       "mandatory": true,
-      "validation_type": "document_presence"
+      "validation_type": "document_presence",
+      "scope": "meta"
     },
     {
       "requirement_id": "REQ-006",
@@ -57,7 +62,8 @@
       "source": "Program Guide, Section 8.5.1",
       "accepted_evidence": "Document of credit ownership structure requirement in Project Plan or reference contracts",
       "mandatory": true,
-      "validation_type": "document_presence"
+      "validation_type": "document_presence",
+      "scope": "meta"
     },
     {
       "requirement_id": "REQ-007",
@@ -66,7 +72,8 @@
       "source": "Program Guide, Section 8.6",
       "accepted_evidence": "Explicit mention of the name, start date, and duration of the project in Project Plan",
       "mandatory": true,
-      "validation_type": "structured_field"
+      "validation_type": "structured_field",
+      "scope": "meta"
     },
     {
       "requirement_id": "REQ-008",
@@ -75,7 +82,8 @@
       "source": "Credit Class, Section 3",
       "accepted_evidence": "Ecological assessment reports detailing ecosystem classification, including types of vegetation, soil, and climate characteristics",
       "mandatory": true,
-      "validation_type": "document_presence"
+      "validation_type": "document_presence",
+      "scope": "meta"
     },
     {
       "requirement_id": "REQ-009",
@@ -84,7 +92,8 @@
       "source": "Credit Class, Section 3.2",
       "accepted_evidence": "Provide proof of land use for a 5-year period preceding project registration in the Project Plan and evidenced by farm-management records",
       "mandatory": true,
-      "validation_type": "document_presence"
+      "validation_type": "document_presence",
+      "scope": "farm"
     },
     {
       "requirement_id": "REQ-010",
@@ -93,7 +102,8 @@
       "source": "Program Guide, Section 8.7.2; Credit Class, Section 3.7",
       "accepted_evidence": "Statement of crediting period length",
       "mandatory": true,
-      "validation_type": "structured_field"
+      "validation_type": "structured_field",
+      "scope": "meta"
     },
     {
       "requirement_id": "REQ-011",
@@ -102,7 +112,8 @@
       "source": "Credit Class, Section 5.1",
       "accepted_evidence": "Proof of additionality, either project or performance based",
       "mandatory": true,
-      "validation_type": "document_presence"
+      "validation_type": "document_presence",
+      "scope": "meta"
     },
     {
       "requirement_id": "REQ-012",
@@ -111,7 +122,8 @@
       "source": "Credit Class, Section 5.2",
       "accepted_evidence": "Included in annual report of crop yields",
       "mandatory": true,
-      "validation_type": "structured_field"
+      "validation_type": "structured_field",
+      "scope": "meta"
     },
     {
       "requirement_id": "REQ-013",
@@ -120,7 +132,8 @@
       "source": "Credit Class, Section 5.3",
       "accepted_evidence": "Explicit permanence period duration in the Project Plan",
       "mandatory": true,
-      "validation_type": "structured_field"
+      "validation_type": "structured_field",
+      "scope": "meta"
     },
     {
       "requirement_id": "REQ-014",
@@ -129,7 +142,8 @@
       "source": "Program Guide, Section 8.8",
       "accepted_evidence": "Documentation of all relevant laws, regulations, or other legally binding mandates directly related to Project Activities and indications of where Project Activities violate compliance",
       "mandatory": true,
-      "validation_type": "document_presence"
+      "validation_type": "document_presence",
+      "scope": "meta"
     },
     {
       "requirement_id": "REQ-015",
@@ -138,7 +152,8 @@
       "source": "Program Guide, Sections 8.9.1, 8.9.2",
       "accepted_evidence": "Official documentation from other registries detailing the project status, issued credits, or correspondence regarding approvals or rejections",
       "mandatory": true,
-      "validation_type": "document_presence"
+      "validation_type": "document_presence",
+      "scope": "meta"
     },
     {
       "requirement_id": "REQ-016",
@@ -147,7 +162,8 @@
       "source": "Program Guide, Section 8.12.2",
       "accepted_evidence": "Statement in the Project Plan of proposed deviation",
       "mandatory": false,
-      "validation_type": "manual"
+      "validation_type": "manual",
+      "scope": "meta"
     },
     {
       "requirement_id": "REQ-017",
@@ -156,7 +172,8 @@
       "source": "Methodology, Section 5.1",
       "accepted_evidence": "Monitoring schedules, soil sampling protocols, remote sensing details, and monitoring responsibility assignments",
       "mandatory": true,
-      "validation_type": "document_presence"
+      "validation_type": "document_presence",
+      "scope": "meta"
     },
     {
       "requirement_id": "REQ-018",
@@ -165,7 +182,8 @@
       "source": "Credit Class, Section 5.4",
       "accepted_evidence": "Buffer pool allocation. For final permanence period monitoring, a buffer pool report is required",
       "mandatory": true,
-      "validation_type": "structured_field"
+      "validation_type": "structured_field",
+      "scope": "meta"
     },
     {
       "requirement_id": "REQ-019",
@@ -174,7 +192,8 @@
       "source": "Program Guide, Section 8.11.1",
       "accepted_evidence": "Description of safeguard activities in Project Plan, impact reports, mitigation strategies and agreements",
       "mandatory": true,
-      "validation_type": "document_presence"
+      "validation_type": "document_presence",
+      "scope": "meta"
     },
     {
       "requirement_id": "REQ-020",
@@ -183,7 +202,8 @@
       "source": "Program Guide, Section 8.11.1",
       "accepted_evidence": "Documentation of conflict resolution, mitigation plans, grievance redresses",
       "mandatory": true,
-      "validation_type": "document_presence"
+      "validation_type": "document_presence",
+      "scope": "meta"
     },
     {
       "requirement_id": "REQ-021",
@@ -192,7 +212,8 @@
       "source": "Program Guide, Section 8.11.2",
       "accepted_evidence": "Descriptions in Project Plan, consultation documentation",
       "mandatory": true,
-      "validation_type": "document_presence"
+      "validation_type": "document_presence",
+      "scope": "meta"
     },
     {
       "requirement_id": "REQ-022",
@@ -201,7 +222,8 @@
       "source": "Program Guide, Section 8.11.3",
       "accepted_evidence": "Environmental impact reports and statements",
       "mandatory": true,
-      "validation_type": "document_presence"
+      "validation_type": "document_presence",
+      "scope": "meta"
     },
     {
       "requirement_id": "REQ-023",
@@ -210,7 +232,8 @@
       "source": "Program Guide, Section 8.11.4",
       "accepted_evidence": "Statements and documentation from public consultation process",
       "mandatory": true,
-      "validation_type": "document_presence"
+      "validation_type": "document_presence",
+      "scope": "meta"
     }
   ]
 }

@@ -116,6 +116,7 @@ class CreateSessionRequest(BaseModel):
         description="Methodology identifier (default: soil-carbon-v1.2.2)",
     )
     project_id: str | None = Field(None, description="Optional project ID (e.g., C06-4997)")
+    scope: str | None = Field(None, description="Scope filter: 'farm' for per-farm, 'meta' for meta-project, None for all")
 
 
 class SessionResponse(BaseModel):
@@ -153,6 +154,7 @@ class StartReviewWithFilesRequest(BaseModel):
     project_name: str = Field(..., description="Name of the project to review")
     files: list[UploadFileRequest] = Field(..., description="List of files to upload (base64 encoded)")
     methodology: str = Field(default="soil-carbon-v1.2.2", description="Methodology identifier")
+    scope: str | None = Field(None, description="Scope filter: 'farm' for per-farm, 'meta' for meta-project, None for all")
 
 
 class GenerateUploadUrlRequest(BaseModel):
@@ -233,6 +235,7 @@ async def create_session(request: CreateSessionRequest):
             project_name=request.project_name,
             methodology=request.methodology,
             project_id=request.project_id,
+            scope=request.scope,
         )
         return SessionResponse(**result)
     except Exception as e:

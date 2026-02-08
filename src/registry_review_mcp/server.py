@@ -56,6 +56,7 @@ async def create_session(
     project_id: str | None = None,
     proponent: str | None = None,
     crediting_period: str | None = None,
+    scope: str | None = None,
 ) -> str:
     """Create a new registry review session.
 
@@ -63,6 +64,11 @@ async def create_session(
     Creates session with project information. Documents can be added later.
 
     Note: documents_path is deprecated - use add_documents() tool instead.
+
+    For multi-project setups (e.g., Carbon Egg), use scope to filter requirements:
+    - "farm": Only per-farm requirements (land tenure, boundaries, ecosystem conditions)
+    - "meta": Only meta-project requirements (methodology, safeguards, etc.)
+    - None: All requirements (default, backward compatible)
     """
     result = await session_tools.create_session(
         project_name=project_name,
@@ -71,6 +77,7 @@ async def create_session(
         project_id=project_id,
         proponent=proponent,
         crediting_period=crediting_period,
+        scope=scope,
     )
     return json.dumps(result, indent=2)
 

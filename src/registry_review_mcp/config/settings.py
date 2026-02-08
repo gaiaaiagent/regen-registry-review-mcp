@@ -122,10 +122,6 @@ class Settings(BaseSettings):
     llm_cache_dir: Path = Field(default_factory=lambda: _get_xdg_cache_home() / APP_NAME / "llm")
     llm_cache_ttl: int = Field(default=604800)  # 7 days in seconds
 
-    # LLM-Native Architecture (Codebase Simplification)
-    # Phase 4.1 validation: 100% accuracy, 98.5% complexity reduction (70 ops → 1)
-    use_llm_native_extraction: bool = Field(default=True)  # Use unified LLM analysis
-
     # Cost Management
     api_call_timeout_seconds: int = Field(default=30, ge=5, le=120)
 

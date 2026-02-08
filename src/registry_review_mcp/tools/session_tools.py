@@ -51,6 +51,7 @@ async def create_session(
     crediting_period: str | None = None,
     submission_date: datetime | None = None,
     documents_path: str | None = None,  # Deprecated: Use add_documents() instead
+    scope: str | None = None,
 ) -> dict[str, Any]:
     """Create a new registry review session.
 
@@ -65,11 +66,12 @@ async def create_session(
         crediting_period: Optional crediting period
         submission_date: Optional submission date
         documents_path: DEPRECATED - Use add_documents() instead
+        scope: Optional scope filter -- "farm" or "meta" for multi-project setups
 
     Returns:
         Session creation result with session_id and metadata
     """
-    import json
+    from ..utils.checklist import load_checklist
 
     # Validate inputs via Pydantic
     project_metadata = ProjectMetadata(
@@ -79,6 +81,7 @@ async def create_session(
         submission_date=submission_date,
         methodology=methodology,
         proponent=proponent,
+        scope=scope,
         documents_path=documents_path,  # Backward compatibility
     )
 
@@ -86,13 +89,13 @@ async def create_session(
     session_id = generate_session_id()
     now = datetime.now(timezone.utc)
 
-    # Load checklist requirements count
-    checklist_path = settings.get_checklist_path(methodology)
+    # Load checklist requirements count (filtered by scope if provided)
     requirements_count = 0
-    if checklist_path.exists():
-        with open(checklist_path, "r") as f:
-            checklist_data = json.load(f)
+    try:
+        checklist_data = load_checklist(methodology, scope)
         requirements_count = len(checklist_data.get("requirements", []))
+    except FileNotFoundError:
+        pass
 
     # Create session with empty document_sources list
     session = Session(

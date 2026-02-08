@@ -39,6 +39,7 @@ class ProjectMetadata(BaseModel):
     submission_date: datetime | None = None
     methodology: str = "soil-carbon-v1.2.2"
     proponent: str | None = None
+    scope: str | None = None  # "farm", "meta", or None (all requirements)
     documents_path: str | None = None  # Optional for backward compatibility
 
     @field_validator("documents_path")

@@ -569,10 +569,11 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
     mappings_data = state_manager.read_json("mappings.json")
     mappings = {m["requirement_id"]: m for m in mappings_data.get("mappings", [])}
 
-    # Load checklist
-    checklist_path = settings.get_checklist_path("soil-carbon-v1.2.2")
-    with open(checklist_path) as f:
-        checklist_data = json.load(f)
+    # Load checklist using session methodology and scope
+    methodology = session_data.get("project_metadata", {}).get("methodology", "soil-carbon-v1.2.2")
+    scope = session_data.get("project_metadata", {}).get("scope")
+    from ..utils.checklist import load_checklist
+    checklist_data = load_checklist(methodology, scope)
     requirements = checklist_data.get("requirements", [])
 
     print(f"📋 Processing {len(requirements)} requirements", flush=True)

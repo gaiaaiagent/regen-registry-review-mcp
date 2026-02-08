@@ -1,13 +1,11 @@
-"""LLM-native analysis implementation.
+"""LLM-native analysis implementation (Path 2, default).
 
-This module provides a drop-in replacement for:
+This module provides a unified replacement for the legacy Path 1 pipeline:
 - evidence_tools.extract_all_evidence()
 - validation_tools.cross_validate()
 - llm_extractors field extraction
 
-Using a single unified LLM call instead of 100+ separate operations.
-
-Feature flag: settings.use_llm_native_extraction (default: False)
+Uses a single unified LLM call instead of 100+ separate operations.
 """
 
 import logging
@@ -17,12 +15,12 @@ from typing import Any
 from anthropic import AsyncAnthropic
 
 from ..config.settings import settings
-from ..models.errors import SessionNotFoundError, DocumentExtractionError
+from ..models.errors import SessionNotFoundError
 from ..prompts.unified_analysis import (
     analyze_with_llm,
     UnifiedAnalysisResult
 )
-from ..utils.state import StateManager, get_session_or_raise
+from ..utils.state import StateManager
 
 logger = logging.getLogger(__name__)
 
@@ -119,11 +117,12 @@ async def analyze_session_unified(session_id: str) -> dict[str, Any]:
     state_manager = StateManager(session_id)
     documents, markdown_contents = await load_all_markdown(session_id)
 
-    # Load checklist
-    checklist_path = settings.get_checklist_path("soil-carbon-v1.2.2")
-    import json
-    with open(checklist_path, "r") as f:
-        checklist_data = json.load(f)
+    # Load checklist using session methodology and scope
+    session_data = state_manager.read_json("session.json")
+    methodology = session_data.get("project_metadata", {}).get("methodology", "soil-carbon-v1.2.2")
+    scope = session_data.get("project_metadata", {}).get("scope")
+    from ..utils.checklist import load_checklist
+    checklist_data = load_checklist(methodology, scope)
     requirements = checklist_data.get("requirements", [])
 
     logger.info(

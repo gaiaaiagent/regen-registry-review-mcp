@@ -57,19 +57,25 @@ Sources: Jan 20 standup, Jan 27 standup, data-types-for-registry-protocols.md
 
 Sources: review-agent-readiness.md items 2.3 and 3.1-3.2, Feb 3 standup
 
-### 1d. Multi-Project Support (Carbon Egg Architecture)
+### 1d. Multi-Project Support + Dead Code Cleanup — DONE (Feb 7)
 
-- [ ] Document the farm vs. meta-project distinction as auxiliary knowledge
-- [ ] Create per-farm checklist variant (shorter, focused on individual farm requirements)
-- [ ] Create meta-project checklist variant (aggregated project-level requirements)
-- [ ] Test processing multiple independent farm projects in sequence
-- [ ] Verify project isolation (one farm's data doesn't leak into another's review)
+- [x] Document the farm vs. meta-project distinction as auxiliary knowledge (`data/knowledge/carbon-egg-multi-project.md`)
+- [x] Add `scope` field to checklist JSON: "farm" for REQ-002/003/004/009, "meta" for the other 19
+- [x] Create centralized `load_checklist(methodology, scope)` utility (`utils/checklist.py`)
+- [x] Wire `scope` through session creation (schemas, session_tools, server.py MCP tool, REST API)
+- [x] Replace all 5 manual `json.load` checklist patterns with `load_checklist()`
+- [x] Fix hardcoded methodology bug in `evidence_tools.py` and `analyze_llm.py`
+- [x] Remove `use_llm_native_extraction` feature flag (always True, dead conditional)
+- [x] Clean unused imports/params in `report_tools.py` and `E_cross_validation.py`
+- [x] Mark `llm_extractors.py` and `validation_tools.py` deprecated (retain for test deps)
+- [x] 11 new tests: scope filtering (5), session creation with scope (4), requirement coverage (2)
+- [x] Full test suite: 257 passed, 56 deselected
 
 Sources: review-agent-readiness.md item 2.2, Feb 3 standup (Darren's recommendation)
 
 **Acceptance:** Carbon Egg's test documents (when available) process cleanly. Report is professional. No mapping errors. Spreadsheets are handled. Becca can run a review and get a result she'd show to a partner.
 
-**Progress:** 1a, 1b, and 1c complete. 1d (multi-project) remains. PDF export deferred (separate feature).
+**Progress:** Phase 1 complete (1a, 1b, 1c, 1d all done). PDF export deferred (separate feature).
 
 ## Phase 2: Demo Readiness and BizDev Support
 

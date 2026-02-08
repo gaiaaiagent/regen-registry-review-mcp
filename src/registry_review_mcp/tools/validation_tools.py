@@ -1,4 +1,9 @@
-"""Cross-document validation tools."""
+"""DEPRECATED: Legacy Path 1 cross-document validation.
+
+Superseded by unified LLM analysis in analyze_llm.py (Path 2).
+Retained only because existing tests reference this module.
+Scheduled for removal in a future cleanup pass.
+"""
 
 import logging
 import re

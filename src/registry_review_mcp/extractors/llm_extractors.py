@@ -1,4 +1,9 @@
-"""
+"""DEPRECATED: Legacy Path 1 field extraction.
+
+Superseded by unified LLM analysis in analyze_llm.py (Path 2).
+Retained only because existing tests reference this module.
+Scheduled for removal in a future cleanup pass.
+
 LLM-powered field extraction for cross-document validation.
 
 Uses Anthropic Claude API to extract structured fields from unstructured

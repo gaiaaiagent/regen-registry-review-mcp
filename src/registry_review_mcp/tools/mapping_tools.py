@@ -3,16 +3,15 @@
 Stage 3 of the registry review workflow.
 """
 
-import json
 from datetime import datetime, timezone
 from typing import Any
 
-from ..config.settings import settings
 from ..models.schemas import (
     RequirementMapping,
     MappingCollection,
     ConfidenceScore,
 )
+from ..utils.checklist import load_checklist
 from ..utils.state import StateManager, get_session_or_raise
 
 
@@ -38,14 +37,9 @@ async def map_all_requirements(session_id: str) -> dict[str, Any]:
     session_data = state_manager.read_json("session.json")
     methodology = session_data.get("project_metadata", {}).get("methodology", "soil-carbon-v1.2.2")
 
-    # Load checklist
-    checklist_path = settings.get_checklist_path(methodology)
-    if not checklist_path.exists():
-        raise FileNotFoundError(f"Checklist not found for methodology: {methodology}")
-
-    with open(checklist_path, "r") as f:
-        checklist_data = json.load(f)
-
+    # Load checklist (filtered by scope if set in session)
+    scope = session_data.get("project_metadata", {}).get("scope")
+    checklist_data = load_checklist(methodology, scope)
     requirements = checklist_data.get("requirements", [])
 
     # Load discovered documents
@@ -502,10 +496,8 @@ async def get_mapping_matrix(session_id: str) -> dict[str, Any]:
     # Load checklist for requirement details
     session_data = state_manager.read_json("session.json")
     methodology = session_data.get("project_metadata", {}).get("methodology", "soil-carbon-v1.2.2")
-    checklist_path = settings.get_checklist_path(methodology)
-
-    with open(checklist_path, "r") as f:
-        checklist_data = json.load(f)
+    scope = session_data.get("project_metadata", {}).get("scope")
+    checklist_data = load_checklist(methodology, scope)
     requirements = {r["requirement_id"]: r for r in checklist_data.get("requirements", [])}
 
     # Build document info

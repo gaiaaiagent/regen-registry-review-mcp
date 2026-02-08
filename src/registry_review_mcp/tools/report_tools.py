@@ -2,7 +2,7 @@
 
 import json
 import shutil
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -16,23 +16,18 @@ from ..models.report import (
     ReportSummary,
     ReviewReport,
 )
-from ..utils.state import StateManager, get_session_or_raise
+from ..utils.state import StateManager
 
 
 async def generate_review_report(
     session_id: str,
     format: str = "markdown",
-    include_evidence_snippets: bool = True,
-    include_validation_details: bool = True
 ) -> dict[str, Any]:
-    """
-    Generate complete review report.
+    """Generate complete review report.
 
     Args:
         session_id: Session identifier
-        format: Output format ("markdown" or "json")
-        include_evidence_snippets: Include full evidence snippets
-        include_validation_details: Include validation details
+        format: Output format ("markdown", "json", "checklist", or "docx")
 
     Returns:
         Report generation result with path to saved report

@@ -2,8 +2,7 @@
 
 from mcp.types import TextContent
 
-from ..config.settings import settings
-from ..tools import validation_tools, session_tools
+from ..tools import session_tools
 from ..utils.state import StateManager
 from ..models.errors import SessionNotFoundError
 from .helpers import (
@@ -88,11 +87,8 @@ Then return here for cross-validation.
     # Load evidence data and run validation
     state_manager = StateManager(session_id)
 
-    if settings.use_llm_native_extraction:
-        from ..tools import analyze_llm
-        validation_results = await analyze_llm.cross_validate_llm(session_id)
-    else:
-        validation_results = await validation_tools.cross_validate(session_id)
+    from ..tools import analyze_llm
+    validation_results = await analyze_llm.cross_validate_llm(session_id)
 
     summary = validation_results["summary"]
 
