@@ -151,6 +151,23 @@ class TestCliInvocation:
 
             proc.communicate.assert_called_once_with(input=b"my prompt text")
 
+    async def test_cli_disables_tools(self):
+        response = {"result": "hello", "is_error": False}
+        with patch("asyncio.create_subprocess_exec") as mock_exec:
+            proc = AsyncMock()
+            proc.communicate = AsyncMock(
+                return_value=(json.dumps(response).encode(), b"")
+            )
+            proc.returncode = 0
+            mock_exec.return_value = proc
+
+            await _call_via_cli("test", None, "claude-haiku-4-5-20251001", 4000)
+
+            cmd_args = mock_exec.call_args[0]
+            assert "--tools" in cmd_args
+            tools_idx = cmd_args.index("--tools")
+            assert cmd_args[tools_idx + 1] == ""
+
     async def test_cli_uses_json_output_format(self):
         response = {"result": "hello", "is_error": False}
         with patch("asyncio.create_subprocess_exec") as mock_exec:

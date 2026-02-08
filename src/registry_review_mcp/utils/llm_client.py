@@ -344,19 +344,20 @@ async def _call_via_cli(
     prompt: str,
     system: str | None,
     model: str,
-    max_tokens: int,
+    max_tokens: int,  # noqa: ARG001 — kept for interface parity with _call_via_api
 ) -> str:
     """Call LLM via the Claude CLI subprocess.
 
     Spawns `claude -p` with structured JSON output. The prompt is piped
-    via stdin to avoid shell escaping issues.
+    via stdin to avoid shell escaping issues. The CLI does not support
+    max_tokens — response length is managed by the CLI internally.
     """
     cmd = [
         "claude",
         "-p",
         "--output-format", "json",
         "--model", model,
-        "--max-tokens", str(max_tokens),
+        "--tools", "",
         "--no-session-persistence",
     ]
 
