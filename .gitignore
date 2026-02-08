@@ -216,5 +216,22 @@ __marimo__/
 data/sessions/
 data/cache/
 
+# GIS and geospatial data (large binary files)
+*.[tT][iI][fF]
+*.[sS][hH][pP]
+*.[sS][hH][xX]
+*.[dD][bB][fF]
+*.[pP][rR][jJ]
+*.cpg
+*.gpe
+*.fdt
+*.lgd
+*.gpl
+*.gpl_
+*.fgp
+*.qmd
+*.mat
+*.aux.xml
+
 # Claude conversation logs (may contain sensitive data)
 .claude/logging/**/*.jsonl

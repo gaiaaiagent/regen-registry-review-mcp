@@ -1,0 +1,23 @@
+{
+  "area_units": "m2",
+  "distance_units": "meters",
+  "ellipsoid": "EPSG:7001",
+  "inputs": {
+    "band1": "D:/Ecometric/EcoMetric Ltd/Ecometric Projects - Projects/Projects in Progress/54105Lowick22/Imagery/20221018/S2B_tile_20221018_30UXD_0_R60B01.TIF",
+    "band1 (2)": "D:/Ecometric/EcoMetric Ltd/Ecometric Projects - Projects/Projects in Progress/54105Lowick22/Imagery/20221018/S2B_tile_20221018_30UXD_0_R10B02.TIF",
+    "band1 (3)": "D:/Ecometric/EcoMetric Ltd/Ecometric Projects - Projects/Projects in Progress/54105Lowick22/Imagery/20221018/S2B_tile_20221018_30UXD_0_R10B03.TIF",
+    "band10": "D:/Ecometric/EcoMetric Ltd/Ecometric Projects - Projects/Projects in Progress/54105Lowick22/Imagery/20221018/S2B_tile_20221018_30UXD_0_R20B8A.TIF",
+    "band11": "D:/Ecometric/EcoMetric Ltd/Ecometric Projects - Projects/Projects in Progress/54105Lowick22/Imagery/20221018/S2B_tile_20221018_30UXD_0_R20B11.TIF",
+    "band12": "D:/Ecometric/EcoMetric Ltd/Ecometric Projects - Projects/Projects in Progress/54105Lowick22/Imagery/20221018/S2B_tile_20221018_30UXD_0_R20B12.TIF",
+    "band3": "D:/Ecometric/EcoMetric Ltd/Ecometric Projects - Projects/Projects in Progress/54105Lowick22/Imagery/20221018/S2B_tile_20221018_30UXD_0_R10B04.TIF",
+    "band4": "D:/Ecometric/EcoMetric Ltd/Ecometric Projects - Projects/Projects in Progress/54105Lowick22/Imagery/20221018/S2B_tile_20221018_30UXD_0_R20B05.TIF",
+    "band6": "D:/Ecometric/EcoMetric Ltd/Ecometric Projects - Projects/Projects in Progress/54105Lowick22/Imagery/20221018/S2B_tile_20221018_30UXD_0_R20B06.TIF",
+    "band7": "D:/Ecometric/EcoMetric Ltd/Ecometric Projects - Projects/Projects in Progress/54105Lowick22/Imagery/20221018/S2B_tile_20221018_30UXD_0_R20B07.TIF",
+    "band8": "D:/Ecometric/EcoMetric Ltd/Ecometric Projects - Projects/Projects in Progress/54105Lowick22/Imagery/20221018/S2B_tile_20221018_30UXD_0_R10B08.TIF",
+    "band9": "D:/Ecometric/EcoMetric Ltd/Ecometric Projects - Projects/Projects in Progress/54105Lowick22/Imagery/20221018/S2B_tile_20221018_30UXD_0_R60B09.TIF",
+    "gdal:translate_1:Tiff": "D:/Ecometric/EcoMetric Ltd/Ecometric Projects - Projects/Projects in Progress/54105Lowick22/Imagery/20221018/S2B_tile_20221018_30UXD_0_R10_Multi.tif",
+    "native:rastersampling_1:RasterSamples": "D:/Ecometric/EcoMetric Ltd/Ecometric Projects - Projects/Projects in Progress/54105Lowick22/Net Training Data/20221018/54105Lowick22_Net_Training_Data_FromSamplePts-20221018.csv",
+    "sample_plan_lab_results": "D:/Ecometric/EcoMetric Ltd/Ecometric Projects - Projects/Projects in Progress/54105Lowick22/NRM Results/Shapefile/54105Lowick22_Ecometric_Sample_Plan_Lab_Results-27700.shp",
+    "soilsamples": "D:/Ecometric/EcoMetric Ltd/Ecometric Projects - Projects/Projects in Progress/54105Lowick22/Sample Positions/27700/54105Lowick22_Ecometric_Sampled_Pts-27700.shp"
+  }
+}
