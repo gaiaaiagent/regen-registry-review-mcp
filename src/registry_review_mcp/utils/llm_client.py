@@ -244,11 +244,11 @@ async def _resolve_backend() -> str:
             )
         return "cli"
 
-    # auto: try API first, then CLI
-    if settings.anthropic_api_key:
-        return "api"
+    # auto: prefer CLI (no per-call cost via Max plan), fall back to API
     if await _check_cli_available():
         return "cli"
+    if settings.anthropic_api_key:
+        return "api"
 
     raise ConfigurationError(
         "No LLM backend available. Either set ANTHROPIC_API_KEY for the API backend, "

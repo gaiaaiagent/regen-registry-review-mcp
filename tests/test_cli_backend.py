@@ -28,13 +28,30 @@ def reset_cli_cache():
 class TestResolveBackend:
     """Verify backend resolution logic based on settings and availability."""
 
-    async def test_api_when_key_set(self):
-        with patch.object(llm_client_module, "settings") as mock_settings:
+    async def test_auto_prefers_cli_over_api(self):
+        with (
+            patch.object(llm_client_module, "settings") as mock_settings,
+            patch("shutil.which", return_value="/usr/bin/claude"),
+            patch("asyncio.create_subprocess_exec") as mock_exec,
+        ):
+            mock_settings.llm_backend = "auto"
+            mock_settings.anthropic_api_key = "sk-ant-test"
+            proc = AsyncMock()
+            proc.returncode = 0
+            proc.wait = AsyncMock(return_value=0)
+            mock_exec.return_value = proc
+            assert await _resolve_backend() == "cli"
+
+    async def test_auto_falls_back_to_api_when_no_cli(self):
+        with (
+            patch.object(llm_client_module, "settings") as mock_settings,
+            patch("shutil.which", return_value=None),
+        ):
             mock_settings.llm_backend = "auto"
             mock_settings.anthropic_api_key = "sk-ant-test"
             assert await _resolve_backend() == "api"
 
-    async def test_cli_when_no_key(self):
+    async def test_auto_uses_cli_when_no_key(self):
         with (
             patch.object(llm_client_module, "settings") as mock_settings,
             patch("shutil.which", return_value="/usr/bin/claude"),
