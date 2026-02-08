@@ -26,6 +26,7 @@ from ..utils.patterns import (
     MONITORING_PATTERNS,
     GHG_PATTERNS,
     LAND_TENURE_PATTERNS,
+    LAND_COVER_PATTERNS,
     REGISTRY_REVIEW_PATTERNS,
     METHODOLOGY_PATTERNS,
     is_pdf_file,
@@ -684,6 +685,9 @@ async def classify_document_by_filename(filepath: str) -> tuple[str, float, str]
 
     if match_any(filename, LAND_TENURE_PATTERNS):
         return ("land_tenure", 0.85, "filename")
+
+    if match_any(filename, LAND_COVER_PATTERNS):
+        return ("land_cover_map", 0.85, "filename")
 
     if match_any(filename, REGISTRY_REVIEW_PATTERNS):
         return ("registry_review", 0.95, "filename")

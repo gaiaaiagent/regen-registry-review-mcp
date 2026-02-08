@@ -55,6 +55,17 @@ LAND_TENURE_PATTERNS = [
     re.compile(r"lease[\s_-]?agreement", re.IGNORECASE),
     re.compile(r"deed", re.IGNORECASE),
     re.compile(r"title", re.IGNORECASE),
+    re.compile(r"official[\s_-]?copy[\s_-]?\(register\)", re.IGNORECASE),
+    re.compile(r"land[\s_-]?registry", re.IGNORECASE),
+    re.compile(r"\bLT\d{5,}", re.IGNORECASE),
+]
+
+# Land Cover / Geographic Boundary indicators
+LAND_COVER_PATTERNS = [
+    re.compile(r"land[\s_-]?cover[\s_-]?map", re.IGNORECASE),
+    re.compile(r"land[\s_-]?cover", re.IGNORECASE),
+    re.compile(r"boundary[\s_-]?map", re.IGNORECASE),
+    re.compile(r"geographic[\s_-]?boundar", re.IGNORECASE),
 ]
 
 # Registry Review indicators

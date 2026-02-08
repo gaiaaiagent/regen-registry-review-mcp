@@ -278,7 +278,7 @@ def _infer_document_types(category: str, accepted_evidence: str) -> list[str]:
         "project boundary": ["project_plan", "gis_shapefile"],
         "project ownership": ["project_plan", "land_tenure", "spreadsheet_data"],
         "project start date": ["project_plan"],
-        "ecosystem type": ["project_plan", "baseline_report"],
+        "ecosystem type": ["project_plan", "baseline_report", "spreadsheet_data", "land_cover_map"],
         "crediting period": ["project_plan"],
         "ghg accounting": ["project_plan", "ghg_emissions", "monitoring_report"],
         "regulatory compliance": ["project_plan"],

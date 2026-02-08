@@ -175,6 +175,54 @@ class TestMappingConventionConsistency:
             f"Project Area requirement should look for 'gis_shapefile' documents, got: {types}"
         )
 
+    @pytest.mark.asyncio
+    async def test_land_registry_documents_classified_as_land_tenure(self):
+        """UK Land Registry 'Official Copy (Register)' files should classify as land_tenure."""
+        test_cases = [
+            "Official Copy (Register) - LT330529.pdf",
+            "Official Copy (Register) - LT438680.pdf",
+        ]
+        for filename in test_cases:
+            classification, confidence, method = await document_tools.classify_document_by_filename(filename)
+            assert classification == "land_tenure", (
+                f"'{filename}' should classify as land_tenure, got: {classification}"
+            )
+            assert confidence >= 0.80
+
+    @pytest.mark.asyncio
+    async def test_land_cover_map_classified(self):
+        """Land Cover Map PDFs should classify as land_cover_map."""
+        classification, confidence, method = await document_tools.classify_document_by_filename(
+            "Greens Lodge Farm - 2012 Land Cover Map.pdf"
+        )
+        assert classification == "land_cover_map", (
+            f"Land cover map should classify as land_cover_map, got: {classification}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_land_cover_map_maps_to_project_area(self):
+        """Land cover maps should be included in Project Area requirement mapping."""
+        from registry_review_mcp.tools.mapping_tools import _infer_document_types
+
+        types = _infer_document_types(
+            "Project Area",
+            "GIS shapefiles and maps, with delineations of eligible and ineligible land",
+        )
+        assert "land_cover_map" in types
+
+    @pytest.mark.asyncio
+    async def test_ecosystem_type_includes_spreadsheet_data(self):
+        """Ecosystem Type requirements should accept spreadsheet and land cover data."""
+        from registry_review_mcp.tools.mapping_tools import _infer_document_types
+
+        types = _infer_document_types("Ecosystem Type", "Provide proof of land use")
+        assert "spreadsheet_data" in types, (
+            f"Ecosystem Type should include spreadsheet_data, got: {types}"
+        )
+        assert "land_cover_map" in types, (
+            f"Ecosystem Type should include land_cover_map, got: {types}"
+        )
+
     def test_no_hyphenated_labels_in_mapper(self):
         """The mapper should never return hyphenated labels. All labels must use
         underscores to match the classifier convention."""
