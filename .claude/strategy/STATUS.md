@@ -6,9 +6,9 @@ Last updated: 2026-02-07
 
 The Registry Review MCP runs on the GAIA server (`202.61.196.119`) managed by **PM2** (not systemd) on port 8003, proxied through nginx at `https://regen.gaiaai.xyz/api/registry`. A Custom GPT and Darren's web app (`https://regen.gaiaai.xyz/registry-review/`) both consume this REST API. The MCP server is also available for direct Claude Desktop/Code integration via stdio.
 
-**Deployed version:** `0513c8b` (task-12, Jan 26) — confirmed via SSH on Feb 7. All of Becca's 6 feedback items are live in production. The strategy directory commit (`c53aebf`) has also been pulled to production.
+**Deployed version:** `a7c7a5f` (Phase 1 complete + test data, Feb 7). All Phase 1 work (mapping bug, spreadsheet ingestion, report formatting, multi-project scope, test data) is live in production.
 
-**Production health:** Verified healthy on Feb 7. API responds on port 8003. PM2 shows `registry-review-api` online for 11 days (PID 502414), 46MB memory, 8743 restarts total. Last service restart was Jan 27. Seven active sessions on the server including Clackson and Blaston Soil Carbon projects. Server uptime: 163 days.
+**Production health:** Verified healthy on Feb 7. API responds on port 8003. PM2 shows `registry-review-api` online (PID 2351086), restart count 8744. Dependencies synced — `openpyxl` installed for spreadsheet support.
 
 **Other services on this server:** koi-api, koi-mcp-knowledge, regen-koi-mcp, regen-network-api, regenai-agents, koi-event-bridge. All managed via PM2 under the `shawn` user.
 
@@ -28,7 +28,10 @@ Specifically verified:
 - Human review flagged only where needed
 - Session persistence and recovery
 - File upload via signed URLs and path-based ingestion
-- 246 tests passing (fast suite)
+- Spreadsheet ingestion (.xlsx, .xls, .csv, .tsv)
+- Multi-project scope filtering (farm/meta/all)
+- Centralized checklist loading via `load_checklist()`
+- 257 tests passing (fast suite)
 
 ## What's Broken or Missing
 
@@ -72,12 +75,26 @@ Specifically verified:
 - BizDev calls potentially starting as early as first week of Feb
 - Last code change: Feb 7 (Phases 1a, 1b, 1c, 1d)
 
+## Test Data Available
+
+Becca's test data extracted to `examples/test-data/` with clean directory structure:
+- `registration/botany-farm/` — 7 PDFs (project plan, baseline, GHG, monitoring, methodology, reviews)
+- `registration/fonthill-farms/` — 5 files (project plans, title plan, yields spreadsheet, land cover)
+- `registration/greens-lodge/` — 19 files (3 project plan versions, 13 land registry PDFs, yields spreadsheet, land cover)
+- `issuance/kerr/` — Baseline + Monitoring Round 1 (SOC reports, AI network data, sampling, yields)
+- `issuance/lowick/` — Baseline + Monitoring Round 1 (same structure as Kerr)
+- `issuance/neesham/` — Baseline + Monitoring Round 1 (same structure)
+- GIS raster files (.tif, .shp, etc.) present on disk but gitignored (192MB)
+
 ## Immediate Next Actions
 
 See ROADMAP.md for the phased plan. The critical path is:
-1. ~~Verify production deployment state (SSH to server)~~ — Done (Feb 7)
-2. ~~Reproduce and fix the mapping bug~~ — Done (Feb 7, commit `467695e`)
-3. ~~Add spreadsheet ingestion (.xlsx, .csv)~~ — Done (Feb 7)
-4. ~~Clean up report output formatting~~ — Done (Feb 7, Phase 1c)
-5. Test with Carbon Egg data
-6. Deploy latest changes to production
+1. ~~Verify production deployment state~~ — Done (Feb 7)
+2. ~~Fix mapping bug~~ — Done (Feb 7, commit `467695e`)
+3. ~~Add spreadsheet ingestion~~ — Done (Feb 7)
+4. ~~Clean up report formatting~~ — Done (Feb 7, Phase 1c)
+5. ~~Multi-project scope support~~ — Done (Feb 7, Phase 1d)
+6. ~~Deploy Phase 1 to production~~ — Done (Feb 7, commit `a7c7a5f`)
+7. ~~Extract and organize test data~~ — Done (Feb 7)
+8. Run registration review on Fonthill Farms and Greens Lodge test data
+9. Verify supplementary evidence quality across documents
