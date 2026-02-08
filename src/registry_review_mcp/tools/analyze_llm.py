@@ -12,9 +12,6 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from anthropic import AsyncAnthropic
-
-from ..config.settings import settings
 from ..models.errors import SessionNotFoundError
 from ..prompts.unified_analysis import (
     analyze_with_llm,
@@ -129,16 +126,26 @@ async def analyze_session_unified(session_id: str) -> dict[str, Any]:
         f"Analyzing {len(documents)} documents against {len(requirements)} requirements"
     )
 
-    # Initialize Anthropic client
-    client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+    # Initialize Anthropic client — validates key before expensive LLM call
+    from ..utils.llm_client import classify_api_error, get_anthropic_client
+    client = get_anthropic_client()
 
     # Single unified LLM call
-    result: UnifiedAnalysisResult = await analyze_with_llm(
-        documents=documents,
-        markdown_contents=markdown_contents,
-        requirements=requirements,
-        anthropic_client=client
-    )
+    try:
+        result: UnifiedAnalysisResult = await analyze_with_llm(
+            documents=documents,
+            markdown_contents=markdown_contents,
+            requirements=requirements,
+            anthropic_client=client
+        )
+    except Exception as e:
+        error_info = classify_api_error(e)
+        logger.error(f"Unified analysis failed: {error_info.message}")
+        if error_info.is_fatal:
+            raise type(e)(
+                f"{error_info.message}\n\nHow to fix: {error_info.guidance}"
+            ) from e
+        raise
 
     logger.info(
         f"Analysis complete: {result.requirements_covered}/{len(requirements)} covered"

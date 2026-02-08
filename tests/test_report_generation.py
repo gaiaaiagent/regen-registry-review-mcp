@@ -269,6 +269,7 @@ class TestReportExport:
 class TestCompleteWorkflow:
     """Test complete report generation workflow."""
 
+    @pytest.mark.expensive
     async def test_full_report_workflow(self, tmp_path):
         """Test complete workflow from session to report."""
         example_path = Path(__file__).parent.parent / "examples" / "22-23"

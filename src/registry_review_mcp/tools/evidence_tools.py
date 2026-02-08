@@ -26,6 +26,7 @@ from ..models.evidence import (
     RequirementEvidence,
     EvidenceExtractionResult,
 )
+from ..utils.llm_client import classify_api_error, get_anthropic_client
 from ..utils.state import StateManager
 
 logger = logging.getLogger(__name__)
@@ -527,7 +528,12 @@ async def extract_evidence_with_llm(
         return snippets
 
     except Exception as e:
-        logger.error(f"LLM extraction failed for {document_name}: {e}")
+        error_info = classify_api_error(e)
+        if error_info.is_fatal:
+            # Billing/auth errors will fail on every subsequent call — stop immediately
+            logger.error(f"Fatal API error: {error_info.message}")
+            raise
+        logger.warning(f"LLM extraction failed for {document_name}: {e}")
         return []
 
 
@@ -683,8 +689,8 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
 
     print(f"\n🔍 Extracting evidence with LLM...\n", flush=True)
 
-    # Create LLM client (shared across all extractions)
-    anthropic_client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+    # Create LLM client — validates API key before expensive work begins
+    anthropic_client = get_anthropic_client()
 
     # Process requirements in parallel (rate-limited)
     semaphore = asyncio.Semaphore(5)  # Max 5 concurrent LLM calls
@@ -784,7 +790,15 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
         for i, req in enumerate(requirements, 1)
     ]
 
-    all_evidence = await asyncio.gather(*tasks)
+    try:
+        all_evidence = await asyncio.gather(*tasks)
+    except Exception as e:
+        error_info = classify_api_error(e)
+        if error_info.is_fatal:
+            print(f"\n  LLM API Error: {error_info.category}", flush=True)
+            print(f"  {error_info.message}", flush=True)
+            print(f"\n  How to fix: {error_info.guidance}", flush=True)
+        raise
 
     # ========================================================================
     # Phase 4: Calculate Statistics & Save

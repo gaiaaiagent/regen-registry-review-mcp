@@ -1,10 +1,10 @@
 # Development Roadmap
 
-Last updated: 2026-02-07
+Last updated: 2026-02-07 (evening)
 
 This roadmap sequences work into phases based on urgency and dependency. Each phase has clear acceptance criteria. Phases may overlap where work is independent.
 
-## Phase 0: Orientation and Production Verification
+## Phase 0: Orientation and Production Verification — DONE
 
 **Goal:** Establish ground truth about what's deployed and working.
 
@@ -17,7 +17,7 @@ This roadmap sequences work into phases based on urgency and dependency. Each ph
 
 **Acceptance:** Complete. STATUS.md updated, runbooks corrected for PM2, test suite green. Phase 0 done on 2026-02-07.
 
-## Phase 1: Carbon Egg Registration Readiness
+## Phase 1: Carbon Egg Registration Readiness — IN PROGRESS
 
 **Goal:** The system can process Carbon Egg's registration documents end-to-end without errors and produce a clean, professional report.
 
@@ -35,7 +35,7 @@ Sources: review-agent-readiness.md item 2.1, Becca's Slack screenshots
 
 - [x] Add `openpyxl>=3.1.0` dependency
 - [x] Add `SPREADSHEET_EXTENSIONS` and `is_spreadsheet_file()` to `utils/patterns.py`
-- [x] Create `extractors/spreadsheet_extractor.py` (.xlsx/.xls/.csv/.tsv → markdown tables)
+- [x] Create `extractors/spreadsheet_extractor.py` (.xlsx/.xls/.csv/.tsv to markdown tables)
 - [x] Integrate with document discovery (Stage B) — spreadsheet extensions in `supported_extensions`
 - [x] Classification: filename patterns take priority, generic `spreadsheet_data` as fallback
 - [x] Integrate into `document_processor.py` fast extraction path (spreadsheets skip HQ dual-track)
@@ -73,16 +73,57 @@ Sources: review-agent-readiness.md items 2.3 and 3.1-3.2, Feb 3 standup
 
 Sources: review-agent-readiness.md item 2.2, Feb 3 standup (Darren's recommendation)
 
-**Acceptance:** Carbon Egg's test documents (when available) process cleanly. Report is professional. No mapping errors. Spreadsheets are handled. Becca can run a review and get a result she'd show to a partner.
+### 1e. Classification Fixes — DONE (Feb 7)
 
-**Progress:** Phase 1 complete (1a, 1b, 1c, 1d all done). PDF export deferred (separate feature).
+Discovered during first real test run against Greens Lodge (19 files):
+- [x] Add UK Land Registry patterns to `LAND_TENURE_PATTERNS` ("Official Copy (Register)", "Land Registry", LT title numbers)
+- [x] Create `LAND_COVER_PATTERNS` for geographic/boundary documents
+- [x] Add classification check for `land_cover_map` in `document_tools.py`
+- [x] Add `land_cover_map` and `spreadsheet_data` to ecosystem type mapping
+- [x] 4 new tests for classification and mapping coverage
+- [x] Greens Lodge classification: 5/19 (26%) to 19/19 (100%)
+
+### 1f. LLM Error Handling — DONE (Feb 7, uncommitted)
+
+Discovered when evidence extraction hit $0 API credit balance:
+- [x] Create `utils/llm_client.py` — centralized `get_anthropic_client()`, `classify_api_error()`
+- [x] `LLMBillingError` and `LLMAuthenticationError` custom exceptions
+- [x] Fatal errors (billing, auth) propagate immediately instead of being silently swallowed
+- [x] Actionable guidance in error messages (console URLs, explanations)
+- [x] REST API returns HTTP 402 for billing/auth errors
+- [x] Mark `test_full_report_workflow` as `@pytest.mark.expensive` (was previously false-passing)
+- [x] 8 new tests for error classification and key validation
+- [x] Full test suite: 268 passed, 57 deselected
+
+### 1g. Claude CLI Backend — SPEC'D (Feb 7)
+
+**Goal:** Route LLM calls through Max plan via `claude -p` subprocess, eliminating the need for API credits.
+
+Full spec: `.claude/strategy/plans/claude-cli-backend.md`
+
+- [ ] Add `call_llm()` to `utils/llm_client.py` with auto-detecting dual backend (API + CLI)
+- [ ] Add `_call_via_cli()` using `asyncio.create_subprocess_exec` with `claude -p`
+- [ ] Add `llm_backend` setting (auto/api/cli) to `config/settings.py`
+- [ ] Update `evidence_tools.py` to use `call_llm()` instead of direct `AsyncAnthropic`
+- [ ] Update `llm_synthesis.py` to use `call_llm()`
+- [ ] Update `analyze_llm.py` / `unified_analysis.py` to use `call_llm()`
+- [ ] Add tests for backend selection, CLI invocation, error classification
+- [ ] Manual verification with Max plan on dev machine
+- [ ] Install Claude Code on GAIA production server
+- [ ] Deploy and verify end-to-end
+
+**Acceptance:** Evidence extraction runs successfully using Max plan (CLI backend) with no API credit charges. The system auto-detects the best backend. Test suite passes. Greens Lodge and Fonthill Farms produce complete reviews.
+
+**Overall Phase 1 Acceptance:** Carbon Egg's test documents process cleanly. Report is professional. No mapping errors. Spreadsheets are handled. LLM pipeline runs without API credit costs. Becca can run a review and get a result she'd show to a partner.
+
+**Progress:** 1a through 1f complete. 1g spec'd, implementation next.
 
 ## Phase 2: Demo Readiness and BizDev Support
 
 **Goal:** The web app is impressive enough that partners focus on usefulness, not rough edges. The team has demo materials and talking points.
 
 - [ ] Prepare demo framing: "This is a registry agent, not an AI assistant"
-- [ ] Ensure demo flow works in <3 minutes (start review → see results)
+- [ ] Ensure demo flow works in <3 minutes (start review to see results)
 - [ ] Privacy and data isolation talking points documented
 - [ ] Test with Fonthill Farms and Greens Lodge projects (Becca shared these for Ecometric protocol)
 - [ ] Stage bypass capability: start at evidence extraction when documents are already mapped
@@ -100,7 +141,6 @@ Sources: updated-registry-spec.md, review-agent-readiness.md Demo-Ready checklis
 - [ ] Third-party Drive access testing (can clients add the bot to their own Drive?)
 - [ ] Airtable API integration for structured data (Samu exploring with Carbon Egg)
 - [ ] CarbonEg-specific requirements pre-loaded in checklist
-- [ ] Improved error handling for edge cases (large documents, malformed PDFs, network failures)
 - [ ] Production monitoring: alerts when service goes down, log rotation
 - [ ] Deploy procedure documented and tested (runbooks/deploy.md)
 

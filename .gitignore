@@ -216,6 +216,9 @@ __marimo__/
 data/sessions/
 data/cache/
 
+# Marker extraction artifacts (generated .md files alongside source PDFs in test data)
+examples/test-data/**/*.md
+
 # GIS and geospatial data (large binary files)
 *.[tT][iI][fF]
 *.[sS][hH][pP]

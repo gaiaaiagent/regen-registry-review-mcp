@@ -31,6 +31,11 @@ from registry_review_mcp.tools import (
     human_review_tools,
 )
 from registry_review_mcp.config.settings import settings
+from registry_review_mcp.utils.llm_client import (
+    LLMAuthenticationError,
+    LLMBillingError,
+    classify_api_error,
+)
 
 # Start session monitoring if enabled
 if settings.monitor_sessions:
@@ -449,8 +454,13 @@ async def extract_evidence(session_id: str):
         return result
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    except (LLMAuthenticationError, LLMBillingError) as e:
+        raise HTTPException(status_code=402, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_info = classify_api_error(e)
+        status = 402 if error_info.is_fatal else 500
+        detail = f"{error_info.message}\n\nHow to fix: {error_info.guidance}" if error_info.is_fatal else str(e)
+        raise HTTPException(status_code=status, detail=detail)
 
 
 @app.get("/sessions/{session_id}/evidence-matrix", summary="Get evidence matrix")

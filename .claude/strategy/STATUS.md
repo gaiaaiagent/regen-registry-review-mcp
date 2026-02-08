@@ -1,12 +1,12 @@
 # Project Status
 
-Last updated: 2026-02-07
+Last updated: 2026-02-07 (evening)
 
 ## Production State
 
 The Registry Review MCP runs on the GAIA server (`202.61.196.119`) managed by **PM2** (not systemd) on port 8003, proxied through nginx at `https://regen.gaiaai.xyz/api/registry`. A Custom GPT and Darren's web app (`https://regen.gaiaai.xyz/registry-review/`) both consume this REST API. The MCP server is also available for direct Claude Desktop/Code integration via stdio.
 
-**Deployed version:** `a7c7a5f` (Phase 1 complete + test data, Feb 7). All Phase 1 work (mapping bug, spreadsheet ingestion, report formatting, multi-project scope, test data) is live in production.
+**Deployed version:** `6433b13` (Phase 1 complete + test data + UK Land Registry classification fixes, Feb 7). All Phase 1 work and classification fixes are live in production.
 
 **Production health:** Verified healthy on Feb 7. API responds on port 8003. PM2 shows `registry-review-api` online (PID 2351086), restart count 8744. Dependencies synced — `openpyxl` installed for spreadsheet support.
 
@@ -31,41 +31,53 @@ Specifically verified:
 - Spreadsheet ingestion (.xlsx, .xls, .csv, .tsv)
 - Multi-project scope filtering (farm/meta/all)
 - Centralized checklist loading via `load_checklist()`
-- 257 tests passing (fast suite)
+- UK Land Registry document classification ("Official Copy (Register) - LT*.pdf")
+- Land cover map classification
+- Centralized LLM error handling with actionable guidance
+- 268 tests passing (fast suite), 57 deselected (expensive)
 
 ## What's Broken or Missing
 
 ### Blocking for Carbon Egg (registration imminent)
 
-1. **Mapping bug** — Diagnosed (Feb 7): naming convention split between classifier (underscores: `land_tenure`) and mapping lookup (hyphens: `land-tenure`). Three document types missed: `land_tenure`, `ghg_emissions`, `gis_shapefile`. Fixed in commit `467695e` with regression tests. (See: review-agent-readiness.md, item 2.1)
-
-2. **Spreadsheet ingestion** — Implemented (Feb 7). System now processes .xlsx, .xls, .csv, .tsv alongside PDFs. New `spreadsheet_extractor.py` converts tabular data to markdown tables with sheet markers. Integrated into discovery, classification, extraction, and requirement mapping. 7 new tests added. (See: Jan 20 standup, Jan 27 standup)
-
-3. **~~Meta-project architecture~~** — Implemented (Feb 7). Scope-based filtering: `scope="farm"` loads 4 per-farm requirements (REQ-002/003/004/009), `scope="meta"` loads 19 meta-project requirements. Centralized `load_checklist()` utility replaces 5 scattered `json.load` patterns. Knowledge doc at `data/knowledge/carbon-egg-multi-project.md`. 11 new tests. (See: review-agent-readiness.md, item 2.2)
-
-4. **CarbonEg-specific requirements** — Addressed via scope filtering. The soil-carbon-v1.2.2 checklist now has scope tags on every requirement. No separate Carbon Egg variant needed.
+1. ~~**Mapping bug**~~ — Fixed (Feb 7, commit `467695e`).
+2. ~~**Spreadsheet ingestion**~~ — Implemented (Feb 7).
+3. ~~**Meta-project architecture**~~ — Implemented (Feb 7, scope filtering).
+4. ~~**CarbonEg-specific requirements**~~ — Addressed via scope filtering.
+5. **API credits exhausted** — Anthropic pay-as-you-go balance is $0. LLM-based evidence extraction, unified analysis, and validation synthesis cannot run. **Resolution in progress:** implementing Claude Code CLI backend to route LLM calls through Max plan subscription. See `plans/claude-cli-backend.md`.
 
 ### Blocking for demos and BizDev
 
-5. **~~Report formatting~~** — Fixed (Feb 7). Emojis removed from all report prose (summary stats, section headers, requirement headings, validation summaries). Text labels (`PASS:/WARNING:/FAIL:`, `[Review]`) replace emoji status indicators. Dead code with old patterns removed.
-
-6. **PDF download** — Not implemented (raises `NotImplementedError`). Requires a rendering library (e.g., weasyprint). Deferred — markdown and DOCX downloads work correctly.
-
-7. **~~Duplicate value field~~** — Fixed (Feb 7). The `**Value:**` label removed from Submitted Material in both markdown and DOCX paths. Extracted value now stands alone before "Primary Documentation:".
-
-8. **Supplementary evidence quality** — Unclear how well the system pulls supplementary evidence beyond primary documentation. Needs testing. (See: review-agent-readiness.md, item 2.3)
+6. ~~**Report formatting**~~ — Fixed (Feb 7).
+7. **PDF download** — Not implemented (raises `NotImplementedError`). Requires a rendering library (e.g., weasyprint). Deferred — markdown and DOCX downloads work correctly.
+8. ~~**Duplicate value field**~~ — Fixed (Feb 7).
+9. **Supplementary evidence quality** — Unclear how well the system pulls supplementary evidence beyond primary documentation. Needs testing once LLM backend is restored.
 
 ### Needed but not blocking
 
-9. **Google Drive ingestion bot** — Darren built an email-based bot that can be added to Drive folders. Not yet integrated with the review workflow. Question open: does it work with third-party drives?
+10. **Google Drive ingestion bot** — Darren built an email-based bot that can be added to Drive folders. Not yet integrated with the review workflow.
+11. **Airtable integration** — Carbon Egg maintains land tenure data in spreadsheets, team considering Airtable migration.
+12. **Bypass workflow stages** — Ability to skip document discovery and requirement mapping, starting directly at evidence extraction.
+13. **Issuance Review Agent** — Scoped by Becca but not implemented. Post-registration priority.
+14. **Geospatial processing** — Stub exists. Long-term.
 
-10. **Airtable integration** — Carbon Egg maintains land tenure data in spreadsheets, team considering Airtable migration. Samu exploring.
+## Recent Changes (Feb 7)
 
-11. **Bypass workflow stages** — Ability to skip document discovery and requirement mapping, starting directly at evidence extraction. Requested in readiness checklist.
+### Committed and deployed
 
-12. **Issuance Review Agent** — Scoped by Becca (updated-registry-spec.md) but not implemented. Covers monitoring reports, sampling data, lab analysis, SOC%, accreditation checks. Post-registration priority.
+- **Phase 1a-1d** — Mapping bug, spreadsheet ingestion, report formatting, multi-project scope. All deployed as commit `a7c7a5f`.
+- **UK Land Registry classification** — 3 new patterns for `land_tenure` (Official Copy, Land Registry, LT title numbers), new `land_cover_map` type with 4 patterns. Greens Lodge went from 26% to 100% classification. Deployed as commit `6433b13`.
+- **Test data** — Becca's 415-file archive organized into `examples/test-data/` with clean directory structure. GIS files gitignored (192MB).
 
-13. **Geospatial processing** — Stub exists. GIS-el proposed polygon overlap checking across registered projects. Ecometric protocol requires .tif, .shp, .shx, .dbf, .prj, .mat files. Terrasos requires .gdb, .mxd, and shapefiles. Long-term.
+### Uncommitted (ready to commit)
+
+- **LLM error handling** — New `utils/llm_client.py` with centralized `get_anthropic_client()`, `classify_api_error()`, `LLMBillingError`, `LLMAuthenticationError`. Fatal errors (billing, auth) now propagate immediately with actionable guidance instead of being silently swallowed. REST API returns HTTP 402 for billing errors.
+- **Test fix** — `test_full_report_workflow` marked `@pytest.mark.expensive` (was previously "passing" by silently swallowing billing errors).
+- **8 new tests** for error classification and API key validation.
+
+### Spec'd (not yet implemented)
+
+- **Claude CLI backend** — Alternative LLM backend using `claude -p` subprocess calls to route through Max plan billing. Spec at `.claude/strategy/plans/claude-cli-backend.md`.
 
 ## Key Dates and Context
 
@@ -73,7 +85,7 @@ Specifically verified:
 - ETHDenver/Boulder hackathon: starting around Feb 7 (Shawn, Darren, Eve attending)
 - Next team check-in target: Wednesday Feb 11
 - BizDev calls potentially starting as early as first week of Feb
-- Last code change: Feb 7 (Phases 1a, 1b, 1c, 1d)
+- Last code change: Feb 7
 
 ## Test Data Available
 
@@ -88,7 +100,6 @@ Becca's test data extracted to `examples/test-data/` with clean directory struct
 
 ## Immediate Next Actions
 
-See ROADMAP.md for the phased plan. The critical path is:
 1. ~~Verify production deployment state~~ — Done (Feb 7)
 2. ~~Fix mapping bug~~ — Done (Feb 7, commit `467695e`)
 3. ~~Add spreadsheet ingestion~~ — Done (Feb 7)
@@ -96,5 +107,9 @@ See ROADMAP.md for the phased plan. The critical path is:
 5. ~~Multi-project scope support~~ — Done (Feb 7, Phase 1d)
 6. ~~Deploy Phase 1 to production~~ — Done (Feb 7, commit `a7c7a5f`)
 7. ~~Extract and organize test data~~ — Done (Feb 7)
-8. Run registration review on Fonthill Farms and Greens Lodge test data
-9. Verify supplementary evidence quality across documents
+8. ~~Fix UK Land Registry classification~~ — Done (Feb 7, commit `6433b13`)
+9. ~~Centralize LLM error handling~~ — Done (Feb 7, uncommitted)
+10. **Commit error handling + spec doc** — Ready
+11. **Implement Claude CLI backend** — Spec at `plans/claude-cli-backend.md`
+12. Run registration review on Greens Lodge with CLI backend
+13. Verify supplementary evidence quality across documents
