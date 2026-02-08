@@ -466,12 +466,11 @@ async def analyze_with_llm(
     documents: list[dict[str, Any]],
     markdown_contents: dict[str, str],
     requirements: list[dict[str, Any]],
-    anthropic_client: Any
 ) -> UnifiedAnalysisResult:
     """Perform unified analysis with single LLM call.
 
     This replaces:
-    - Multiple calls in llm_extractors.py (3 extractors × N chunks)
+    - Multiple calls in llm_extractors.py (3 extractors x N chunks)
     - Multiple calls in evidence_tools.py (N requirements)
     - Multiple calls in validation_tools.py (3-5 validation checks)
 
@@ -482,7 +481,6 @@ async def analyze_with_llm(
         documents: Document metadata
         markdown_contents: Full markdown for each document
         requirements: Requirements checklist
-        anthropic_client: Anthropic API client
 
     Returns:
         Complete analysis result
@@ -490,44 +488,22 @@ async def analyze_with_llm(
     Raises:
         DocumentExtractionError: If LLM call fails
     """
+    from ..config.settings import settings
     from ..models.errors import DocumentExtractionError
+    from ..utils.llm_client import call_llm
 
     # Build prompt with embedded schema
     prompt = build_unified_analysis_prompt(documents, markdown_contents, requirements)
 
-    # The schema is now embedded in the prompt, no need for additional instruction
     logger = logging.getLogger(__name__)
 
     try:
-        # Single LLM call - Note: Claude currently doesn't support tool_choice for structured output
-        # so we rely on prompt engineering to get JSON
-        response = await anthropic_client.messages.create(
-            model="claude-sonnet-4-5-20250929",
+        result_text = await call_llm(
+            prompt=prompt,
+            system=SYSTEM_PROMPT,
+            model=settings.get_active_llm_model(),
             max_tokens=16000,
-            temperature=0,
-            system=[
-                {
-                    "type": "text",
-                    "text": SYSTEM_PROMPT,
-                    "cache_control": {"type": "ephemeral"}  # Cache system prompt
-                }
-            ],
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": prompt,
-                            "cache_control": {"type": "ephemeral"}  # Cache documents
-                        }
-                    ]
-                }
-            ]
         )
-
-        # Extract JSON from response
-        result_text = response.content[0].text
 
         # Log first 1000 chars for debugging
         logger.debug(f"LLM response (first 1000 chars): {result_text[:1000]}")

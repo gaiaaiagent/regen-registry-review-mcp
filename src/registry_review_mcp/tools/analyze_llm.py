@@ -126,9 +126,7 @@ async def analyze_session_unified(session_id: str) -> dict[str, Any]:
         f"Analyzing {len(documents)} documents against {len(requirements)} requirements"
     )
 
-    # Initialize Anthropic client — validates key before expensive LLM call
-    from ..utils.llm_client import classify_api_error, get_anthropic_client
-    client = get_anthropic_client()
+    from ..utils.llm_client import classify_api_error
 
     # Single unified LLM call
     try:
@@ -136,7 +134,6 @@ async def analyze_session_unified(session_id: str) -> dict[str, Any]:
             documents=documents,
             markdown_contents=markdown_contents,
             requirements=requirements,
-            anthropic_client=client
         )
     except Exception as e:
         error_info = classify_api_error(e)

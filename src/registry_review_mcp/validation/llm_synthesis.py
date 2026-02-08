@@ -191,24 +191,9 @@ async def run_llm_synthesis(
         LLMSynthesisResult with coherence assessment
     """
     from ..config.settings import settings
-
-    # Validate API key before proceeding
-    from ..utils.llm_client import classify_api_error, get_anthropic_client
-    try:
-        anthropic_client = get_anthropic_client()
-    except Exception:
-        logger.info("LLM synthesis skipped: no API key configured")
-        return LLMSynthesisResult(
-            available=False,
-            error=(
-                "No Anthropic API key configured. "
-                "Set ANTHROPIC_API_KEY in your environment. "
-                "Get a key at https://console.anthropic.com/settings/keys"
-            )
-        )
+    from ..utils.llm_client import call_llm, classify_api_error
 
     try:
-
         # Collect evidence snippets
         snippets = _collect_evidence_snippets(evidence_data)
 
@@ -223,14 +208,11 @@ async def run_llm_synthesis(
 
         logger.info("Running LLM synthesis for coherence assessment")
 
-        # Make API call
-        response = await anthropic_client.messages.create(
+        response_text = await call_llm(
+            prompt=prompt,
             model=settings.get_active_llm_model(),
             max_tokens=1500,
-            messages=[{"role": "user", "content": prompt}]
         )
-
-        response_text = response.content[0].text
 
         # Parse response
         parsed = _parse_llm_response(response_text)

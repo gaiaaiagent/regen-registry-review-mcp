@@ -17,8 +17,6 @@ import time
 from pathlib import Path
 from typing import Any
 
-from anthropic import AsyncAnthropic
-
 from ..config.settings import settings
 from ..models.evidence import (
     EvidenceSnippet,
@@ -26,7 +24,7 @@ from ..models.evidence import (
     RequirementEvidence,
     EvidenceExtractionResult,
 )
-from ..utils.llm_client import classify_api_error, get_anthropic_client
+from ..utils.llm_client import call_llm, classify_api_error
 from ..utils.state import StateManager
 
 logger = logging.getLogger(__name__)
@@ -375,14 +373,14 @@ def load_from_cache(cache_key: str) -> list[EvidenceSnippet] | None:
 def save_to_cache(
     cache_key: str,
     snippets: list[EvidenceSnippet],
-    api_response
+    metadata: dict[str, Any] | None = None,
 ) -> None:
     """Save LLM response to cache.
 
     Args:
         cache_key: Cache key from generate_cache_key()
         snippets: Extracted evidence snippets
-        api_response: Raw API response object with usage metadata
+        metadata: Optional dict with model/token info (informational only)
     """
     cache_path = settings.get_llm_cache_path(cache_key)
 
@@ -391,11 +389,7 @@ def save_to_cache(
         "created_at": time.time(),
         "ttl": settings.llm_cache_ttl,
         "response": [s.model_dump() for s in snippets],
-        "metadata": {
-            "input_tokens": api_response.usage.input_tokens,
-            "output_tokens": api_response.usage.output_tokens,
-            "model": api_response.model
-        }
+        "metadata": metadata or {}
     }
 
     try:
@@ -406,7 +400,6 @@ def save_to_cache(
 
 
 async def extract_evidence_with_llm(
-    client: AsyncAnthropic,
     requirement: dict,
     document_content: str,
     document_id: str,
@@ -462,33 +455,12 @@ async def extract_evidence_with_llm(
     logger.info(f"🌐 API call: {requirement_id} + {document_name}")
 
     try:
-        # Call Claude with prompt caching
-        response = await client.messages.create(
+        response_text = await call_llm(
+            prompt=prompt,
+            system="You are an expert at analyzing carbon credit project documentation and extracting relevant evidence for compliance requirements.",
             model=active_model,
             max_tokens=4000,
-            system=[
-                {
-                    "type": "text",
-                    "text": "You are an expert at analyzing carbon credit project documentation and extracting relevant evidence for compliance requirements.",
-                    "cache_control": {"type": "ephemeral"}
-                }
-            ],
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": prompt,
-                            "cache_control": {"type": "ephemeral"}
-                        }
-                    ]
-                }
-            ]
         )
-
-        # Parse JSON response
-        response_text = response.content[0].text
 
         # Extract JSON from response (might be wrapped in markdown)
         json_match = re.search(r'```json\s*(\[.*?\])\s*```', response_text, re.DOTALL)
@@ -523,7 +495,7 @@ async def extract_evidence_with_llm(
 
         # Save to cache (if enabled)
         if settings.llm_cache_enabled:
-            save_to_cache(cache_key, snippets, response)
+            save_to_cache(cache_key, snippets)
 
         return snippets
 
@@ -689,9 +661,6 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
 
     print(f"\n🔍 Extracting evidence with LLM...\n", flush=True)
 
-    # Create LLM client — validates API key before expensive work begins
-    anthropic_client = get_anthropic_client()
-
     # Process requirements in parallel (rate-limited)
     semaphore = asyncio.Semaphore(5)  # Max 5 concurrent LLM calls
 
@@ -743,7 +712,6 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
 
                 # Use type-aware LLM extraction based on validation_type
                 snippets = await extract_evidence_with_llm(
-                    client=anthropic_client,
                     requirement=req,
                     document_content=content,
                     document_id=doc_id,

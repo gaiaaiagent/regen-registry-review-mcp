@@ -97,6 +97,7 @@ class Settings(BaseSettings):
     # LLM Extraction (Phase 4.2)
     anthropic_api_key: str = Field(default="")
     llm_extraction_enabled: bool = Field(default=False)  # Conservative default
+    llm_backend: Literal["auto", "api", "cli"] = Field(default="auto")
 
     # Environment-aware model selection (2025-11-26)
     # Dev: Haiku 4.5 ($1/$5 per 1M tokens) - 5x cheaper for testing
