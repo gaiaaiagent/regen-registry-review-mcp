@@ -6,9 +6,9 @@ Last updated: 2026-02-07 (evening)
 
 The Registry Review MCP runs on the GAIA server (`202.61.196.119`) managed by **PM2** (not systemd) on port 8003, proxied through nginx at `https://regen.gaiaai.xyz/api/registry`. A Custom GPT and Darren's web app (`https://regen.gaiaai.xyz/registry-review/`) both consume this REST API. The MCP server is also available for direct Claude Desktop/Code integration via stdio.
 
-**Deployed version:** `6433b13` (Phase 1a-1e + test data, Feb 7). Phase 1f-1g committed locally (`8ac8fe9`) but not yet deployed.
+**Deployed version:** `a56f16a` (Phase 1 complete, Feb 7). All phases 1a-1g deployed. CLI backend active, auto-preferring CLI over API.
 
-**Production health:** Verified healthy on Feb 7. API responds on port 8003. PM2 shows `registry-review-api` online (PID 2351086), restart count 8744. Dependencies synced — `openpyxl` installed for spreadsheet support.
+**Production health:** Verified healthy on Feb 7. API responds on port 8003. PM2 shows `registry-review-api` online. Claude Code v2.1.37 installed (native install with auto-updates). Dependencies synced.
 
 **Other services on this server:** koi-api, koi-mcp-knowledge, regen-koi-mcp, regen-network-api, regenai-agents, koi-event-bridge. All managed via PM2 under the `shawn` user.
 
@@ -35,8 +35,8 @@ Specifically verified:
 - Land cover map classification
 - Centralized LLM error handling with actionable guidance
 - Dual LLM backend: API (SDK) and CLI (`claude -p` subprocess via Max plan)
-- Auto-detecting backend resolution (API key present → API, otherwise → CLI)
-- 286 tests passing (fast suite), 57 deselected (expensive)
+- Auto backend prefers CLI (zero cost), falls back to API
+- 288 tests passing (fast suite), 57 deselected (expensive)
 
 ## What's Broken or Missing
 
@@ -46,7 +46,7 @@ Specifically verified:
 2. ~~**Spreadsheet ingestion**~~ — Implemented (Feb 7).
 3. ~~**Meta-project architecture**~~ — Implemented (Feb 7, scope filtering).
 4. ~~**CarbonEg-specific requirements**~~ — Addressed via scope filtering.
-5. ~~**API credits exhausted**~~ — Resolved. Claude CLI backend implemented (commit `8ac8fe9`). LLM calls now auto-route through Max plan via `claude -p` when no API key is set. Needs deployment to production (install Claude Code on GAIA, authenticate).
+5. ~~**API credits exhausted**~~ — Resolved. CLI backend deployed (`a56f16a`). Auto mode prefers CLI (Max plan, zero cost), falls back to API. Claude Code v2.1.37 installed on GAIA.
 
 ### Blocking for demos and BizDev
 
@@ -71,10 +71,11 @@ Specifically verified:
 - **UK Land Registry classification** — 3 new patterns for `land_tenure` (Official Copy, Land Registry, LT title numbers), new `land_cover_map` type with 4 patterns. Greens Lodge went from 26% to 100% classification. Deployed as commit `6433b13`.
 - **Test data** — Becca's 415-file archive organized into `examples/test-data/` with clean directory structure. GIS files gitignored (192MB).
 
-### Committed locally (not yet deployed)
+### Also committed and deployed (Feb 7, later)
 
-- **LLM error handling (1f)** — Centralized `get_anthropic_client()`, `classify_api_error()`, `LLMBillingError`, `LLMAuthenticationError`. Fatal errors propagate with actionable guidance. REST API returns HTTP 402 for billing errors. 8 new tests.
-- **Claude CLI backend (1g)** — Unified `call_llm()` entry point with dual backend (API SDK + CLI subprocess). Auto-detects available backend. All three LLM call sites converted. Fixed hardcoded model bug in `unified_analysis.py`. 18 new tests. Commit `8ac8fe9`.
+- **LLM error handling (1f)** — Centralized error classification, fatal errors propagate with actionable guidance. 8 new tests.
+- **Claude CLI backend (1g)** — Unified `call_llm()` with dual backend. Auto prefers CLI (Max plan). Fixed hardcoded model bug. 20 new tests. Deployed as `a56f16a`.
+- **CLI flag fix** — Removed non-existent `--max-tokens`, added `--tools ""` for pure LLM mode. Verified against claude v2.1.37.
 
 ## Key Dates and Context
 
@@ -107,6 +108,6 @@ Becca's test data extracted to `examples/test-data/` with clean directory struct
 8. ~~Fix UK Land Registry classification~~ — Done (Feb 7, commit `6433b13`)
 9. ~~Centralize LLM error handling~~ — Done (Feb 7, commit `b669d9c`)
 10. ~~Implement Claude CLI backend~~ — Done (Feb 7, commit `8ac8fe9`)
-11. **Deploy 1f+1g to production** — Install Claude Code on GAIA, authenticate, push + restart
-12. Run registration review on Greens Lodge with CLI backend
-13. Verify supplementary evidence quality across documents
+11. ~~Deploy 1f+1g to production~~ — Done (Feb 7, commit `a56f16a`). Claude Code v2.1.37 installed on GAIA.
+12. **Run registration review on Greens Lodge with CLI backend**
+13. **Verify supplementary evidence quality across documents**

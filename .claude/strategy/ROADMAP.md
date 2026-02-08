@@ -109,13 +109,15 @@ Discovered when evidence extraction hit $0 API credit balance:
 - [x] Convert `unified_analysis.py` — removed `anthropic_client` param, fixed hardcoded model bug
 - [x] Convert `analyze_llm.py` — removed client creation and threading
 - [x] 18 new tests for backend selection, CLI flag construction, error classification
-- [x] Full test suite: 286 passed, 57 deselected
-- [ ] Install Claude Code on GAIA production server
-- [ ] Deploy and verify end-to-end
+- [x] Full test suite: 288 passed, 57 deselected
+- [x] Install Claude Code v2.1.37 on GAIA production server (native install)
+- [x] Deploy and configure: auto backend prefers CLI, falls back to API
+- [x] Fix CLI flags: removed `--max-tokens`, added `--tools ""` for pure LLM mode
+- [ ] End-to-end verification: run Greens Lodge review via CLI backend
 
 **Overall Phase 1 Acceptance:** Carbon Egg's test documents process cleanly. Report is professional. No mapping errors. Spreadsheets are handled. LLM pipeline runs without API credit costs. Becca can run a review and get a result she'd show to a partner.
 
-**Progress:** 1a through 1g code complete. Deployment of 1f+1g pending.
+**Progress:** 1a through 1g deployed to production. End-to-end validation remaining.
 
 ## Phase 2: Demo Readiness and BizDev Support
 
