@@ -83,7 +83,7 @@ Discovered during first real test run against Greens Lodge (19 files):
 - [x] 4 new tests for classification and mapping coverage
 - [x] Greens Lodge classification: 5/19 (26%) to 19/19 (100%)
 
-### 1f. LLM Error Handling — DONE (Feb 7, uncommitted)
+### 1f. LLM Error Handling — DONE (Feb 7)
 
 Discovered when evidence extraction hit $0 API credit balance:
 - [x] Create `utils/llm_client.py` — centralized `get_anthropic_client()`, `classify_api_error()`
@@ -93,30 +93,29 @@ Discovered when evidence extraction hit $0 API credit balance:
 - [x] REST API returns HTTP 402 for billing/auth errors
 - [x] Mark `test_full_report_workflow` as `@pytest.mark.expensive` (was previously false-passing)
 - [x] 8 new tests for error classification and key validation
-- [x] Full test suite: 268 passed, 57 deselected
 
-### 1g. Claude CLI Backend — SPEC'D (Feb 7)
+### 1g. Claude CLI Backend — DONE (Feb 7, commit `8ac8fe9`)
 
 **Goal:** Route LLM calls through Max plan via `claude -p` subprocess, eliminating the need for API credits.
 
-Full spec: `.claude/strategy/plans/claude-cli-backend.md`
-
-- [ ] Add `call_llm()` to `utils/llm_client.py` with auto-detecting dual backend (API + CLI)
-- [ ] Add `_call_via_cli()` using `asyncio.create_subprocess_exec` with `claude -p`
-- [ ] Add `llm_backend` setting (auto/api/cli) to `config/settings.py`
-- [ ] Update `evidence_tools.py` to use `call_llm()` instead of direct `AsyncAnthropic`
-- [ ] Update `llm_synthesis.py` to use `call_llm()`
-- [ ] Update `analyze_llm.py` / `unified_analysis.py` to use `call_llm()`
-- [ ] Add tests for backend selection, CLI invocation, error classification
-- [ ] Manual verification with Max plan on dev machine
+- [x] Add `call_llm()` to `utils/llm_client.py` with auto-detecting dual backend (API + CLI)
+- [x] Add `_call_via_api()` wrapping AsyncAnthropic with prompt caching
+- [x] Add `_call_via_cli()` using `asyncio.create_subprocess_exec` with `claude -p`
+- [x] Add `_resolve_backend()` with auto/api/cli logic and `_check_cli_available()` with caching
+- [x] Add `classify_cli_error()` mapping CLI failures to same `APIErrorInfo` categories
+- [x] Add `llm_backend` setting (auto/api/cli) to `config/settings.py`
+- [x] Convert `llm_synthesis.py` — removed pre-flight client check, uses `call_llm()`
+- [x] Convert `evidence_tools.py` — removed `client` param threading, simplified `save_to_cache()`
+- [x] Convert `unified_analysis.py` — removed `anthropic_client` param, fixed hardcoded model bug
+- [x] Convert `analyze_llm.py` — removed client creation and threading
+- [x] 18 new tests for backend selection, CLI flag construction, error classification
+- [x] Full test suite: 286 passed, 57 deselected
 - [ ] Install Claude Code on GAIA production server
 - [ ] Deploy and verify end-to-end
 
-**Acceptance:** Evidence extraction runs successfully using Max plan (CLI backend) with no API credit charges. The system auto-detects the best backend. Test suite passes. Greens Lodge and Fonthill Farms produce complete reviews.
-
 **Overall Phase 1 Acceptance:** Carbon Egg's test documents process cleanly. Report is professional. No mapping errors. Spreadsheets are handled. LLM pipeline runs without API credit costs. Becca can run a review and get a result she'd show to a partner.
 
-**Progress:** 1a through 1f complete. 1g spec'd, implementation next.
+**Progress:** 1a through 1g code complete. Deployment of 1f+1g pending.
 
 ## Phase 2: Demo Readiness and BizDev Support
 
