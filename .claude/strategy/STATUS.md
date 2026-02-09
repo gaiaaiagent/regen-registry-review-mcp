@@ -40,7 +40,10 @@ Specifically verified:
 - Auto backend prefers CLI (zero cost), falls back to API
 - Cross-validation endpoint returns structured results (Pydantic model tolerates partial coordinator output)
 - REST session creation accepts `documents_path` for path-based ingestion without manual setup
-- 300 tests passing (fast suite), 57 deselected (expensive)
+- 310 tests passing (fast suite), 57 deselected
+- Health endpoint (`GET /health`) for PM2 liveness
+- Request ID tracing (`X-Request-ID`, `X-Response-Time-Ms` on every response)
+- Request model hardening (`extra="forbid"` on all 13 request models) (expensive)
 
 ## What's Broken or Missing
 
@@ -86,7 +89,7 @@ Specifically verified:
 - **Phase 1h polish** — Unified REST error handling (`_llm_error_response()`), auth→401/billing→402. 7 new tests.
 - **documents_path passthrough** — `CreateSessionRequest` now accepts and forwards `documents_path` to `create_session()`. Removes need to manually set path after session creation.
 - **Cross-validation Pydantic fix** — `LandTenureValidation.fields`, `area_consistent`, and `tenure_type_consistent` now have safe defaults. `/validate` no longer 500s when the coordinator doesn't produce field-level results.
-- **300 tests passing** (fast suite), 57 deselected (expensive).
+- **310 tests passing** (fast suite), 57 deselected (expensive).
 
 ## Key Dates and Context
 
@@ -94,7 +97,8 @@ Specifically verified:
 - ETHDenver/Boulder hackathon: starting around Feb 7 (Shawn, Darren, Eve attending)
 - Next team check-in target: Wednesday Feb 11
 - BizDev calls potentially starting as early as first week of Feb
-- Last code change: Feb 9
+- Last code change: Feb 9 (Phase 2 operational foundations)
+- PM2 restart mystery: diagnosed Feb 9 — port-bind storm on Jan 14, fix in `ecosystem.config.cjs`
 
 ## Test Data Available
 
@@ -109,6 +113,8 @@ Becca's test data extracted to `examples/test-data/` with clean directory struct
 
 ## Immediate Next Actions
 
-Phase 1 is complete. Next priority is Phase 2 (Operational Foundations) from the ROADMAP. Start with 2a (PM2 diagnostics) and 2b (health check + smoke test) — these directly prevent the kind of debugging friction encountered during Phase 1 deployment.
+Phase 1 complete. Phase 2 code-level work (2a-2d, 2f partial) complete. Remaining Phase 2 items are operational (2e architecture docs, 2f log rotation + uptime monitoring) and deployment (apply `ecosystem.config.cjs` via `pm2 delete && pm2 start ecosystem.config.cjs && pm2 save`).
 
-See `ROADMAP.md` for the full Phase 2 breakdown (2a through 2f).
+Next priority is deploying Phase 2 changes to production and coordinating with Darren on request model hardening (verify web app doesn't send extra fields that would now return 422).
+
+After that: Phase 3 (Demo Readiness). Carbon Egg registration is "this month." Team check-in target: Wednesday Feb 11.

@@ -6,6 +6,7 @@ allowing ChatGPT to interact via Custom GPT Actions.
 """
 
 import sys
+import time
 import uuid
 import secrets
 import base64
@@ -19,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from fastapi import FastAPI, HTTPException, File, UploadFile, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 import uvicorn
 
 from registry_review_mcp.tools import (
@@ -110,7 +111,7 @@ def _llm_error_response(e: Exception) -> HTTPException:
 app = FastAPI(
     title="Registry Review API",
     description="Carbon credit project registry review tools for ChatGPT",
-    version="1.0.0",
+    version="2.0.0",
     servers=[
         {"url": "https://regen.gaiaai.xyz/api/registry", "description": "Production endpoint"}
     ],
@@ -125,6 +126,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    """Attach a unique request ID and response timing to every response.
+
+    Honors client-provided X-Request-ID for end-to-end tracing.
+    """
+    request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+    start = time.time()
+    response = await call_next(request)
+    duration_ms = (time.time() - start) * 1000
+    response.headers["X-Request-ID"] = request_id
+    response.headers["X-Response-Time-Ms"] = f"{duration_ms:.0f}"
+    return response
+
+
 # In-memory storage for pending uploads (use Redis/database in production)
 pending_uploads: dict[str, dict] = {}
 
@@ -135,6 +151,7 @@ pending_uploads: dict[str, dict] = {}
 
 
 class CreateSessionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     project_name: str = Field(..., description="Name of the project to review")
     methodology: str = Field(
         default="soil-carbon-v1.2.2",
@@ -155,28 +172,34 @@ class SessionResponse(BaseModel):
 
 
 class DiscoverRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     session_id: str = Field(..., description="Session ID to discover documents for")
 
 
 class MapRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     session_id: str = Field(..., description="Session ID to map requirements for")
 
 
 class EvidenceRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     session_id: str = Field(..., description="Session ID to extract evidence for")
 
 
 class UploadFileRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     filename: str = Field(..., description="Name of the file being uploaded")
     content_base64: str = Field(..., description="Base64-encoded file content")
 
 
 class StartExampleReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     example_name: str = Field(..., description="Name of example project (e.g., '22-23')")
     project_name: str | None = Field(None, description="Custom project name (optional)")
 
 
 class StartReviewWithFilesRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     project_name: str = Field(..., description="Name of the project to review")
     files: list[UploadFileRequest] = Field(..., description="List of files to upload (base64 encoded)")
     methodology: str = Field(default="soil-carbon-v1.2.2", description="Methodology identifier")
@@ -184,12 +207,14 @@ class StartReviewWithFilesRequest(BaseModel):
 
 
 class GenerateUploadUrlRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     project_name: str = Field(..., description="Name of the project to review")
     methodology: str = Field(default="soil-carbon-v1.2.2", description="Methodology identifier")
     session_id: str | None = Field(None, description="Existing session ID to add files to (optional)")
 
 
 class SetOverrideRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     requirement_id: str = Field(..., description="Requirement ID (e.g., 'REQ-001')")
     override_status: str = Field(
         ..., description="Decision status: approved, rejected, needs_revision, conditional, pending"
@@ -199,6 +224,7 @@ class SetOverrideRequest(BaseModel):
 
 
 class AddAnnotationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     requirement_id: str = Field(..., description="Requirement ID (e.g., 'REQ-001')")
     note: str = Field(..., description="The annotation text")
     annotation_type: str = Field(
@@ -208,6 +234,7 @@ class AddAnnotationRequest(BaseModel):
 
 
 class SetDeterminationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     determination: str = Field(
         ..., description="Final decision: approve, conditional, reject, hold"
     )
@@ -217,6 +244,7 @@ class SetDeterminationRequest(BaseModel):
 
 
 class RevisionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     requirement_id: str = Field(..., description="Requirement ID (e.g., 'REQ-001')")
     description: str = Field(..., description="What revision is needed from proponent")
     priority: str = Field(default="medium", description="Priority: critical, high, medium, low")
@@ -224,6 +252,7 @@ class RevisionRequest(BaseModel):
 
 
 class ResolveRevisionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     resolution_notes: str = Field(..., description="Notes about how the revision was resolved")
     resolved_by: str = Field(default="user", description="Identifier of the resolver")
 
@@ -238,7 +267,7 @@ async def root():
     """API root endpoint"""
     return {
         "name": "Registry Review API",
-        "version": "1.0.0",
+        "version": app.version,
         "description": "Carbon credit project registry review tools",
         "endpoints": {
             "sessions": "/sessions",
@@ -247,6 +276,22 @@ async def root():
             "map": "/sessions/{session_id}/map",
             "evidence": "/sessions/{session_id}/evidence",
         },
+    }
+
+
+@app.get("/health", summary="Health check")
+async def health():
+    """Liveness probe for PM2 and monitoring.
+
+    Returns service status, version, and session directory health.
+    """
+    sessions_dir = settings.sessions_dir
+    session_count = len(list(sessions_dir.glob("session-*"))) if sessions_dir.exists() else 0
+    return {
+        "status": "healthy",
+        "version": app.version,
+        "sessions_dir_exists": sessions_dir.exists(),
+        "session_count": session_count,
     }
 
 
