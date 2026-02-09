@@ -6,9 +6,11 @@ Last updated: 2026-02-09
 
 The Registry Review MCP runs on the GAIA server (`202.61.196.119`) managed by **PM2** (not systemd) on port 8003, proxied through nginx at `https://regen.gaiaai.xyz/api/registry`. A Custom GPT and Darren's web app (`https://regen.gaiaai.xyz/registry-review/`) both consume this REST API. The MCP server is also available for direct Claude Desktop/Code integration via stdio.
 
-**Deployed version:** `a56f16a` (Phase 1 complete, Feb 7). All phases 1a-1g deployed. CLI backend active, auto-preferring CLI over API.
+**Deployed version:** `2a52f2b` (Phase 1 complete + bug fixes, Feb 9). All phases 1a-1h deployed. CLI backend active, auto-preferring CLI over API.
 
-**Production health:** Verified healthy on Feb 7. API responds on port 8003. PM2 shows `registry-review-api` online. Claude Code v2.1.37 installed (native install with auto-updates). Dependencies synced.
+**Production health:** Verified healthy on Feb 9. Greens Lodge E2E: 19 docs discovered, 4/4 farm reqs covered, 122 evidence snippets, validation returns structured results (no 500), report generated. API responds on port 8003. PM2 shows `registry-review-api` online.
+
+**Important:** The nginx proxy at `regen.gaiaai.xyz/api/registry` routes to port 8200 (Darren's web app), NOT directly to port 8003. Direct API access is via `regen.gaiaai.xyz/registry` (requires auth_basic) or `localhost:8003` on the server.
 
 **Other services on this server:** koi-api, koi-mcp-knowledge, regen-koi-mcp, regen-network-api, regenai-agents, koi-event-bridge. All managed via PM2 under the `shawn` user.
 
@@ -79,7 +81,7 @@ Specifically verified:
 - **Claude CLI backend (1g)** — Unified `call_llm()` with dual backend. Auto prefers CLI (Max plan). Fixed hardcoded model bug. 20 new tests. Deployed as `a56f16a`.
 - **CLI flag fix** — Removed non-existent `--max-tokens`, added `--tools ""` for pure LLM mode. Verified against claude v2.1.37.
 
-### Committed locally, pending deployment (Feb 9)
+### Deployed (Feb 9, commit `2a52f2b`)
 
 - **Phase 1h polish** — Unified REST error handling (`_llm_error_response()`), auth→401/billing→402. 7 new tests.
 - **documents_path passthrough** — `CreateSessionRequest` now accepts and forwards `documents_path` to `create_session()`. Removes need to manually set path after session creation.
@@ -107,16 +109,6 @@ Becca's test data extracted to `examples/test-data/` with clean directory struct
 
 ## Immediate Next Actions
 
-1. ~~Verify production deployment state~~ — Done (Feb 7)
-2. ~~Fix mapping bug~~ — Done (Feb 7, commit `467695e`)
-3. ~~Add spreadsheet ingestion~~ — Done (Feb 7)
-4. ~~Clean up report formatting~~ — Done (Feb 7, Phase 1c)
-5. ~~Multi-project scope support~~ — Done (Feb 7, Phase 1d)
-6. ~~Deploy Phase 1 to production~~ — Done (Feb 7, commit `a7c7a5f`)
-7. ~~Extract and organize test data~~ — Done (Feb 7)
-8. ~~Fix UK Land Registry classification~~ — Done (Feb 7, commit `6433b13`)
-9. ~~Centralize LLM error handling~~ — Done (Feb 7, commit `b669d9c`)
-10. ~~Implement Claude CLI backend~~ — Done (Feb 7, commit `8ac8fe9`)
-11. ~~Deploy 1f+1g to production~~ — Done (Feb 7, commit `a56f16a`). Claude Code v2.1.37 installed on GAIA.
-12. ~~Run registration review on Greens Lodge with CLI backend~~ — Done (Feb 9). 19/19 docs discovered, 4/4 farm requirements covered (100%), 122 evidence snippets, report generated. Cross-validation has a pre-existing Pydantic model mismatch (missing `fields`/`area_consistent`/`tenure_type_consistent` on land tenure validation results) — tracked separately.
-13. ~~Verify supplementary evidence quality across documents~~ — Verified (Feb 9). Greens Lodge review pulled supplementary evidence from 17 documents for REQ-002 (land tenure), citing specific sections and pages across all Land Registry Official Copies.
+Phase 1 is complete. Next priority is Phase 2 (Operational Foundations) from the ROADMAP. Start with 2a (PM2 diagnostics) and 2b (health check + smoke test) — these directly prevent the kind of debugging friction encountered during Phase 1 deployment.
+
+See `ROADMAP.md` for the full Phase 2 breakdown (2a through 2f).

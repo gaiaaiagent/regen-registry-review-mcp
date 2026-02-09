@@ -127,7 +127,96 @@ Discovered when evidence extraction hit $0 API credit balance:
 
 **Progress:** Phase 1 complete. All sub-phases (1a-1h) deployed. End-to-end Greens Lodge review verified via CLI backend on production (Feb 9).
 
-## Phase 2: Demo Readiness and BizDev Support
+## Phase 2: Operational Foundations
+
+**Goal:** The system is trustworthy enough that failures are caught before users see them, deployments are predictable, and the next person who touches this codebase doesn't have to reverse-engineer the infrastructure.
+
+**Why this comes before demos:** Phase 1 deployment revealed that a demo could fail for purely operational reasons — wrong nginx route, missing access logs, silent field-dropping in request models. A demo that fails because of infrastructure is worse than no demo at all. This phase ensures the floor is solid before we invite people to stand on it.
+
+### 2a. Diagnose PM2 Instability
+
+PM2 shows 8,749 restarts. Log rotation preserves 7 rotated files (back to Dec 13), but the current log only has ~600 lines covering the most recent session. We don't know whether the restarts are crashes, OOM kills, or accumulated manual restarts over 2+ months.
+
+- [ ] Decompress and analyze rotated PM2 logs (`pm2-error.log.1` through `pm2-error.log.7.gz`) for crash patterns
+- [ ] Check system journal for OOM kills: `journalctl -k | grep -i 'oom\|killed'`
+- [ ] Check PM2 ecosystem config for `max_memory_restart`, `min_uptime`, or other auto-restart triggers
+- [ ] Monitor process memory over a 24-hour period: `pm2 monit` or log `pm2 jlist` periodically
+- [ ] Document findings — if restarts are benign (accumulated from deploys), note it; if there's a memory leak, fix it
+
+**Acceptance:** We can explain why the restart count is 8,749 and either fix the underlying issue or document that it's expected.
+
+### 2b. Health Check and Smoke Test
+
+No health endpoint exists. No deployment verification script exists. The `runbooks/` directory referenced in Phase 0 doesn't exist. Every deployment is a manual curl adventure.
+
+- [ ] Add `GET /health` endpoint to `chatgpt_rest_api.py` returning: API version (from `pyproject.toml`), uptime, session count, git commit hash, last request timestamp
+- [ ] Create `scripts/smoke-test.sh` that exercises the 6-stage pipeline against a small fixture (Botany Farm, fastest test data): create session → discover → map → verify non-zero mappings → verify no 500s on validate
+- [ ] Wire smoke test into deployment: the deployment script runs it automatically after `pm2 restart` and rolls back on failure
+- [ ] Add a test for the `/health` endpoint in the integration test suite (see 2c)
+
+**Acceptance:** `scripts/smoke-test.sh` runs in <30 seconds, exits 0 when the API is healthy, exits 1 with a clear error message when something is wrong. Deployments refuse to finish without a green smoke test.
+
+### 2c. REST API Integration Tests
+
+We have 300 unit tests but zero tests that exercise the actual FastAPI endpoints. Both bugs fixed today (documents_path silently dropped, validation 500) would have been caught by integration tests.
+
+- [ ] Add `httpx` (or use FastAPI's `TestClient`) as a test dependency
+- [ ] Create `tests/test_rest_integration.py` with a `TestClient` fixture that uses a temp `sessions_dir`
+- [ ] Test `POST /sessions` round-trip: send `documents_path`, read back session, verify it's stored
+- [ ] Test `POST /sessions/{id}/discover` with a real test-data directory
+- [ ] Test `POST /sessions/{id}/validate` returns 200 (not 500) with partial coordinator output
+- [ ] Test `GET /health` returns expected structure
+- [ ] Test that unknown fields in request body are rejected (see 2d)
+
+**Acceptance:** Integration tests cover every REST endpoint's happy path. Running `pytest` still completes in <10 seconds (these tests don't call LLMs). Test count increases by ~10-15.
+
+### 2d. Request Model Hardening
+
+Pydantic's default `extra` config is `"ignore"` — callers can send fields that the model doesn't declare, and they're silently discarded. This is how `documents_path` went unnoticed for weeks. The REST request models should reject unknown fields so that mismatches between callers and the API surface immediately.
+
+- [ ] Add `model_config = ConfigDict(extra='forbid')` to all REST request models in `chatgpt_rest_api.py`: `CreateSessionRequest`, `DiscoverRequest`, `MapRequest`, `EvidenceRequest`, `UploadFileRequest`, and any others
+- [ ] Verify that existing callers (web app, Custom GPT) don't send extra fields that would now be rejected — if they do, add the fields to the model or coordinate with Darren
+- [ ] Add a test that sends an unknown field to `POST /sessions` and verifies a 422 response
+
+**Acceptance:** Sending `{"project_name": "Test", "bogus_field": true}` to `POST /sessions` returns 422 Unprocessable Entity, not 200 with the field silently dropped.
+
+### 2e. Architecture Documentation
+
+Two systems (our API on port 8003, Darren's web app on port 8200) serve different nginx paths but share session state. This relationship is undocumented. During Phase 1 closure we lost 10 minutes to a ghost session that existed in the web app layer but not in ours.
+
+- [ ] Create `docs/architecture.md` with a clear diagram: nginx → `/registry` (auth_basic, port 8003, our API) vs. `/api/registry` (port 8200, web app) vs. `/registry-review/` (web app frontend)
+- [ ] Document which sessions belong to which system (shawn's data dir vs. darren's)
+- [ ] Document the deployment topology: PM2 processes, ports, nginx routing, user contexts
+- [ ] Create `runbooks/deploy.md` with the actual deployment steps (currently just in our heads and MEMORY.md)
+- [ ] Document how to verify a deployment is healthy (reference `scripts/smoke-test.sh`)
+
+**Acceptance:** A new developer can read `docs/architecture.md` and `runbooks/deploy.md` and deploy a change to production without SSH archaeology.
+
+### 2f. Observability
+
+The PM2 out log showed no access logs from our test requests. FastAPI logs `INFO:` access lines but they may not be flushing reliably, or log rotation truncated them. When something goes wrong in production, we need to be able to see what happened.
+
+- [ ] Verify FastAPI access logging works after PM2 restart (may need `--log-level info` in uvicorn config or explicit `logging.basicConfig`)
+- [ ] Add structured logging with request IDs: each request gets a UUID, logged at start and end, so we can trace a request through the system
+- [ ] Configure `pm2-logrotate` explicitly: retain 14 days, compress after 1 day, max size 50MB per file
+- [ ] Set up basic uptime monitoring: a free service (UptimeRobot, Healthchecks.io, or a cron job) that hits `GET /health` every 5 minutes and alerts on failure
+- [ ] Add a `last_request_at` timestamp to the health endpoint so we can see if the API is receiving traffic
+
+**Acceptance:** After a deployment, `pm2 logs registry-review-api --lines 10` shows access logs for the smoke test. If the API goes down at 3am, someone gets a notification.
+
+### Phase 2 Overall Acceptance
+
+All of the following are true:
+
+1. `scripts/smoke-test.sh` passes after every deployment
+2. `pytest` includes REST integration tests (310+ tests, <10 seconds)
+3. Unknown request fields return 422, not silent success
+4. `GET /health` returns API version, uptime, and session count
+5. `docs/architecture.md` and `runbooks/deploy.md` exist and are accurate
+6. PM2 restart count is explained (and fixed if it's a real problem)
+7. Access logs are visible in PM2 logs after every request
+
+## Phase 3: Demo Readiness and BizDev Support
 
 **Goal:** The web app is impressive enough that partners focus on usefulness, not rough edges. The team has demo materials and talking points.
 
@@ -142,7 +231,7 @@ Sources: updated-registry-spec.md, review-agent-readiness.md Demo-Ready checklis
 
 **Acceptance:** A non-technical person (Dave, Gregory) can watch a demo and understand the value proposition. The web app doesn't crash, stall, or produce embarrassing output.
 
-## Phase 3: Infrastructure Hardening
+## Phase 4: Integration and Sustained Use
 
 **Goal:** The system is reliable for sustained use, not just demos.
 
@@ -150,12 +239,12 @@ Sources: updated-registry-spec.md, review-agent-readiness.md Demo-Ready checklis
 - [ ] Third-party Drive access testing (can clients add the bot to their own Drive?)
 - [ ] Airtable API integration for structured data (Samu exploring with Carbon Egg)
 - [ ] CarbonEg-specific requirements pre-loaded in checklist
-- [ ] Production monitoring: alerts when service goes down, log rotation
-- [ ] Deploy procedure documented and tested (runbooks/deploy.md)
+- [ ] Session data backup strategy (periodic snapshot of sessions directory to offsite storage)
+- [ ] Evaluate file-based storage vs. lightweight database (SQLite) for Phase 5+ scale
 
 **Acceptance:** The system can be pointed at a new project's Drive folder and produce a review without manual intervention beyond clicking "Start Review."
 
-## Phase 4: Issuance Review Agent
+## Phase 5: Issuance Review Agent
 
 **Goal:** Extend from registration review to credit issuance review.
 
@@ -167,9 +256,9 @@ Scoped in updated-registry-spec.md. Builds on the same architecture with expande
 - Buffer pool, leakage, and additionality evidence
 - Issuance-specific checklist and report format
 
-This is substantial new work. Detailed plan to be created when Phase 1 is complete.
+This is substantial new work. Detailed plan to be created when Phase 4 integration work is stable.
 
-## Phase 5: Scale and Ecosystem
+## Phase 6: Scale and Ecosystem
 
 **Goal:** Support multiple protocols, registries, and project types.
 
