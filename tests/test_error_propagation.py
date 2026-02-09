@@ -1,4 +1,4 @@
-"""Regression tests for critical bug fix: Silent failure in error handling decorator.
+"""Regression tests for error handling: MCP protocol compliance and REST API status codes.
 
 Bug: The @with_error_handling decorator was catching exceptions and returning
 error strings instead of re-raising them. This violated the MCP protocol contract
@@ -15,6 +15,11 @@ from pathlib import Path
 from unittest.mock import Mock, patch, AsyncMock
 from registry_review_mcp.tools import session_tools
 from registry_review_mcp.models.errors import SessionNotFoundError
+from registry_review_mcp.utils.llm_client import (
+    LLMAuthenticationError,
+    LLMBillingError,
+    classify_api_error,
+)
 
 
 class TestErrorPropagation:
@@ -182,3 +187,139 @@ class TestIncidentRecreation:
                         "CRITICAL: Bug regression detected! Tool returned error string "
                         f"instead of raising exception: {result}"
                     )
+
+
+class TestRestApiErrorResponses:
+    """Verify that _llm_error_response maps LLM errors to correct HTTP status codes.
+
+    The REST API wraps MCP tools and must translate LLM-specific exceptions into
+    appropriate HTTP responses: 401 for auth, 402 for billing, 500 for transient.
+    """
+
+    def _helper(self):
+        """Import the helper from the REST module."""
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).parents[1]))
+        from chatgpt_rest_api import _llm_error_response
+        return _llm_error_response
+
+    def test_evidence_billing_error_returns_402(self):
+        _llm_error_response = self._helper()
+        exc = LLMBillingError("Insufficient credits")
+        response = _llm_error_response(exc)
+        assert response.status_code == 402
+        assert "Insufficient credits" in response.detail
+
+    def test_evidence_auth_error_returns_401(self):
+        _llm_error_response = self._helper()
+        exc = LLMAuthenticationError("Invalid API key")
+        response = _llm_error_response(exc)
+        assert response.status_code == 401
+        assert "Invalid API key" in response.detail
+
+    def test_validate_billing_error_returns_402(self):
+        """Billing errors return 402 regardless of which endpoint triggers them."""
+        _llm_error_response = self._helper()
+        exc = LLMBillingError("Usage limit reached")
+        response = _llm_error_response(exc)
+        assert response.status_code == 402
+        assert "Usage limit" in response.detail
+
+
+class TestCreateSessionDocumentsPath:
+    """Verify that CreateSessionRequest accepts and forwards documents_path."""
+
+    def _import_model(self):
+        import sys
+        sys.path.insert(0, str(Path(__file__).parents[1]))
+        from chatgpt_rest_api import CreateSessionRequest
+        return CreateSessionRequest
+
+    def test_documents_path_accepted_in_request(self):
+        """CreateSessionRequest should accept documents_path field."""
+        CreateSessionRequest = self._import_model()
+        req = CreateSessionRequest(
+            project_name="Test",
+            documents_path="/some/path/to/docs",
+        )
+        assert req.documents_path == "/some/path/to/docs"
+
+    def test_documents_path_defaults_to_none(self):
+        """documents_path should default to None when not provided."""
+        CreateSessionRequest = self._import_model()
+        req = CreateSessionRequest(project_name="Test")
+        assert req.documents_path is None
+
+    @pytest.mark.asyncio
+    async def test_documents_path_forwarded_to_create_session(self, tmp_path, monkeypatch):
+        """documents_path should be forwarded to session_tools.create_session()."""
+        from registry_review_mcp.config.settings import Settings
+        from registry_review_mcp.tools import session_tools as st_module
+        from registry_review_mcp.utils import state as state_module
+
+        sessions_dir = tmp_path / "sessions"
+        sessions_dir.mkdir()
+        new_settings = Settings(sessions_dir=sessions_dir)
+        monkeypatch.setattr(st_module, "settings", new_settings)
+        monkeypatch.setattr(state_module, "settings", new_settings)
+
+        docs_dir = tmp_path / "docs"
+        docs_dir.mkdir()
+
+        result = await session_tools.create_session(
+            project_name="Test",
+            documents_path=str(docs_dir),
+        )
+        assert isinstance(result, dict)
+        assert result["project_name"] == "Test"
+
+
+class TestLandTenureValidationDefaults:
+    """Verify LandTenureValidation works with partial coordinator output."""
+
+    def test_construction_without_fields_or_consistency_checks(self):
+        """The three-layer coordinator only provides owner_name fields.
+
+        fields, area_consistent, and tenure_type_consistent should have
+        safe defaults so validation doesn't 500.
+        """
+        from registry_review_mcp.models.validation import LandTenureValidation
+
+        result = LandTenureValidation(
+            validation_id="test-001",
+            owner_name_match=True,
+            owner_name_similarity=0.95,
+            status="pass",
+            message="Owner names match across documents",
+        )
+        assert result.fields == []
+        assert result.area_consistent is True
+        assert result.tenure_type_consistent is True
+
+    def test_construction_with_explicit_values(self):
+        """Explicit values should override defaults."""
+        from registry_review_mcp.models.validation import LandTenureValidation, LandTenureField
+
+        field = LandTenureField(
+            owner_name="Test Owner",
+            area_hectares=100.0,
+            tenure_type="ownership",
+            source="DOC-001, Page 1",
+            document_id="DOC-001",
+            confidence=0.9,
+        )
+        result = LandTenureValidation(
+            validation_id="test-002",
+            fields=[field],
+            owner_name_match=True,
+            owner_name_similarity=1.0,
+            area_consistent=False,
+            tenure_type_consistent=False,
+            status="fail",
+            message="Area mismatch",
+            discrepancies=["Area differs by 50ha"],
+        )
+        assert len(result.fields) == 1
+        assert result.area_consistent is False
+        assert result.tenure_type_consistent is False

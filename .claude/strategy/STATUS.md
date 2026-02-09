@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-02-07 (evening)
+Last updated: 2026-02-09
 
 ## Production State
 
@@ -36,7 +36,9 @@ Specifically verified:
 - Centralized LLM error handling with actionable guidance
 - Dual LLM backend: API (SDK) and CLI (`claude -p` subprocess via Max plan)
 - Auto backend prefers CLI (zero cost), falls back to API
-- 288 tests passing (fast suite), 57 deselected (expensive)
+- Cross-validation endpoint returns structured results (Pydantic model tolerates partial coordinator output)
+- REST session creation accepts `documents_path` for path-based ingestion without manual setup
+- 300 tests passing (fast suite), 57 deselected (expensive)
 
 ## What's Broken or Missing
 
@@ -53,7 +55,7 @@ Specifically verified:
 6. ~~**Report formatting**~~ — Fixed (Feb 7).
 7. **PDF download** — Not implemented (raises `NotImplementedError`). Requires a rendering library (e.g., weasyprint). Deferred — markdown and DOCX downloads work correctly.
 8. ~~**Duplicate value field**~~ — Fixed (Feb 7).
-9. **Supplementary evidence quality** — Unclear how well the system pulls supplementary evidence beyond primary documentation. Needs testing once LLM backend is restored.
+9. ~~**Supplementary evidence quality**~~ — Verified (Feb 9). Greens Lodge REQ-002 pulled evidence from 17 documents with section/page citations.
 
 ### Needed but not blocking
 
@@ -77,13 +79,20 @@ Specifically verified:
 - **Claude CLI backend (1g)** — Unified `call_llm()` with dual backend. Auto prefers CLI (Max plan). Fixed hardcoded model bug. 20 new tests. Deployed as `a56f16a`.
 - **CLI flag fix** — Removed non-existent `--max-tokens`, added `--tools ""` for pure LLM mode. Verified against claude v2.1.37.
 
+### Committed locally, pending deployment (Feb 9)
+
+- **Phase 1h polish** — Unified REST error handling (`_llm_error_response()`), auth→401/billing→402. 7 new tests.
+- **documents_path passthrough** — `CreateSessionRequest` now accepts and forwards `documents_path` to `create_session()`. Removes need to manually set path after session creation.
+- **Cross-validation Pydantic fix** — `LandTenureValidation.fields`, `area_consistent`, and `tenure_type_consistent` now have safe defaults. `/validate` no longer 500s when the coordinator doesn't produce field-level results.
+- **300 tests passing** (fast suite), 57 deselected (expensive).
+
 ## Key Dates and Context
 
 - Carbon Egg registration: described as "this month" on Feb 3
 - ETHDenver/Boulder hackathon: starting around Feb 7 (Shawn, Darren, Eve attending)
 - Next team check-in target: Wednesday Feb 11
 - BizDev calls potentially starting as early as first week of Feb
-- Last code change: Feb 7
+- Last code change: Feb 9
 
 ## Test Data Available
 
@@ -109,5 +118,5 @@ Becca's test data extracted to `examples/test-data/` with clean directory struct
 9. ~~Centralize LLM error handling~~ — Done (Feb 7, commit `b669d9c`)
 10. ~~Implement Claude CLI backend~~ — Done (Feb 7, commit `8ac8fe9`)
 11. ~~Deploy 1f+1g to production~~ — Done (Feb 7, commit `a56f16a`). Claude Code v2.1.37 installed on GAIA.
-12. **Run registration review on Greens Lodge with CLI backend**
-13. **Verify supplementary evidence quality across documents**
+12. ~~Run registration review on Greens Lodge with CLI backend~~ — Done (Feb 9). 19/19 docs discovered, 4/4 farm requirements covered (100%), 122 evidence snippets, report generated. Cross-validation has a pre-existing Pydantic model mismatch (missing `fields`/`area_consistent`/`tenure_type_consistent` on land tenure validation results) — tracked separately.
+13. ~~Verify supplementary evidence quality across documents~~ — Verified (Feb 9). Greens Lodge review pulled supplementary evidence from 17 documents for REQ-002 (land tenure), citing specific sections and pages across all Land Registry Official Copies.

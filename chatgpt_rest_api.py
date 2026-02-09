@@ -83,6 +83,26 @@ def apply_derived_status(session: dict) -> dict:
     return session
 
 
+def _llm_error_response(e: Exception) -> HTTPException:
+    """Convert LLM errors to appropriate HTTP responses.
+
+    Auth errors → 401, billing errors → 402, classified fatal → 401/402,
+    everything else → 500.
+    """
+    if isinstance(e, LLMAuthenticationError):
+        return HTTPException(status_code=401, detail=str(e))
+    if isinstance(e, LLMBillingError):
+        return HTTPException(status_code=402, detail=str(e))
+    error_info = classify_api_error(e)
+    if error_info.is_fatal:
+        status = 401 if error_info.category == "auth" else 402
+        return HTTPException(
+            status_code=status,
+            detail=f"{error_info.message}\n\nHow to fix: {error_info.guidance}",
+        )
+    return HTTPException(status_code=500, detail=str(e))
+
+
 # ============================================================================
 # FastAPI App
 # ============================================================================
@@ -122,6 +142,7 @@ class CreateSessionRequest(BaseModel):
     )
     project_id: str | None = Field(None, description="Optional project ID (e.g., C06-4997)")
     scope: str | None = Field(None, description="Scope filter: 'farm' for per-farm, 'meta' for meta-project, None for all")
+    documents_path: str | None = Field(None, description="Path to directory containing documents to review")
 
 
 class SessionResponse(BaseModel):
@@ -241,6 +262,7 @@ async def create_session(request: CreateSessionRequest):
             methodology=request.methodology,
             project_id=request.project_id,
             scope=request.scope,
+            documents_path=request.documents_path,
         )
         return SessionResponse(**result)
     except Exception as e:
@@ -454,13 +476,8 @@ async def extract_evidence(session_id: str):
         return result
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    except (LLMAuthenticationError, LLMBillingError) as e:
-        raise HTTPException(status_code=402, detail=str(e))
     except Exception as e:
-        error_info = classify_api_error(e)
-        status = 402 if error_info.is_fatal else 500
-        detail = f"{error_info.message}\n\nHow to fix: {error_info.guidance}" if error_info.is_fatal else str(e)
-        raise HTTPException(status_code=status, detail=detail)
+        raise _llm_error_response(e)
 
 
 @app.get("/sessions/{session_id}/evidence-matrix", summary="Get evidence matrix")
@@ -670,7 +687,7 @@ async def cross_validate(session_id: str):
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _llm_error_response(e)
 
 
 @app.post("/sessions/{session_id}/report", summary="Generate review report")
@@ -755,7 +772,7 @@ async def generate_report(session_id: str, format: str = "markdown", request: Re
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _llm_error_response(e)
 
 
 # ============================================================================

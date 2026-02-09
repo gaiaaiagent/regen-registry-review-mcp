@@ -1,6 +1,7 @@
 """Tests for the CLI backend and backend resolution in llm_client."""
 
 import json
+import logging
 
 import pytest
 from unittest.mock import AsyncMock, patch
@@ -9,7 +10,9 @@ from registry_review_mcp.models.errors import ConfigurationError
 from registry_review_mcp.utils.llm_client import (
     LLMBackendError,
     _resolve_backend,
+    _call_via_api,
     _call_via_cli,
+    call_llm,
     classify_cli_error,
 )
 import registry_review_mcp.utils.llm_client as llm_client_module
@@ -253,3 +256,57 @@ class TestClassifyCliError:
         info = classify_cli_error("Something unexpected", 42)
         assert info.category == "unknown"
         assert info.is_fatal is False
+
+
+class TestCallLLM:
+    """Verify that call_llm() correctly orchestrates backend dispatch."""
+
+    async def test_call_llm_routes_to_api(self):
+        with (
+            patch.object(llm_client_module, "_resolve_backend", new_callable=AsyncMock, return_value="api") as mock_resolve,
+            patch.object(llm_client_module, "_call_via_api", new_callable=AsyncMock, return_value="api response") as mock_api,
+            patch.object(llm_client_module, "settings") as mock_settings,
+        ):
+            mock_settings.get_active_llm_model.return_value = "claude-sonnet-4-5-20250929"
+            result = await call_llm("test prompt", system="be helpful")
+            mock_resolve.assert_awaited_once()
+            mock_api.assert_awaited_once_with("test prompt", "be helpful", "claude-sonnet-4-5-20250929", 4000)
+            assert result == "api response"
+
+    async def test_call_llm_routes_to_cli(self):
+        with (
+            patch.object(llm_client_module, "_resolve_backend", new_callable=AsyncMock, return_value="cli"),
+            patch.object(llm_client_module, "_call_via_cli", new_callable=AsyncMock, return_value="cli response") as mock_cli,
+            patch.object(llm_client_module, "settings") as mock_settings,
+        ):
+            mock_settings.get_active_llm_model.return_value = "claude-sonnet-4-5-20250929"
+            result = await call_llm("test prompt")
+            mock_cli.assert_awaited_once_with("test prompt", None, "claude-sonnet-4-5-20250929", 4000)
+            assert result == "cli response"
+
+    async def test_call_llm_uses_default_model(self):
+        with (
+            patch.object(llm_client_module, "_resolve_backend", new_callable=AsyncMock, return_value="api"),
+            patch.object(llm_client_module, "_call_via_api", new_callable=AsyncMock, return_value="ok") as mock_api,
+            patch.object(llm_client_module, "settings") as mock_settings,
+        ):
+            mock_settings.get_active_llm_model.return_value = "claude-haiku-4-5-20251001"
+            await call_llm("prompt")
+            # Verify the default model from settings was used
+            _, args, _ = mock_api.mock_calls[0]
+            assert args[2] == "claude-haiku-4-5-20251001"
+
+    async def test_call_llm_logs_backend_once(self, caplog):
+        with (
+            patch.object(llm_client_module, "_resolve_backend", new_callable=AsyncMock, return_value="cli"),
+            patch.object(llm_client_module, "_call_via_cli", new_callable=AsyncMock, return_value="ok"),
+            patch.object(llm_client_module, "settings") as mock_settings,
+            caplog.at_level(logging.INFO, logger="registry_review_mcp.utils.llm_client"),
+        ):
+            mock_settings.get_active_llm_model.return_value = "claude-sonnet-4-5-20250929"
+            # First call should log
+            await call_llm("prompt 1")
+            # Second call should not log again
+            await call_llm("prompt 2")
+            backend_logs = [r for r in caplog.records if "LLM backend" in r.message]
+            assert len(backend_logs) == 1

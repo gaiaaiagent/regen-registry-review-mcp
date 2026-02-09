@@ -1,6 +1,6 @@
 # Development Roadmap
 
-Last updated: 2026-02-07 (evening)
+Last updated: 2026-02-09
 
 This roadmap sequences work into phases based on urgency and dependency. Each phase has clear acceptance criteria. Phases may overlap where work is independent.
 
@@ -17,7 +17,7 @@ This roadmap sequences work into phases based on urgency and dependency. Each ph
 
 **Acceptance:** Complete. STATUS.md updated, runbooks corrected for PM2, test suite green. Phase 0 done on 2026-02-07.
 
-## Phase 1: Carbon Egg Registration Readiness — IN PROGRESS
+## Phase 1: Carbon Egg Registration Readiness — DONE
 
 **Goal:** The system can process Carbon Egg's registration documents end-to-end without errors and produce a clean, professional report.
 
@@ -113,11 +113,19 @@ Discovered when evidence extraction hit $0 API credit balance:
 - [x] Install Claude Code v2.1.37 on GAIA production server (native install)
 - [x] Deploy and configure: auto backend prefers CLI, falls back to API
 - [x] Fix CLI flags: removed `--max-tokens`, added `--tools ""` for pure LLM mode
-- [ ] End-to-end verification: run Greens Lodge review via CLI backend
+- [x] End-to-end verification: Greens Lodge review via CLI backend (Feb 9). 19/19 docs, 4/4 reqs covered, 122 evidence snippets, report generated. Cross-validation has pre-existing Pydantic model bug (not blocking).
+
+### 1h. Polish for Acceptance — DONE (Feb 9)
+
+- [x] Unified REST API error handling: `_llm_error_response()` helper applied to `/evidence`, `/validate`, `/report`
+- [x] Auth errors return 401, billing errors return 402 (was returning 402 for both)
+- [x] 4 new `call_llm()` happy-path tests (routing, default model, log-once)
+- [x] 3 new REST API error response tests (auth→401, billing→402)
+- [x] Full test suite: 295 passed, 57 deselected
 
 **Overall Phase 1 Acceptance:** Carbon Egg's test documents process cleanly. Report is professional. No mapping errors. Spreadsheets are handled. LLM pipeline runs without API credit costs. Becca can run a review and get a result she'd show to a partner.
 
-**Progress:** 1a through 1g deployed to production. End-to-end validation remaining.
+**Progress:** Phase 1 complete. All sub-phases (1a-1h) deployed. End-to-end Greens Lodge review verified via CLI backend on production (Feb 9).
 
 ## Phase 2: Demo Readiness and BizDev Support
 

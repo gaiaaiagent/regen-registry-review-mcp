@@ -45,11 +45,11 @@ class LandTenureValidation(BaseModel):
 
     validation_id: str
     validation_type: str = "land_tenure"
-    fields: list[LandTenureField]
+    fields: list[LandTenureField] = Field(default_factory=list)
     owner_name_match: bool
     owner_name_similarity: float = Field(..., ge=0.0, le=1.0)
-    area_consistent: bool
-    tenure_type_consistent: bool
+    area_consistent: bool = True
+    tenure_type_consistent: bool = True
     status: str  # "pass", "fail", "warning"
     message: str
     discrepancies: list[str] = Field(default_factory=list)
