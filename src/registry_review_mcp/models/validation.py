@@ -20,10 +20,10 @@ class DateAlignmentValidation(BaseModel):
 
     validation_id: str
     validation_type: str = "date_alignment"
-    date1: DateField
-    date2: DateField
-    delta_days: int
-    max_allowed_days: int
+    date1: DateField | None = None
+    date2: DateField | None = None
+    delta_days: int | None = None
+    max_allowed_days: int | None = None
     status: str  # "pass", "fail", "warning"
     message: str
     flagged_for_review: bool = False
@@ -71,13 +71,13 @@ class ProjectIDValidation(BaseModel):
 
     validation_id: str
     validation_type: str = "project_id"
-    expected_pattern: str  # r"^C\d{2}-\d+$"
-    found_ids: list[str]
+    expected_pattern: str | None = None
+    found_ids: list[str] = Field(default_factory=list)
     primary_id: str | None = None
-    occurrences: list[ProjectIDOccurrence]
-    total_occurrences: int
-    documents_with_id: int
-    total_documents: int
+    occurrences: list[ProjectIDOccurrence] = Field(default_factory=list)
+    total_occurrences: int | None = None
+    documents_with_id: int | None = None
+    total_documents: int | None = None
     status: str  # "pass", "fail", "warning"
     message: str
     flagged_for_review: bool = False
@@ -88,14 +88,14 @@ class ContradictionCheck(BaseModel):
 
     validation_id: str
     validation_type: str = "contradiction"
-    field_name: str
-    value1: str
-    source1: str
-    value2: str
-    source2: str
-    is_contradiction: bool
-    severity: str  # "high", "medium", "low"
-    message: str
+    field_name: str | None = None
+    value1: str | None = None
+    source1: str | None = None
+    value2: str | None = None
+    source2: str | None = None
+    is_contradiction: bool = False
+    severity: str = "medium"  # "high", "medium", "low"
+    message: str = ""
     flagged_for_review: bool = False
 
 
