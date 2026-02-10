@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-from ..config.settings import settings
+from ..config.settings import settings, validate_session_id
 from ..models.errors import SessionLockError, SessionNotFoundError
 
 
@@ -21,7 +21,11 @@ class StateManager:
 
         Args:
             session_id: Unique identifier for the session
+
+        Raises:
+            ValueError: If session_id doesn't match expected format
         """
+        validate_session_id(session_id)
         self.session_id = session_id
         self.session_dir = settings.get_session_path(session_id)
         self.lock_file = self.session_dir / ".lock"

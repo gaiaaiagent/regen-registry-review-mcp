@@ -52,7 +52,7 @@ class TestErrorPropagation:
         """Verify that loading non-existent session raises SessionNotFoundError."""
         # Should raise SessionNotFoundError, not return error string
         with pytest.raises(SessionNotFoundError, match="Session not found"):
-            await session_tools.load_session("nonexistent-session-id")
+            await session_tools.load_session("session-000000000000")
 
     @pytest.mark.asyncio
     async def test_successful_operation_returns_result(self, tmp_path, monkeypatch):

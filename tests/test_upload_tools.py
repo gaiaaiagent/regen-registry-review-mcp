@@ -305,7 +305,7 @@ class TestUploadAdditionalFiles:
         """Test error when session doesn't exist."""
         with pytest.raises(SessionNotFoundError):
             await upload_tools.upload_additional_files(
-                session_id="nonexistent-session-id",
+                session_id="session-000000000000",
                 files=[{"filename": "test.pdf", "content_base64": sample_pdf_base64}]
             )
 

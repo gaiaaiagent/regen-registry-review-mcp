@@ -797,11 +797,11 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
     # Save to state
     state_manager.write_json("evidence.json", result.model_dump())
 
-    # Update session workflow progress
-    session_data = state_manager.read_json("session.json")
-    session_data["workflow_progress"]["evidence_extraction"] = "completed"
-    session_data["statistics"]["requirements_covered"] = covered
-    session_data["statistics"]["overall_coverage"] = overall_coverage
-    state_manager.write_json("session.json", session_data)
+    # Update session workflow progress (atomic read-modify-write inside lock)
+    state_manager.update_json("session.json", {
+        "workflow_progress.evidence_extraction": "completed",
+        "statistics.requirements_covered": covered,
+        "statistics.overall_coverage": overall_coverage,
+    })
 
     return result.model_dump()

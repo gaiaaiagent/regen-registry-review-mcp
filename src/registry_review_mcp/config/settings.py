@@ -5,6 +5,7 @@ Uses XDG Base Directory Specification for production data isolation.
 """
 
 import os
+import re
 from pathlib import Path
 from typing import Literal
 
@@ -41,6 +42,19 @@ def _get_project_root() -> Path:
 
 # Application identifier for XDG directories
 APP_NAME = "registry-review-mcp"
+
+# Session ID format: "session-" followed by exactly 12 hex characters
+SESSION_ID_PATTERN = re.compile(r"^session-[a-f0-9]{12}$")
+
+
+def validate_session_id(session_id: str) -> str:
+    """Validate session ID format to prevent path traversal attacks.
+
+    Raises ValueError if the ID doesn't match the expected format.
+    """
+    if not SESSION_ID_PATTERN.match(session_id):
+        raise ValueError(f"Invalid session ID format: {session_id!r}")
+    return session_id
 
 
 class Settings(BaseSettings):

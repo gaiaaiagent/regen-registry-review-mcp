@@ -67,7 +67,7 @@ class TestDocumentDiscoveryUX:
 
         try:
             # Try with invalid session_id
-            result = await document_discovery_prompt(session_id="invalid-session-id")
+            result = await document_discovery_prompt(session_id="session-000000000000")
 
             # Should list available sessions
             assert len(result) == 1

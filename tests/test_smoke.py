@@ -34,7 +34,7 @@ class TestCoreInfrastructure:
 
     def test_state_manager_write_read(self, test_settings):
         """State manager can persist data."""
-        manager = StateManager("smoke-test-state")
+        manager = StateManager("session-aa0000000001")
         test_data = {"status": "ok", "count": 42}
 
         manager.write_json("smoke.json", test_data)
@@ -148,7 +148,7 @@ class TestDataIntegrity:
 
     def test_state_manager_atomic_update(self, test_settings):
         """State updates are atomic."""
-        manager = StateManager("smoke-atomic")
+        manager = StateManager("session-aa0000000002")
 
         initial = {"counter": 0, "status": "pending"}
         manager.write_json("atomic.json", initial)
@@ -167,7 +167,7 @@ class TestErrorHandling:
         """Loading nonexistent session raises proper error."""
         from registry_review_mcp.models.errors import SessionNotFoundError
 
-        manager = StateManager("nonexistent-session-12345")
+        manager = StateManager("session-aa0000000003")
 
         with pytest.raises(SessionNotFoundError):
             manager.read_json("nonexistent.json")

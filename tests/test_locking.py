@@ -12,7 +12,7 @@ class TestLockingMechanism:
 
     def test_basic_lock_acquisition_and_release(self, test_settings):
         """Test that a lock can be acquired and released."""
-        manager = StateManager("test-lock-basic")
+        manager = StateManager("session-bb0000000001")
 
         # Should be able to acquire lock
         with manager.lock():
@@ -23,12 +23,12 @@ class TestLockingMechanism:
 
     def test_lock_prevents_concurrent_access(self, test_settings):
         """Test that lock actually prevents concurrent access."""
-        manager = StateManager("test-lock-concurrent")
+        manager = StateManager("session-bb0000000002")
 
         # Acquire lock
         with manager.lock():
             # Try to acquire again - should fail quickly
-            manager2 = StateManager("test-lock-concurrent")
+            manager2 = StateManager("session-bb0000000002")
             with pytest.raises(Exception) as exc_info:
                 with manager2.lock(timeout=1):  # Short timeout
                     pass
@@ -37,7 +37,7 @@ class TestLockingMechanism:
 
     def test_write_json_alone(self, test_settings):
         """Test that write_json works and releases lock."""
-        manager = StateManager("test-write-alone")
+        manager = StateManager("session-bb0000000003")
 
         data = {"test": "value"}
         manager.write_json("test.json", data)
@@ -53,7 +53,7 @@ class TestLockingMechanism:
 
     def test_update_json_critical_bug(self, test_settings):
         """Test the critical bug: update_json calling write_json while holding lock."""
-        manager = StateManager("test-update-bug")
+        manager = StateManager("session-bb0000000004")
 
         # Create initial data
         initial = {"count": 0, "status": "pending"}

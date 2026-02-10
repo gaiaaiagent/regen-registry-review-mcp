@@ -44,13 +44,13 @@ class TestStateManager:
 
     def test_state_manager_initialization(self, test_settings):
         """Test state manager initialization."""
-        manager = StateManager("test-session")
-        assert manager.session_id == "test-session"
-        assert "test-session" in str(manager.session_dir)
+        manager = StateManager("session-aabbccddeeff")
+        assert manager.session_id == "session-aabbccddeeff"
+        assert "session-aabbccddeeff" in str(manager.session_dir)
 
     def test_write_and_read_json(self, test_settings):
         """Test writing and reading JSON files."""
-        manager = StateManager("test-session")
+        manager = StateManager("session-aabbccddeeff")
 
         test_data = {"key": "value", "number": 42}
         manager.write_json("test.json", test_data)
@@ -60,14 +60,14 @@ class TestStateManager:
 
     def test_read_nonexistent_file(self, test_settings):
         """Test reading nonexistent file raises error."""
-        manager = StateManager("test-session")
+        manager = StateManager("session-aabbccddeeff")
 
         with pytest.raises(SessionNotFoundError):
             manager.read_json("nonexistent.json")
 
     def test_update_json(self, test_settings):
         """Test atomic JSON updates."""
-        manager = StateManager("test-session")
+        manager = StateManager("session-aabbccddeeff")
 
         # Create initial data
         initial_data = {"count": 0, "status": "pending"}
@@ -81,7 +81,7 @@ class TestStateManager:
 
     def test_exists(self, test_settings):
         """Test checking file existence."""
-        manager = StateManager("test-session-exists")
+        manager = StateManager("session-aabbccddee00")
 
         # Ensure clean state (cleanup fixture may not have run yet)
         if manager.exists():
@@ -192,7 +192,7 @@ class TestSessionTools:
     async def test_load_nonexistent_session(self, test_settings):
         """Test loading nonexistent session raises error."""
         with pytest.raises(SessionNotFoundError):
-            await session_tools.load_session("nonexistent-session")
+            await session_tools.load_session("session-000000000001")
 
     @pytest.mark.asyncio
     async def test_update_session_state(self, test_settings, example_documents_path):

@@ -5,6 +5,8 @@ This provides HTTP endpoints that wrap the MCP server's functionality,
 allowing ChatGPT to interact via Custom GPT Actions.
 """
 
+import html
+import logging
 import sys
 import time
 import uuid
@@ -12,14 +14,14 @@ import secrets
 import base64
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
-from typing import List
+from typing import List, Literal
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from fastapi import FastAPI, HTTPException, File, UploadFile, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 import uvicorn
 
@@ -31,7 +33,12 @@ from registry_review_mcp.tools import (
     upload_tools,
     human_review_tools,
 )
-from registry_review_mcp.config.settings import settings
+from registry_review_mcp.config.settings import settings, SESSION_ID_PATTERN
+from registry_review_mcp.tools.human_review_tools import (
+    OverrideStatus,
+    DeterminationStatus,
+    RevisionPriority,
+)
 from registry_review_mcp.utils.llm_client import (
     LLMAuthenticationError,
     LLMBillingError,
@@ -101,7 +108,8 @@ def _llm_error_response(e: Exception) -> HTTPException:
             status_code=status,
             detail=f"{error_info.message}\n\nHow to fix: {error_info.guidance}",
         )
-    return HTTPException(status_code=500, detail=str(e))
+    logger.error("LLM error: %s", e)
+    return HTTPException(status_code=500, detail="Internal server error")
 
 
 # ============================================================================
@@ -120,11 +128,49 @@ app = FastAPI(
 # Enable CORS for ChatGPT and browser uploads
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://chat.openai.com", "https://chatgpt.com", "*"],
+    allow_origins=[
+        "https://chat.openai.com",
+        "https://chatgpt.com",
+        "https://regen.gaiaai.xyz",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+logger = logging.getLogger("registry_review_api")
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Catch-all handler that logs full details but returns a safe generic message."""
+    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
+
+
+@app.middleware("http")
+async def session_id_validation_middleware(request: Request, call_next):
+    """Reject requests with malformed session IDs before they reach handlers.
+
+    Prevents path traversal attacks via crafted session IDs like '../../etc/passwd'.
+    Only applies to /sessions/{session_id}... routes (not /sessions or /sessions/).
+    """
+    parts = [p for p in request.url.path.split("/") if p]
+    # Find "sessions" segment and validate the ID that follows it
+    for i, part in enumerate(parts):
+        if part == "sessions" and i + 1 < len(parts):
+            candidate = parts[i + 1]
+            if not SESSION_ID_PATTERN.match(candidate):
+                return JSONResponse(
+                    status_code=400,
+                    content={"detail": "Invalid session ID format"},
+                )
+            break
+    return await call_next(request)
+
 
 @app.middleware("http")
 async def request_id_middleware(request: Request, call_next):
@@ -223,7 +269,7 @@ class GenerateUploadUrlRequest(BaseModel):
 class SetOverrideRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     requirement_id: str = Field(..., description="Requirement ID (e.g., 'REQ-001')")
-    override_status: str = Field(
+    override_status: OverrideStatus = Field(
         ..., description="Decision status: approved, rejected, needs_revision, conditional, pending"
     )
     notes: str | None = Field(None, description="Optional notes explaining the decision")
@@ -234,7 +280,7 @@ class AddAnnotationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     requirement_id: str = Field(..., description="Requirement ID (e.g., 'REQ-001')")
     note: str = Field(..., description="The annotation text")
-    annotation_type: str = Field(
+    annotation_type: Literal["note", "question", "concern", "clarification"] = Field(
         default="note", description="Type: note, question, concern, clarification"
     )
     reviewer: str = Field(default="user", description="Identifier of the reviewer")
@@ -242,7 +288,7 @@ class AddAnnotationRequest(BaseModel):
 
 class SetDeterminationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    determination: str = Field(
+    determination: DeterminationStatus = Field(
         ..., description="Final decision: approve, conditional, reject, hold"
     )
     notes: str = Field(..., description="Required explanation of the determination")
@@ -254,7 +300,7 @@ class RevisionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     requirement_id: str = Field(..., description="Requirement ID (e.g., 'REQ-001')")
     description: str = Field(..., description="What revision is needed from proponent")
-    priority: str = Field(default="medium", description="Priority: critical, high, medium, low")
+    priority: RevisionPriority = Field(default="medium", description="Priority: critical, high, medium, low")
     requested_by: str = Field(default="user", description="Identifier of the requester")
 
 
@@ -309,17 +355,14 @@ async def create_session(request: CreateSessionRequest):
 
     This initializes a session with project metadata. Documents can be added later.
     """
-    try:
-        result = await session_tools.create_session(
-            project_name=request.project_name,
-            methodology=request.methodology,
-            project_id=request.project_id,
-            scope=request.scope,
-            documents_path=request.documents_path,
-        )
-        return SessionResponse(**result)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    result = await session_tools.create_session(
+        project_name=request.project_name,
+        methodology=request.methodology,
+        project_id=request.project_id,
+        scope=request.scope,
+        documents_path=request.documents_path,
+    )
+    return SessionResponse(**result)
 
 
 @app.get("/sessions", summary="List all sessions")
@@ -329,13 +372,10 @@ async def list_sessions():
     Returns a list of all sessions with their current status.
     Status is derived from workflow_progress to reflect actual progress.
     """
-    try:
-        sessions = await session_tools.list_sessions()
-        # Apply derived status to each session
-        sessions = [apply_derived_status(s) for s in sessions]
-        return {"sessions": sessions}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    sessions = await session_tools.list_sessions()
+    # Apply derived status to each session
+    sessions = [apply_derived_status(s) for s in sessions]
+    return {"sessions": sessions}
 
 
 @app.get("/sessions/{session_id}", summary="Get session details")
@@ -350,8 +390,6 @@ async def get_session(session_id: str):
         return apply_derived_status(session)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/examples", summary="List example projects")
@@ -360,11 +398,8 @@ async def list_examples():
 
     Returns a list of example projects that can be used to test the review workflow.
     """
-    try:
-        examples = await session_tools.list_example_projects()
-        return examples
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    examples = await session_tools.list_example_projects()
+    return examples
 
 
 @app.post("/sessions/{session_id}/discover", summary="Discover documents")
@@ -379,8 +414,6 @@ async def discover_documents(session_id: str):
         return result
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/sessions/{session_id}/map", summary="Map requirements to documents")
@@ -395,8 +428,6 @@ async def map_requirements(session_id: str):
         return result
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/sessions/{session_id}/mapping-status", summary="Get mapping status")
@@ -410,8 +441,6 @@ async def get_mapping_status(session_id: str):
         return result
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/sessions/{session_id}/mapping-matrix", summary="Get mapping matrix view")
@@ -427,8 +456,6 @@ async def get_mapping_matrix(session_id: str):
         return result
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/sessions/{session_id}/confirm-all-mappings", summary="Confirm all mappings")
@@ -443,8 +470,6 @@ async def confirm_all_mappings(session_id: str):
         return result
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/sessions/{session_id}/conversion-status", summary="Get PDF conversion status")
@@ -489,8 +514,6 @@ async def get_conversion_status(session_id: str):
         }
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/sessions/{session_id}/evidence", summary="Extract evidence")
@@ -667,8 +690,6 @@ async def get_evidence_matrix(session_id: str):
         raise
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/sessions/{session_id}/validate", summary="Cross-validate evidence")
@@ -875,8 +896,6 @@ async def download_report(session_id: str):
         )
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/sessions/{session_id}/checklist/download", summary="Download checklist")
@@ -916,8 +935,6 @@ async def download_checklist(session_id: str):
         )
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/sessions/{session_id}/checklist/download-docx", summary="Download DOCX checklist")
@@ -958,8 +975,6 @@ async def download_checklist_docx(session_id: str):
         )
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/sessions/{session_id}/report/download-pdf", summary="Download PDF report")
@@ -997,8 +1012,6 @@ async def download_report_pdf(session_id: str):
         )
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================================================
@@ -1020,8 +1033,6 @@ async def get_review_status(session_id: str, requirement_id: str | None = None):
         return result
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/sessions/{session_id}/override", summary="Set requirement override")
@@ -1042,8 +1053,6 @@ async def set_override(session_id: str, request: SetOverrideRequest):
         return result
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.delete("/sessions/{session_id}/override/{requirement_id}", summary="Clear override")
@@ -1061,8 +1070,6 @@ async def clear_override(session_id: str, requirement_id: str, reviewer: str = "
         return result
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/sessions/{session_id}/annotation", summary="Add annotation")
@@ -1083,8 +1090,6 @@ async def add_annotation(session_id: str, request: AddAnnotationRequest):
         return result
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/sessions/{session_id}/determination", summary="Get final determination")
@@ -1098,8 +1103,6 @@ async def get_determination(session_id: str):
         return result
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/sessions/{session_id}/determination", summary="Set final determination")
@@ -1122,8 +1125,6 @@ async def set_determination(session_id: str, request: SetDeterminationRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.delete("/sessions/{session_id}/determination", summary="Clear determination")
@@ -1140,8 +1141,6 @@ async def clear_determination(session_id: str, reviewer: str = "user"):
         return result
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================================================
@@ -1163,8 +1162,6 @@ async def get_revisions(session_id: str, status: str | None = None):
         return result
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/sessions/{session_id}/revisions", summary="Request revision")
@@ -1186,8 +1183,6 @@ async def request_revision(session_id: str, request: RevisionRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/sessions/{session_id}/revisions/summary", summary="Get revision summary")
@@ -1201,8 +1196,6 @@ async def get_revision_summary(session_id: str):
         return result
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/sessions/{session_id}/revisions/{requirement_id}/resolve", summary="Resolve revision")
@@ -1221,8 +1214,6 @@ async def resolve_revision(session_id: str, requirement_id: str, request: Resolv
         return result
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/sessions/{session_id}/audit-log", summary="Get audit log")
@@ -1247,8 +1238,6 @@ async def get_audit_log(
         return result
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.delete("/sessions/{session_id}", summary="Delete session")
@@ -1262,8 +1251,6 @@ async def delete_session(session_id: str):
         return result
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/sessions/{session_id}/upload", summary="Upload file to session")
@@ -1280,8 +1267,6 @@ async def upload_file(session_id: str, request: UploadFileRequest):
         return result
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/start-review-with-files", summary="Start review with uploaded files")
@@ -1293,17 +1278,14 @@ async def start_review_with_files(request: StartReviewWithFilesRequest):
 
     Files must be base64-encoded. Returns session details and discovery results.
     """
-    try:
-        files = [{"filename": f.filename, "content_base64": f.content_base64} for f in request.files]
-        result = await upload_tools.start_review_from_uploads(
-            project_name=request.project_name,
-            files=files,
-            methodology=request.methodology,
-            auto_extract=False,
-        )
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    files = [{"filename": f.filename, "content_base64": f.content_base64} for f in request.files]
+    result = await upload_tools.start_review_from_uploads(
+        project_name=request.project_name,
+        files=files,
+        methodology=request.methodology,
+        auto_extract=False,
+    )
+    return result
 
 
 @app.post("/start-example-review", summary="Start review with example project")
@@ -1343,8 +1325,6 @@ async def start_example_review(request: StartExampleReviewRequest):
         }
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================================================
@@ -1414,6 +1394,7 @@ async def upload_form(upload_id: str, token: str = Query(...)):
             status_code=403,
         )
 
+    safe_project_name = html.escape(session['project_name'])
     html_content = f"""
     <!DOCTYPE html>
     <html>
@@ -1450,7 +1431,7 @@ async def upload_form(upload_id: str, token: str = Query(...)):
     <body>
         <div class="container">
             <h1>Upload Project Documents</h1>
-            <p class="project-name">Project: <strong>{session['project_name']}</strong></p>
+            <p class="project-name">Project: <strong>{safe_project_name}</strong></p>
 
             <form id="uploadForm" enctype="multipart/form-data">
                 <div class="upload-area" id="dropZone">
@@ -1540,7 +1521,10 @@ async def upload_form(upload_id: str, token: str = Query(...)):
                 if (selectedFiles.length === 0) return;
 
                 submitBtn.disabled = true;
-                status.innerHTML = '<div class="uploading">⏳ Uploading files... Please wait.</div>';
+                const uploadingDiv = document.createElement('div');
+                uploadingDiv.className = 'uploading';
+                uploadingDiv.textContent = 'Uploading files... Please wait.';
+                status.replaceChildren(uploadingDiv);
 
                 const formData = new FormData();
                 selectedFiles.forEach(file => formData.append('files', file));
@@ -1557,13 +1541,17 @@ async def upload_form(upload_id: str, token: str = Query(...)):
                         successDiv.style.display = 'block';
                     }} else {{
                         const error = await response.json();
-                        status.innerHTML = `<div style="background:#ffebee;color:#c62828;padding:10px;border-radius:5px;">
-                            ❌ Upload failed: ${{error.detail || 'Unknown error'}}</div>`;
+                        const errDiv = document.createElement('div');
+                        errDiv.style.cssText = 'background:#ffebee;color:#c62828;padding:10px;border-radius:5px;';
+                        errDiv.textContent = 'Upload failed: ' + (error.detail || 'Unknown error');
+                        status.replaceChildren(errDiv);
                         submitBtn.disabled = false;
                     }}
                 }} catch (err) {{
-                    status.innerHTML = `<div style="background:#ffebee;color:#c62828;padding:10px;border-radius:5px;">
-                        ❌ Upload failed: ${{err.message}}</div>`;
+                    const errDiv = document.createElement('div');
+                    errDiv.style.cssText = 'background:#ffebee;color:#c62828;padding:10px;border-radius:5px;';
+                    errDiv.textContent = 'Upload failed: ' + err.message;
+                    status.replaceChildren(errDiv);
                     submitBtn.disabled = false;
                 }}
             }});
@@ -1595,8 +1583,9 @@ async def handle_file_upload(
     for file in files:
         content = await file.read()
         content_b64 = base64.b64encode(content).decode("utf-8")
+        safe_filename = Path(file.filename).name if file.filename else "unnamed"
         saved_files.append({
-            "filename": file.filename,
+            "filename": safe_filename,
             "content_base64": content_b64,
             "size_bytes": len(content),
         })
@@ -1641,49 +1630,46 @@ async def process_uploaded_files(upload_id: str):
     if not files:
         raise HTTPException(status_code=400, detail="No files found in upload session")
 
-    try:
-        existing_session_id = session.get("session_id")
-        file_list = [{"filename": f["filename"], "content_base64": f["content_base64"]} for f in files]
+    existing_session_id = session.get("session_id")
+    file_list = [{"filename": f["filename"], "content_base64": f["content_base64"]} for f in files]
 
-        if existing_session_id:
-            # Add files to existing session
-            result = await upload_tools.upload_additional_files(
-                session_id=existing_session_id,
-                files=file_list,
-            )
-            session["status"] = "processed"
-            # Run discovery on the updated session
-            discovery_result = await document_tools.discover_documents(existing_session_id)
-            return {
-                "success": True,
-                "upload_id": upload_id,
-                "session_id": existing_session_id,
-                "files_processed": len(files),
-                "files_added": result.get("files_added", len(files)),
-                "discovery": {
-                    "documents_found": discovery_result.get("documents_found", 0),
-                    "classification_summary": discovery_result.get("classification_summary", {}),
-                },
-            }
-        else:
-            # Create new session with files
-            result = await upload_tools.start_review_from_uploads(
-                project_name=session["project_name"],
-                files=file_list,
-                methodology=session["methodology"],
-                auto_extract=False,
-            )
-            session["status"] = "processed"
-            session["session_id"] = result.get("session_creation", {}).get("session_id")
-            return {
-                "success": True,
-                "upload_id": upload_id,
-                "session_id": session["session_id"],
-                "files_processed": len(files),
-                "result": result,
-            }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    if existing_session_id:
+        # Add files to existing session
+        result = await upload_tools.upload_additional_files(
+            session_id=existing_session_id,
+            files=file_list,
+        )
+        session["status"] = "processed"
+        # Run discovery on the updated session
+        discovery_result = await document_tools.discover_documents(existing_session_id)
+        return {
+            "success": True,
+            "upload_id": upload_id,
+            "session_id": existing_session_id,
+            "files_processed": len(files),
+            "files_added": result.get("files_added", len(files)),
+            "discovery": {
+                "documents_found": discovery_result.get("documents_found", 0),
+                "classification_summary": discovery_result.get("classification_summary", {}),
+            },
+        }
+    else:
+        # Create new session with files
+        result = await upload_tools.start_review_from_uploads(
+            project_name=session["project_name"],
+            files=file_list,
+            methodology=session["methodology"],
+            auto_extract=False,
+        )
+        session["status"] = "processed"
+        session["session_id"] = result.get("session_creation", {}).get("session_id")
+        return {
+            "success": True,
+            "upload_id": upload_id,
+            "session_id": session["session_id"],
+            "files_processed": len(files),
+            "result": result,
+        }
 
 
 @app.get("/upload-status/{upload_id}", summary="Check upload status")

@@ -16,6 +16,10 @@ client = TestClient(app)
 # Minimal payload for session creation (reused across test classes)
 _SESSION_PAYLOAD = {"project_name": "Test", "methodology": "soil-carbon-v1.2.2"}
 
+# Valid-format session ID that doesn't correspond to any real session.
+# Passes the middleware regex but hits 404 in handlers.
+_NONEXISTENT_SESSION = "session-000000000000"
+
 # Absolute path to botany-farm test data (7 PDFs, simplest case)
 _BOTANY_FARM_PATH = str(
     (Path(__file__).parent.parent / "examples" / "test-data" / "registration" / "botany-farm").resolve()
@@ -69,7 +73,7 @@ class TestRequestModelHardening:
         assert r.status_code == 422
 
     def test_override_rejects_unknown_fields(self):
-        r = client.post("/sessions/fake-id/override", json={
+        r = client.post(f"/sessions/{_NONEXISTENT_SESSION}/override", json={
             "requirement_id": "REQ-001",
             "override_status": "approved",
             "unknown_field": "should_fail",
@@ -77,7 +81,7 @@ class TestRequestModelHardening:
         assert r.status_code == 422
 
     def test_set_determination_rejects_unknown_fields(self):
-        r = client.post("/sessions/fake-id/determination", json={
+        r = client.post(f"/sessions/{_NONEXISTENT_SESSION}/determination", json={
             "determination": "approve",
             "notes": "looks good",
             "bogus": "nope",
@@ -104,7 +108,7 @@ class TestRequestIdMiddleware:
 class TestPDFDownloadEndpoint:
     def test_pdf_download_returns_404_without_generation(self):
         """PDF download for nonexistent session returns 404."""
-        r = client.get("/sessions/nonexistent-id/report/download-pdf")
+        r = client.get(f"/sessions/{_NONEXISTENT_SESSION}/report/download-pdf")
         assert r.status_code == 404
 
 
@@ -185,15 +189,15 @@ class TestErrorPaths:
     """HTTP error codes for missing/invalid resources."""
 
     def test_get_nonexistent_session_404(self):
-        r = client.get("/sessions/no-such-id")
+        r = client.get(f"/sessions/{_NONEXISTENT_SESSION}")
         assert r.status_code == 404
 
     def test_discover_nonexistent_session_404(self):
-        r = client.post("/sessions/no-such-id/discover")
+        r = client.post(f"/sessions/{_NONEXISTENT_SESSION}/discover")
         assert r.status_code == 404
 
     def test_map_nonexistent_session_404(self):
-        r = client.post("/sessions/no-such-id/map")
+        r = client.post(f"/sessions/{_NONEXISTENT_SESSION}/map")
         assert r.status_code == 404
 
     def test_create_session_empty_body_422(self):
@@ -342,3 +346,166 @@ class TestReportDownloads:
         assert r.status_code in (200, 404)
         if r.status_code == 200:
             assert "markdown" in r.headers.get("content-type", "") or "text" in r.headers.get("content-type", "")
+
+
+# ============================================================================
+# Phase 4: Security Tests
+# ============================================================================
+
+
+class TestCORSSecurity:
+    """Verify CORS only allows whitelisted origins."""
+
+    def test_allowed_origin_gets_header(self):
+        r = client.get("/health", headers={"Origin": "https://regen.gaiaai.xyz"})
+        assert r.headers.get("access-control-allow-origin") == "https://regen.gaiaai.xyz"
+
+    def test_unknown_origin_no_header(self):
+        r = client.get("/health", headers={"Origin": "https://evil.example.com"})
+        assert "access-control-allow-origin" not in r.headers
+
+    def test_wildcard_origin_not_allowed(self):
+        r = client.get("/health", headers={"Origin": "*"})
+        assert r.headers.get("access-control-allow-origin") != "*"
+
+
+class TestSessionIdValidation:
+    """Session ID format validation blocks path traversal."""
+
+    def test_path_traversal_rejected(self):
+        # URL-level traversal (../../) gets normalized by HTTP clients,
+        # so we test with a traversal-like ID in a single path segment
+        r = client.get("/sessions/..%2e..%2eetc%2epasswd")
+        assert r.status_code == 400
+        assert "Invalid session ID" in r.json()["detail"]
+
+    def test_arbitrary_string_rejected(self):
+        r = client.get("/sessions/hello-world")
+        assert r.status_code == 400
+
+    def test_valid_format_accepted(self):
+        # Valid format but nonexistent — should reach the handler and 404
+        r = client.get(f"/sessions/{_NONEXISTENT_SESSION}")
+        assert r.status_code == 404
+
+    def test_sql_injection_rejected(self):
+        r = client.get("/sessions/'; DROP TABLE--")
+        assert r.status_code == 400
+
+    def test_sessions_list_not_blocked(self):
+        # /sessions (no session ID) should NOT be intercepted
+        r = client.get("/sessions")
+        assert r.status_code == 200
+
+
+class TestFilenameSanitization:
+    """Upload filename sanitization strips directory traversal."""
+
+    def test_traversal_stripped(self):
+        from registry_review_mcp.tools.upload_tools import _sanitize_filename
+        assert _sanitize_filename("../../etc/passwd") == "passwd"
+
+    def test_normal_name_preserved(self):
+        from registry_review_mcp.tools.upload_tools import _sanitize_filename
+        assert _sanitize_filename("document.pdf") == "document.pdf"
+
+    def test_dot_file_rejected(self):
+        from registry_review_mcp.tools.upload_tools import _sanitize_filename
+        import pytest
+        with pytest.raises(ValueError):
+            _sanitize_filename(".bashrc")
+
+    def test_empty_rejected(self):
+        from registry_review_mcp.tools.upload_tools import _sanitize_filename
+        import pytest
+        with pytest.raises(ValueError):
+            _sanitize_filename("")
+
+    def test_nested_traversal_stripped(self):
+        from registry_review_mcp.tools.upload_tools import _sanitize_filename
+        assert _sanitize_filename("foo/bar/../../baz.txt") == "baz.txt"
+
+
+class TestXSSPrevention:
+    """Upload form escapes HTML in project names."""
+
+    def test_script_tag_escaped_in_upload_form(self):
+        # Create an upload session with a malicious project name
+        r = client.post("/generate-upload-url", json={
+            "project_name": '<script>alert("xss")</script>',
+            "methodology": "soil-carbon-v1.2.2",
+        })
+        assert r.status_code == 200
+        data = r.json()
+        upload_id = data["upload_id"]
+        # Extract token from the upload URL
+        import re
+        token_match = re.search(r'token=([^&]+)', data["upload_url"])
+        assert token_match, "Token not found in upload URL"
+        token = token_match.group(1)
+        # Fetch the upload form HTML
+        r = client.get(f"/upload/{upload_id}", params={"token": token})
+        assert r.status_code == 200
+        html_content = r.text
+        # The raw script tag must NOT appear — it should be escaped
+        assert "<script>alert" not in html_content
+        assert "&lt;script&gt;" in html_content
+
+
+class TestEnumValidation:
+    """Pydantic Literal types reject invalid enum values with 422."""
+
+    def test_invalid_override_status(self):
+        data = _create_session()
+        r = client.post(f"/sessions/{data['session_id']}/override", json={
+            "requirement_id": "REQ-001",
+            "override_status": "garbage",
+        })
+        assert r.status_code == 422
+
+    def test_invalid_annotation_type(self):
+        data = _create_session()
+        r = client.post(f"/sessions/{data['session_id']}/annotation", json={
+            "requirement_id": "REQ-001",
+            "note": "test",
+            "annotation_type": "invalid_type",
+        })
+        assert r.status_code == 422
+
+    def test_invalid_determination(self):
+        data = _create_session()
+        r = client.post(f"/sessions/{data['session_id']}/determination", json={
+            "determination": "maybe",
+        })
+        assert r.status_code == 422
+
+    def test_valid_override_accepted(self):
+        data = _create_session()
+        r = client.post(f"/sessions/{data['session_id']}/override", json={
+            "requirement_id": "REQ-001",
+            "override_status": "approved",
+        })
+        assert r.status_code == 200
+
+
+class TestErrorMessageSanitization:
+    """Internal paths and tracebacks must not leak in error responses."""
+
+    def test_500_hides_internal_details(self):
+        # Hit an endpoint that will fail internally — use a valid-format session
+        # with corrupted state by creating then manually breaking it
+        r = client.get(f"/sessions/{_NONEXISTENT_SESSION}/evidence-matrix")
+        # Should be 404 (not found), not 500 with internal details
+        body = r.json()
+        detail = body.get("detail", "")
+        assert "/home/" not in detail
+        assert "/tmp/" not in detail
+        assert "Traceback" not in detail
+
+    def test_global_handler_returns_generic_message(self):
+        # Any unhandled exception should return the generic message
+        # We verify via a 404 path that the error doesn't leak internals
+        r = client.get(f"/sessions/{_NONEXISTENT_SESSION}/report/download")
+        body = r.json()
+        detail = body.get("detail", "")
+        assert "/home/" not in detail

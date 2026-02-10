@@ -126,7 +126,7 @@ class TestStateManagerNestedUpdates:
         top-level keys like "workflow_progress.initialize" instead of updating
         the nested structure data["workflow_progress"]["initialize"].
         """
-        with StateManagerCleanup("test-nested-update") as state_manager:
+        with StateManagerCleanup("session-cc0000000001") as state_manager:
             # Write initial data
             initial_data = {
                 "status": "initialized",
@@ -163,7 +163,7 @@ class TestStateManagerNestedUpdates:
 
     def test_update_json_mixed_updates(self, tmp_path):
         """Test update_json with both top-level and nested updates."""
-        with StateManagerCleanup("test-mixed-update") as state_manager:
+        with StateManagerCleanup("session-cc0000000002") as state_manager:
             initial_data = {
                 "status": "initialized",
                 "workflow_progress": {"initialize": "pending"},
@@ -186,7 +186,7 @@ class TestStateManagerNestedUpdates:
 
     def test_update_json_creates_missing_nested_structure(self, tmp_path):
         """Test that update_json creates missing nested structures."""
-        with StateManagerCleanup("test-create-nested") as state_manager:
+        with StateManagerCleanup("session-cc0000000003") as state_manager:
             initial_data = {"status": "initialized"}
             state_manager.write_json("test.json", initial_data)
 

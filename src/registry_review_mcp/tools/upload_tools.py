@@ -18,6 +18,17 @@ from ..models.errors import SessionNotFoundError
 from ..config.settings import settings
 
 
+def _sanitize_filename(filename: str) -> str:
+    """Strip directory components and reject hidden/invalid filenames.
+
+    Prevents path traversal via filenames like '../../.bashrc'.
+    """
+    safe_name = Path(filename).name
+    if not safe_name or safe_name.startswith(".") or safe_name in (".", ".."):
+        raise ValueError(f"Invalid filename: {filename!r}")
+    return safe_name
+
+
 def _sanitize_project_name(project_name: str) -> str:
     """Sanitize project name for use in directory names.
     """
@@ -94,6 +105,8 @@ def process_file_input(file_obj: dict[str, Any], index: int) -> dict[str, str]:
             f"File at index {index} is missing 'filename' or 'name' field "
             f"and no path to extract filename from"
         )
+
+    filename = _sanitize_filename(filename)
 
     # Check if base64 content is provided
     if "content_base64" in file_obj and file_obj["content_base64"]:
@@ -349,8 +362,9 @@ async def create_session_from_uploads(
                     f"Failed to decode base64 content for '{filename}': {str(e)}"
                 ) from e
 
-            # Write to persistent uploads directory
+            # Write to persistent uploads directory (bounds-checked)
             file_path = uploads_dir / filename
+            file_path.resolve().relative_to(uploads_dir.resolve())
             file_path.write_bytes(file_content)
             files_saved.append(filename)
 
@@ -447,6 +461,7 @@ async def upload_additional_files(
             content_base64 = file["content_base64"]
 
             file_path = documents_path / filename
+            file_path.resolve().relative_to(documents_path.resolve())
 
             # Check if file already exists
             if file_path.exists():
