@@ -19,8 +19,12 @@ class SessionError(RegistryReviewError):
     pass
 
 
-class SessionNotFoundError(SessionError):
-    """Session does not exist."""
+class SessionNotFoundError(SessionError, FileNotFoundError):
+    """Session does not exist.
+
+    Inherits FileNotFoundError so REST handlers' ``except FileNotFoundError``
+    clauses catch it without per-endpoint changes.
+    """
 
     pass
 
