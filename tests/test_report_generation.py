@@ -605,3 +605,188 @@ class TestReportOutputQuality:
         assert "⚠️" not in row
         assert "✅" not in row
         assert "❌" not in row
+
+
+class TestPDFReportGeneration:
+    """Tests for PDF report generation (fpdf2)."""
+
+    def _make_report(self):
+        """Build a representative ReviewReport for PDF testing."""
+        from registry_review_mcp.models.report import ReviewReport, ReportMetadata, ReportSummary
+
+        return ReviewReport(
+            metadata=ReportMetadata(
+                session_id="pdf-test",
+                project_name="Greens Lodge Farm",
+                project_id="C06-123",
+                methodology="soil-carbon-v1.2.2",
+                generated_at=datetime(2026, 2, 9, 14, 0, 0),
+                report_format="pdf",
+            ),
+            summary=ReportSummary(
+                requirements_total=4,
+                requirements_covered=2,
+                requirements_partial=1,
+                requirements_missing=1,
+                requirements_flagged=0,
+                overall_coverage=0.625,
+                validations_total=3,
+                validations_passed=2,
+                validations_failed=1,
+                validations_warning=0,
+                documents_reviewed=19,
+                total_evidence_snippets=42,
+                items_for_human_review=2,
+            ),
+            requirements=[
+                RequirementFinding(
+                    requirement_id="REQ-001",
+                    requirement_text="Project plan including baseline land use and management practices",
+                    category="Project Design",
+                    status="covered",
+                    confidence=0.92,
+                    documents_referenced=3,
+                    snippets_found=8,
+                    evidence_summary="Strong evidence found across 3 document(s)",
+                    page_citations=["Project Plan v3 p.5", "Baseline Report p.12"],
+                    human_review_required=False,
+                ),
+                RequirementFinding(
+                    requirement_id="REQ-002",
+                    requirement_text="Evidence of land tenure or right to manage the land",
+                    category="Land Tenure",
+                    status="covered",
+                    confidence=0.88,
+                    documents_referenced=13,
+                    snippets_found=17,
+                    evidence_summary="Strong evidence found across 13 document(s)",
+                    page_citations=["LT12345 p.1", "LT12346 p.1", "LT12347 p.1"],
+                    human_review_required=False,
+                ),
+                RequirementFinding(
+                    requirement_id="REQ-003",
+                    requirement_text="GHG emissions quantification methodology",
+                    category="Monitoring",
+                    status="partial",
+                    confidence=0.55,
+                    documents_referenced=1,
+                    snippets_found=2,
+                    evidence_summary="Partial evidence found in 1 document(s)",
+                    page_citations=[],
+                    human_review_required=True,
+                ),
+                RequirementFinding(
+                    requirement_id="REQ-004",
+                    requirement_text="Additionality demonstration",
+                    category="Project Design",
+                    status="missing",
+                    confidence=0.0,
+                    documents_referenced=0,
+                    snippets_found=0,
+                    evidence_summary="No evidence found",
+                    page_citations=[],
+                    human_review_required=True,
+                ),
+            ],
+            validations=[
+                ValidationFinding(
+                    validation_type="land_tenure",
+                    status="pass",
+                    message="Land tenure covers project boundary",
+                    flagged_for_review=False,
+                ),
+                ValidationFinding(
+                    validation_type="date_alignment",
+                    status="pass",
+                    message="Dates consistent across documents",
+                    flagged_for_review=False,
+                ),
+                ValidationFinding(
+                    validation_type="project_id",
+                    status="fail",
+                    message="Project ID mismatch between plan v2 and v3",
+                    flagged_for_review=True,
+                ),
+            ],
+            items_for_review=[
+                "REQ-003: GHG emissions quantification... (Status: partial, Confidence: 0.55)",
+                "REQ-004: Additionality demonstration... (Status: missing, Confidence: 0.00)",
+            ],
+            next_steps=[
+                "Review items flagged for human review",
+                "Verify partial requirements have sufficient evidence",
+                "Address any validation warnings or failures",
+                "Make final approval decision",
+            ],
+        )
+
+    def test_format_pdf_produces_valid_file(self, tmp_path):
+        """format_pdf_report writes a valid PDF to disk."""
+        report = self._make_report()
+        output_path = tmp_path / "report.pdf"
+
+        result = report_tools.format_pdf_report(report, output_path)
+
+        assert result == output_path
+        assert output_path.exists()
+        # PDF files start with the %PDF magic bytes
+        header = output_path.read_bytes()[:5]
+        assert header == b"%PDF-", f"Expected PDF header, got {header!r}"
+        # Should be a non-trivial file (our test report has real content)
+        assert output_path.stat().st_size > 1000
+
+    def test_pdf_contains_project_name(self, tmp_path):
+        """PDF content includes the project name."""
+        import fitz
+
+        report = self._make_report()
+        output_path = tmp_path / "report.pdf"
+        report_tools.format_pdf_report(report, output_path)
+
+        doc = fitz.open(str(output_path))
+        text = "".join(page.get_text() for page in doc)
+        doc.close()
+        assert "Greens Lodge Farm" in text
+
+    def test_pdf_contains_all_requirement_ids(self, tmp_path):
+        """PDF includes all requirement IDs from the report."""
+        import fitz
+
+        report = self._make_report()
+        output_path = tmp_path / "report.pdf"
+        report_tools.format_pdf_report(report, output_path)
+
+        doc = fitz.open(str(output_path))
+        text = "".join(page.get_text() for page in doc)
+        doc.close()
+        for req in report.requirements:
+            assert req.requirement_id in text, f"{req.requirement_id} not found in PDF"
+
+    def test_pdf_sanitizes_unicode(self, tmp_path):
+        """_sanitize replaces non-latin-1 chars for core PDF fonts."""
+        from registry_review_mcp.tools.report_tools import _sanitize
+
+        assert _sanitize("Hello \u2014 World") == "Hello -- World"
+        assert _sanitize("\u201cquoted\u201d") == '"quoted"'
+        assert _sanitize("plain ascii") == "plain ascii"
+
+    @pytest.mark.usefixtures("cleanup_sessions")
+    async def test_generate_review_report_pdf_format(self, tmp_path):
+        """generate_review_report with format='pdf' produces a PDF file."""
+        session = await session_tools.create_session(
+            project_name="PDF Test",
+            documents_path=str(tmp_path),
+            methodology="soil-carbon-v1.2.2",
+        )
+        session_id = session["session_id"]
+
+        result = await report_tools.generate_review_report(
+            session_id=session_id,
+            format="pdf",
+        )
+
+        assert result["format"] == "pdf"
+        pdf_path = Path(result["report_path"])
+        assert pdf_path.exists()
+        assert pdf_path.suffix == ".pdf"
+        assert pdf_path.read_bytes()[:5] == b"%PDF-"

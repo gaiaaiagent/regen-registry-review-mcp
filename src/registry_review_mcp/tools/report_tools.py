@@ -1,10 +1,15 @@
 """Report generation tools."""
 
+from __future__ import annotations
+
 import json
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from fpdf import FPDF
 
 from docx import Document as DocxDocument
 from docx.shared import RGBColor
@@ -226,8 +231,11 @@ async def generate_review_report(
             raise ValueError(f"DOCX template not found at {template_path}")
         report_path = state_manager.session_dir / "checklist.docx"
         format_docx_report(report, session_data, evidence_data, template_path, report_path)
+    elif format == "pdf":
+        report_path = state_manager.session_dir / "report.pdf"
+        format_pdf_report(report, report_path)
     else:
-        raise ValueError(f"Unsupported format: {format}. Choose: markdown, json, checklist, docx")
+        raise ValueError(f"Unsupported format: {format}. Choose: markdown, json, checklist, docx, pdf")
 
     report.report_path = str(report_path)
 
@@ -1146,6 +1154,182 @@ def _get_docx_comments_with_evidence(req: RequirementFinding, evidence_text: str
     return "\n".join(parts) if parts else ""
 
 
+def format_pdf_report(report: ReviewReport, output_path: Path) -> Path:
+    """Format review report as a PDF document.
+
+    Renders the ReviewReport model into a clean, professional PDF using fpdf2.
+    Structure mirrors the markdown report: metadata, summary, requirements by
+    status, validation results, human review items, and next steps.
+
+    Args:
+        report: ReviewReport object with complete review data
+        output_path: Path where PDF should be saved
+
+    Returns:
+        Path to the generated PDF file
+    """
+    from fpdf import FPDF
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=20)
+    pdf.add_page()
+
+    # Title
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.cell(0, 12, "Registry Agent Review", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(4)
+
+    # Project Metadata
+    _pdf_heading(pdf, "Project Metadata")
+    _pdf_field(pdf, "Project Name", report.metadata.project_name)
+    if report.metadata.project_id:
+        _pdf_field(pdf, "Project ID", report.metadata.project_id)
+    _pdf_field(pdf, "Methodology", report.metadata.methodology)
+    _pdf_field(pdf, "Review Date", report.metadata.generated_at.strftime("%Y-%m-%d %H:%M:%S UTC"))
+    pdf.ln(4)
+
+    # Summary — Requirements Coverage
+    _pdf_heading(pdf, "Summary")
+    _pdf_subheading(pdf, "Requirements Coverage")
+    s = report.summary
+    total = s.requirements_total or 1  # avoid division by zero
+    _pdf_field(pdf, "Total Requirements", str(s.requirements_total))
+    _pdf_field(pdf, "Covered", f"{s.requirements_covered} ({s.requirements_covered / total * 100:.1f}%)")
+    _pdf_field(pdf, "Partial", f"{s.requirements_partial} ({s.requirements_partial / total * 100:.1f}%)")
+    _pdf_field(pdf, "Missing", f"{s.requirements_missing} ({s.requirements_missing / total * 100:.1f}%)")
+    _pdf_field(pdf, "Overall Coverage", f"{s.overall_coverage * 100:.1f}%")
+    pdf.ln(2)
+
+    # Summary — Cross-Document Validation
+    if s.validations_total > 0:
+        _pdf_subheading(pdf, "Cross-Document Validation")
+        _pdf_field(pdf, "Total Checks", str(s.validations_total))
+        _pdf_field(pdf, "Passed", str(s.validations_passed))
+        _pdf_field(pdf, "Warnings", str(s.validations_warning))
+        _pdf_field(pdf, "Failed", str(s.validations_failed))
+        pdf.ln(2)
+
+    # Summary — Review Statistics
+    _pdf_subheading(pdf, "Review Statistics")
+    _pdf_field(pdf, "Documents Reviewed", str(s.documents_reviewed))
+    _pdf_field(pdf, "Evidence Snippets Extracted", str(s.total_evidence_snippets))
+    _pdf_field(pdf, "Items Requiring Human Review", str(s.items_for_human_review))
+    pdf.ln(4)
+
+    # Requirements by status
+    covered = [r for r in report.requirements if r.status == "covered"]
+    partial = [r for r in report.requirements if r.status == "partial"]
+    missing = [r for r in report.requirements if r.status == "missing"]
+    flagged = [r for r in report.requirements if r.status == "flagged"]
+
+    for section_title, reqs in [
+        ("Covered Requirements", covered),
+        ("Partially Covered Requirements", partial),
+        ("Missing Requirements", missing),
+        ("Flagged Requirements", flagged),
+    ]:
+        if not reqs:
+            continue
+        _pdf_heading(pdf, section_title)
+        for req in reqs:
+            _pdf_requirement(pdf, req)
+        pdf.ln(2)
+
+    # Cross-Document Validation Results
+    if report.validations:
+        _pdf_heading(pdf, "Cross-Document Validation Results")
+        for val in report.validations:
+            status_label = {"pass": "PASS", "warning": "WARNING", "fail": "FAIL"}.get(val.status, val.status.upper())
+            flag = " [Review]" if val.flagged_for_review else ""
+            pdf.set_font("Helvetica", "", 10)
+            pdf.multi_cell(0, 6, f"**{status_label}:{flag}** {_sanitize(val.message)}", markdown=True, new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(4)
+
+    # Items Requiring Human Review
+    if report.items_for_review:
+        _pdf_heading(pdf, "Items Requiring Human Review")
+        pdf.set_font("Helvetica", "", 10)
+        for idx, item in enumerate(report.items_for_review, 1):
+            pdf.multi_cell(0, 6, _sanitize(f"{idx}. {item}"), new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(4)
+
+    # Next Steps
+    _pdf_heading(pdf, "Next Steps")
+    pdf.set_font("Helvetica", "", 10)
+    for idx, step in enumerate(report.next_steps, 1):
+        pdf.multi_cell(0, 6, _sanitize(f"{idx}. {step}"), new_x="LMARGIN", new_y="NEXT")
+
+    pdf.output(str(output_path))
+    return output_path
+
+
+def _pdf_heading(pdf: "FPDF", text: str) -> None:
+    """Render a section heading (H2 equivalent)."""
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.cell(0, 10, _sanitize(text), new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(1)
+
+
+def _pdf_subheading(pdf: "FPDF", text: str) -> None:
+    """Render a subsection heading (H3 equivalent)."""
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.cell(0, 8, _sanitize(text), new_x="LMARGIN", new_y="NEXT")
+
+
+def _pdf_field(pdf: "FPDF", label: str, value: str) -> None:
+    """Render a bold label followed by a value, wrapping if needed."""
+    pdf.set_font("Helvetica", "", 10)
+    pdf.multi_cell(0, 6, f"**{label}:** {_sanitize(value)}", markdown=True, new_x="LMARGIN", new_y="NEXT")
+
+
+def _pdf_requirement(pdf: "FPDF", req: RequirementFinding) -> None:
+    """Render a single requirement finding block."""
+    # Requirement heading
+    title = f"{req.requirement_id}: {req.requirement_text[:80]}{'...' if len(req.requirement_text) > 80 else ''}"
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.multi_cell(0, 7, _sanitize(title), new_x="LMARGIN", new_y="NEXT")
+
+    _pdf_field(pdf, "Status", req.status.title())
+    _pdf_field(pdf, "Confidence", f"{req.confidence:.2f} ({req.confidence * 100:.0f}%)")
+    _pdf_field(pdf, "Evidence", f"{req.snippets_found} snippet(s) from {req.documents_referenced} document(s)")
+
+    if req.evidence_summary:
+        _pdf_field(pdf, "Summary", req.evidence_summary)
+
+    if req.page_citations:
+        citations = ", ".join(req.page_citations[:3])
+        if len(req.page_citations) > 3:
+            citations += f" (and {len(req.page_citations) - 3} more)"
+        _pdf_field(pdf, "Citations", citations)
+
+    pdf.ln(4)
+
+
+def _sanitize(text: str) -> str:
+    """Replace characters outside the latin-1 range for core PDF fonts.
+
+    fpdf2's built-in Helvetica covers latin-1. Characters outside that range
+    are replaced with reasonable ASCII equivalents so the PDF renders cleanly.
+    """
+    replacements = {
+        "\u2713": "Y",     # ✓
+        "\u2717": "X",     # ✗
+        "\u26a0": "!",     # ⚠
+        "\u2014": "--",    # em dash
+        "\u2013": "-",     # en dash
+        "\u2018": "'",     # left single quote
+        "\u2019": "'",     # right single quote
+        "\u201c": '"',     # left double quote
+        "\u201d": '"',     # right double quote
+        "\u2026": "...",   # ellipsis
+        "\u00a0": " ",     # non-breaking space
+    }
+    for char, repl in replacements.items():
+        text = text.replace(char, repl)
+    # Fallback: replace any remaining non-latin-1 characters
+    return text.encode("latin-1", errors="replace").decode("latin-1")
+
+
 async def export_review(
     session_id: str,
     output_format: str,
@@ -1156,15 +1340,12 @@ async def export_review(
 
     Args:
         session_id: Session identifier
-        output_format: Output format ("markdown", "json", "pdf")
+        output_format: Output format ("markdown", "json", "checklist", "docx", "pdf")
         output_path: Optional custom output path
 
     Returns:
         Export result with path to exported file
     """
-    if output_format == "pdf":
-        raise NotImplementedError("PDF export not yet implemented")
-
     # Generate report
     result = await generate_review_report(session_id, format=output_format)
 
@@ -1186,5 +1367,6 @@ __all__ = [
     "format_validation_summary_markdown",
     "format_checklist_report",
     "format_docx_report",
+    "format_pdf_report",
     "export_review",
 ]

@@ -11,7 +11,7 @@ import uuid
 import secrets
 import base64
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List
 
 # Add src to path
@@ -131,7 +131,10 @@ async def request_id_middleware(request: Request, call_next):
     """Attach a unique request ID and response timing to every response.
 
     Honors client-provided X-Request-ID for end-to-end tracing.
+    Also updates _last_request_at for health endpoint staleness detection.
     """
+    global _last_request_at
+    _last_request_at = datetime.now(timezone.utc)
     request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
     start = time.time()
     response = await call_next(request)
@@ -143,6 +146,10 @@ async def request_id_middleware(request: Request, call_next):
 
 # In-memory storage for pending uploads (use Redis/database in production)
 pending_uploads: dict[str, dict] = {}
+
+# Tracks the most recent request timestamp (resets on process restart).
+# Used by /health so operators can detect stale processes.
+_last_request_at: datetime | None = None
 
 
 # ============================================================================
@@ -292,6 +299,7 @@ async def health():
         "version": app.version,
         "sessions_dir_exists": sessions_dir.exists(),
         "session_count": session_count,
+        "last_request_at": _last_request_at.isoformat().replace("+00:00", "Z") if _last_request_at else None,
     }
 
 
@@ -746,7 +754,7 @@ async def generate_report(session_id: str, format: str = "markdown", request: Re
     - Items flagged for human review
 
     Args:
-        format: Output format - "markdown", "json", or "checklist" (default: markdown)
+        format: Output format - "markdown", "json", "checklist", "docx", or "pdf" (default: markdown)
                 "checklist" generates a populated registry submission form
 
     Returns report generation result with path to saved file.
@@ -761,7 +769,7 @@ async def generate_report(session_id: str, format: str = "markdown", request: Re
         )
 
         # Add download URL for all file formats
-        if request and format in ("markdown", "checklist", "docx"):
+        if request and format in ("markdown", "checklist", "docx", "pdf"):
             # Use X-Forwarded-Host if available, otherwise fall back to Host header
             forwarded_host = request.headers.get("x-forwarded-host") or request.headers.get("host")
             forwarded_proto = request.headers.get("x-forwarded-proto", "https")
@@ -779,6 +787,11 @@ async def generate_report(session_id: str, format: str = "markdown", request: Re
                 result["download_url"] = f"{base_url}/sessions/{session_id}/checklist/download"
                 result["download_instructions"] = (
                     f"Download your populated checklist (Markdown): {result['download_url']}"
+                )
+            elif format == "pdf":
+                result["download_url"] = f"{base_url}/sessions/{session_id}/report/download-pdf"
+                result["download_instructions"] = (
+                    f"Download your review report (PDF): {result['download_url']}"
                 )
             else:  # docx
                 result["download_url"] = f"{base_url}/sessions/{session_id}/checklist/download-docx"
@@ -942,6 +955,45 @@ async def download_checklist_docx(session_id: str):
             path=docx_path,
             filename=f"checklist_{safe_id}.docx",
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/sessions/{session_id}/report/download-pdf", summary="Download PDF report")
+async def download_report_pdf(session_id: str):
+    """Download the review report as a PDF document.
+
+    Returns the report.pdf file for direct download.
+    Generate the report first with POST /sessions/{session_id}/report?format=pdf
+    """
+    try:
+        from registry_review_mcp.utils.state import StateManager
+
+        state_manager = StateManager(session_id)
+
+        if not state_manager.exists():
+            raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+
+        pdf_path = state_manager.session_dir / "report.pdf"
+
+        if not pdf_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"PDF report not found. Generate it first with "
+                    f"POST /sessions/{session_id}/report?format=pdf"
+                ),
+            )
+
+        safe_id = "".join(c for c in session_id[:12] if c.isalnum() or c in "-_")
+
+        return FileResponse(
+            path=pdf_path,
+            filename=f"report_{safe_id}.pdf",
+            media_type="application/pdf",
         )
     except HTTPException:
         raise
