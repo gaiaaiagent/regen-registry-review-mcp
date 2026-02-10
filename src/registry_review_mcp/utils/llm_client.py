@@ -132,6 +132,66 @@ def classify_api_error(error: Exception) -> APIErrorInfo:
     )
 
 
+def classify_openai_error(error: Exception) -> APIErrorInfo:
+    """Turn an OpenAI SDK exception into actionable guidance.
+
+    Mirrors classify_api_error() for Anthropic but handles the OpenAI exception
+    hierarchy (openai.AuthenticationError, openai.RateLimitError, etc.).
+    """
+    from openai import APIConnectionError as OAIConnectionError
+    from openai import APIStatusError as OAIStatusError
+    from openai import AuthenticationError as OAIAuthError
+    from openai import RateLimitError as OAIRateLimitError
+
+    error_str = str(error).lower()
+
+    if isinstance(error, OAIAuthError):
+        return APIErrorInfo(
+            category="auth",
+            message=f"Invalid OpenAI API key: {error}",
+            is_fatal=True,
+            guidance="Your REGISTRY_REVIEW_OPENAI_API_KEY is invalid. Check https://platform.openai.com/api-keys",
+        )
+
+    if isinstance(error, OAIRateLimitError):
+        if "insufficient_quota" in error_str or "billing" in error_str:
+            return APIErrorInfo(
+                category="billing",
+                message=f"OpenAI billing issue: {error}",
+                is_fatal=True,
+                guidance="Your OpenAI account has insufficient quota. Check https://platform.openai.com/settings/organization/billing",
+            )
+        return APIErrorInfo(
+            category="rate_limit",
+            message=f"OpenAI rate limited: {error}",
+            is_fatal=False,
+            guidance="Too many concurrent requests to OpenAI. The system will retry automatically.",
+        )
+
+    if isinstance(error, OAIConnectionError):
+        return APIErrorInfo(
+            category="network",
+            message=f"Cannot reach OpenAI API: {error}",
+            is_fatal=False,
+            guidance="Check your internet connection and try again.",
+        )
+
+    if isinstance(error, OAIStatusError):
+        return APIErrorInfo(
+            category="server",
+            message=f"OpenAI API error (HTTP {error.status_code}): {error}",
+            is_fatal=False,
+            guidance="OpenAI is experiencing issues. Try again in a few minutes.",
+        )
+
+    return APIErrorInfo(
+        category="unknown",
+        message=f"Unexpected OpenAI error: {error}",
+        is_fatal=False,
+        guidance="An unexpected error occurred with the OpenAI backend. Check the logs.",
+    )
+
+
 def classify_cli_error(stderr: str, returncode: int) -> APIErrorInfo:
     """Map CLI subprocess failures to the same APIErrorInfo categories."""
     stderr_lower = stderr.lower()
@@ -222,7 +282,10 @@ async def _check_cli_available() -> bool:
 async def _resolve_backend() -> str:
     """Determine which backend to use based on settings.
 
-    Returns "api" or "cli".
+    Returns "api", "cli", or "openai".
+
+    Forced modes ("api", "cli", "openai") validate prerequisites and return.
+    Auto mode tries the cheapest backend first: cli → api → openai.
 
     Raises ConfigurationError if no backend is available.
     """
@@ -244,15 +307,25 @@ async def _resolve_backend() -> str:
             )
         return "cli"
 
-    # auto: prefer CLI (no per-call cost via Max plan), fall back to API
+    if backend == "openai":
+        if not settings.openai_api_key:
+            raise ConfigurationError(
+                "llm_backend='openai' but no REGISTRY_REVIEW_OPENAI_API_KEY is set.",
+                details={"setting": "llm_backend"},
+            )
+        return "openai"
+
+    # auto: prefer CLI (free via Max plan), then Anthropic API, then OpenAI
     if await _check_cli_available():
         return "cli"
     if settings.anthropic_api_key:
         return "api"
+    if settings.openai_api_key:
+        return "openai"
 
     raise ConfigurationError(
-        "No LLM backend available. Either set ANTHROPIC_API_KEY for the API backend, "
-        "or install and authenticate the Claude CLI (`claude login`) for the CLI backend.",
+        "No LLM backend available. Set ANTHROPIC_API_KEY, REGISTRY_REVIEW_OPENAI_API_KEY, "
+        "or install the Claude CLI (`claude login`).",
         details={"setting": "llm_backend"},
     )
 
@@ -292,11 +365,14 @@ async def call_llm(
     model = model or settings.get_active_llm_model()
 
     if not _backend_logged:
-        logger.info(f"LLM backend: {backend} (model: {model})")
+        display_model = settings.get_active_openai_model() if backend == "openai" else model
+        logger.info(f"LLM backend: {backend} (model: {display_model})")
         _backend_logged = True
 
     if backend == "api":
         return await _call_via_api(prompt, system, model, max_tokens)
+    if backend == "openai":
+        return await _call_via_openai(prompt, system, max_tokens)
     return await _call_via_cli(prompt, system, model, max_tokens)
 
 
@@ -338,6 +414,36 @@ async def _call_via_api(
 
     response = await client.messages.create(**kwargs)
     return response.content[0].text
+
+
+async def _call_via_openai(
+    prompt: str,
+    system: str | None,
+    max_tokens: int,
+) -> str:
+    """Call LLM via the OpenAI API (fallback when Anthropic is unavailable).
+
+    Uses the environment-aware model from settings.get_active_openai_model().
+    The Anthropic model ID passed to call_llm() is ignored — we use the
+    configured OpenAI model instead.
+    """
+    from openai import AsyncOpenAI
+
+    client = AsyncOpenAI(api_key=settings.openai_api_key)
+    model = settings.get_active_openai_model()
+
+    messages: list[dict] = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+
+    response = await client.chat.completions.create(
+        model=model,
+        messages=messages,
+        max_tokens=max_tokens,
+        temperature=0,
+    )
+    return response.choices[0].message.content or ""
 
 
 async def _call_via_cli(

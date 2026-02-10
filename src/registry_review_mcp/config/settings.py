@@ -97,7 +97,7 @@ class Settings(BaseSettings):
     # LLM Extraction (Phase 4.2)
     anthropic_api_key: str = Field(default="")
     llm_extraction_enabled: bool = Field(default=False)  # Conservative default
-    llm_backend: Literal["auto", "api", "cli"] = Field(default="auto")
+    llm_backend: Literal["auto", "api", "cli", "openai"] = Field(default="auto")
 
     # Environment-aware model selection (2025-11-26)
     # Dev: Haiku 4.5 ($1/$5 per 1M tokens) - 5x cheaper for testing
@@ -106,6 +106,11 @@ class Settings(BaseSettings):
     llm_model: str = Field(default="")  # Auto-selected based on environment if empty
     llm_model_dev: str = Field(default="claude-haiku-4-5-20251001")  # Haiku 4.5
     llm_model_prod: str = Field(default="claude-sonnet-4-5-20250929")  # Sonnet 4.5
+
+    # OpenAI fallback (last resort when Anthropic API credits exhausted)
+    openai_api_key: str = Field(default="")
+    openai_model: str = Field(default="gpt-4o")
+    openai_model_dev: str = Field(default="gpt-4o-mini")
 
     llm_max_tokens: int = Field(default=4000, ge=1, le=8000)
     llm_temperature: float = Field(default=0.0, ge=0.0, le=1.0)
@@ -187,6 +192,13 @@ class Settings(BaseSettings):
             return self.llm_model
 
         return self.llm_model_dev if self.environment == "development" else self.llm_model_prod
+
+    def get_active_openai_model(self) -> str:
+        """Get the active OpenAI model based on environment.
+
+        Mirrors get_active_llm_model() but for the OpenAI fallback backend.
+        """
+        return self.openai_model_dev if self.environment == "development" else self.openai_model
 
     def get_checklist_path(self, methodology: str) -> Path:
         """Get the path to a checklist file."""

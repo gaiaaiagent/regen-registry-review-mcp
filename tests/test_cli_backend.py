@@ -75,6 +75,7 @@ class TestResolveBackend:
         ):
             mock_settings.llm_backend = "auto"
             mock_settings.anthropic_api_key = ""
+            mock_settings.openai_api_key = ""
             with pytest.raises(ConfigurationError, match="No LLM backend available"):
                 await _resolve_backend()
 
