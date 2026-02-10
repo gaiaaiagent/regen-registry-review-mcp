@@ -6,7 +6,7 @@ Last updated: 2026-02-09
 
 The Registry Review MCP runs on the GAIA server (`202.61.196.119`) managed by **PM2** (not systemd) on port 8003, proxied through nginx at `https://regen.gaiaai.xyz/api/registry`. A Custom GPT and Darren's web app (`https://regen.gaiaai.xyz/registry-review/`) both consume this REST API. The MCP server is also available for direct Claude Desktop/Code integration via stdio.
 
-**Deployed version:** `2a52f2b` (Phase 1 complete + bug fixes, Feb 9). All phases 1a-1h deployed. CLI backend active, auto-preferring CLI over API.
+**Deployed version:** `2a52f2b` (Phase 1 complete + bug fixes, Feb 9). Ready to deploy: OpenAI fallback, PDF export, integration tests, 404 error fix. 348 tests pass locally.
 
 **Production health:** Verified healthy on Feb 9. Greens Lodge E2E: 19 docs discovered, 4/4 farm reqs covered, 122 evidence snippets, validation returns structured results (no 500), report generated. API responds on port 8003. PM2 shows `registry-review-api` online.
 
@@ -40,10 +40,16 @@ Specifically verified:
 - Auto backend prefers CLI (zero cost), falls back to API
 - Cross-validation endpoint returns structured results (Pydantic model tolerates partial coordinator output)
 - REST session creation accepts `documents_path` for path-based ingestion without manual setup
-- 310 tests passing (fast suite), 57 deselected
-- Health endpoint (`GET /health`) for PM2 liveness
+- PDF report generation via fpdf2 (professional layout, multi-page, automatic wrapping)
+- OpenAI fallback backend (auto-detected, transparent retry when Anthropic unavailable)
+- SessionNotFoundError returns 404 (not 500) across all REST endpoints
+- 348 tests passing (fast suite), 57 deselected
+- Health endpoint (`GET /health`) for PM2 liveness, includes `last_request_at` for staleness detection
 - Request ID tracing (`X-Request-ID`, `X-Response-Time-Ms` on every response)
-- Request model hardening (`extra="forbid"` on all 13 request models) (expensive)
+- Request model hardening (`extra="forbid"` on all 13 request models)
+- pm2-logrotate configured (50MB max, 14-day retention, compressed, daily rotation)
+- Cron health check every 5 minutes (failures logged to `logs/health-failures.log`)
+- Architecture documented in `docs/architecture.md` (correct nginx routing, deployment procedure)
 
 ## What's Broken or Missing
 
@@ -58,7 +64,7 @@ Specifically verified:
 ### Blocking for demos and BizDev
 
 6. ~~**Report formatting**~~ — Fixed (Feb 7).
-7. **PDF download** — Not implemented (raises `NotImplementedError`). Requires a rendering library (e.g., weasyprint). Deferred — markdown and DOCX downloads work correctly.
+7. ~~**PDF download**~~ — Implemented (Feb 9). Uses fpdf2 for PDF rendering. `format=pdf` in report generation, `GET /report/download-pdf` for download. 6 new tests.
 8. ~~**Duplicate value field**~~ — Fixed (Feb 7).
 9. ~~**Supplementary evidence quality**~~ — Verified (Feb 9). Greens Lodge REQ-002 pulled evidence from 17 documents with section/page citations.
 
@@ -97,8 +103,10 @@ Specifically verified:
 - ETHDenver/Boulder hackathon: starting around Feb 7 (Shawn, Darren, Eve attending)
 - Next team check-in target: Wednesday Feb 11
 - BizDev calls potentially starting as early as first week of Feb
-- Last code change: Feb 9 (Phase 2 operational foundations)
+- Last code change: Feb 9 (Phase 3a+3c — PDF export, OpenAI fallback, integration tests, 404 error fix)
 - PM2 restart mystery: diagnosed Feb 9 — port-bind storm on Jan 14, fix in `ecosystem.config.cjs`
+- Phase 2 fully complete: all 2a-2f items done (code + server-side config)
+- Phase 3a (PDF export) + 3c (integration tests) complete. Ready for deploy + E2E (3b)
 
 ## Test Data Available
 
@@ -113,8 +121,11 @@ Becca's test data extracted to `examples/test-data/` with clean directory struct
 
 ## Immediate Next Actions
 
-Phase 1 complete. Phase 2 code-level work (2a-2d, 2f partial) complete. Remaining Phase 2 items are operational (2e architecture docs, 2f log rotation + uptime monitoring) and deployment (apply `ecosystem.config.cjs` via `pm2 delete && pm2 start ecosystem.config.cjs && pm2 save`).
+Phases 1, 2, 3a (PDF export), and 3c (integration tests) complete. All code changes ready for deployment.
 
-Next priority is deploying Phase 2 changes to production and coordinating with Darren on request model hardening (verify web app doesn't send extra fields that would now return 422).
-
-After that: Phase 3 (Demo Readiness). Carbon Egg registration is "this month." Team check-in target: Wednesday Feb 11.
+Next steps:
+1. **Commit + push** — 3 logical commits (OpenAI fallback, PDF export, integration tests + 404 fix)
+2. **Deploy to GAIA** — `git pull`, `uv sync`, `pm2 delete && pm2 start ecosystem.config.cjs && pm2 save`
+3. **Phase 3b: E2E testing** — Botany Farm, Fonthill Farms, Greens Lodge (n=3 confidence needed)
+4. Coordinate with Darren on request model hardening (verify web app doesn't send extra fields → 422)
+5. Phase 3d-3e: Cross-validation quality + demo preparation. Team check-in target: Wednesday Feb 11.

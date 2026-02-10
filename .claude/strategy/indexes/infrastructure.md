@@ -1,6 +1,8 @@
 # Infrastructure Reference
 
-Last updated: 2026-02-07
+Last updated: 2026-02-09
+
+See also: `docs/architecture.md` (canonical public reference)
 
 ## Architecture Overview
 
@@ -10,25 +12,28 @@ Last updated: 2026-02-07
                         nginx proxy
                      (SSL termination)
                             |
-              https://regen.gaiaai.xyz/api/registry/*
-                            |
-                     +--------------+
-                     |  FastAPI     |
-                     |  Port 8003   |  <-- chatgpt_rest_api.py
-                     |  (REST API)  |
-                     +--------------+
-                            |
-                   Shared backend tools
-                  (src/registry_review_mcp/)
-                            |
-                     +--------------+
-                     |  MCP Server  |  <-- server.py (stdio)
-                     |  (FastMCP)   |
-                     +--------------+
+              +-------------+---------------+
+              |             |               |
+         /registry    /api/registry/*  /registry-review/
+              |             |               |
+        +-----------+ +-----------+    (static files)
+        | Port 8003 | | Port 8200 |    Darren's web
+        | Our API   | | Web App   |    app frontend
+        | (FastAPI) | | Backend   |
+        +-----------+ +-----------+
+              |
+     Shared backend tools
+    (src/registry_review_mcp/)
+              |
+        +-----------+
+        | MCP Server|  <-- server.py (stdio)
+        | (FastMCP) |
+        +-----------+
 
 Clients:
-  - Custom GPT         --> REST API (HTTPS)
-  - Web App            --> REST API (HTTPS)  https://regen.gaiaai.xyz/registry-review/
+  - Custom GPT         --> REST API (/registry, auth_basic)
+  - Web App Frontend   --> Web App Backend (/api/registry/*)
+  - Web App Backend    --> REST API (localhost:8003, internal)
   - Claude Desktop     --> MCP Server (stdio)
   - Claude Code        --> MCP Server (stdio via .mcp.json)
 ```
@@ -133,12 +138,14 @@ SSH to production server
   |
   cd /opt/projects/registry-eliza/regen-registry-review-mcp
   git pull origin main
-  sudo systemctl restart registry-review-api
+  pm2 restart registry-review-api
   |
-  Verify: curl http://localhost:8003/sessions
+  Verify: curl http://localhost:8003/health
 ```
 
-See `runbooks/deploy.md` for detailed procedure.
+If `ecosystem.config.cjs` changed, use `pm2 delete registry-review-api && pm2 start ecosystem.config.cjs && pm2 save` instead of `pm2 restart`.
+
+See `docs/architecture.md` for full deployment procedure.
 
 ## External Integrations
 

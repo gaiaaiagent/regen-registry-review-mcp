@@ -52,7 +52,7 @@ Sources: Jan 20 standup, Jan 27 standup, data-types-for-registry-protocols.md
 - [x] Remove dead code (`_get_docx_submitted_material`, `_get_docx_comments`) that still had old patterns
 - [x] 5 new tests: no-emojis-in-report, no-value-label, section-headers, validation-flagged, checklist-row-approved
 - [x] Full test suite: 246 passed, 56 deselected
-- [ ] PDF download — not implemented (raises `NotImplementedError`); requires a rendering library. Deferred.
+- [x] PDF download — implemented in Phase 3a (fpdf2, `format_pdf_report`, REST download endpoint).
 - [ ] Verify tables render cleanly in web app export — needs manual check after deployment
 
 Sources: review-agent-readiness.md items 2.3 and 3.1-3.2, Feb 3 standup
@@ -168,52 +168,122 @@ Discovered when evidence extraction hit $0 API credit balance:
 - [x] 3 tests verify 422 on unknown fields (session creation, override, determination)
 - [ ] Verify web app and Custom GPT don't send extra fields — coordinate with Darren on next deploy
 
-### 2e. Architecture Documentation
+### 2e. Architecture Documentation — DONE (Feb 9)
 
-Two systems (our API on port 8003, Darren's web app on port 8200) serve different nginx paths but share session state. This relationship is undocumented. During Phase 1 closure we lost 10 minutes to a ghost session that existed in the web app layer but not in ours.
+Two systems (our API on port 8003, Darren's web app on port 8200) serve different nginx paths but share session state. This relationship was undocumented. During Phase 1 closure we lost 10 minutes to a ghost session that existed in the web app layer but not in ours.
 
-- [ ] Create `docs/architecture.md` with a clear diagram: nginx → `/registry` (auth_basic, port 8003, our API) vs. `/api/registry` (port 8200, web app) vs. `/registry-review/` (web app frontend)
-- [ ] Document which sessions belong to which system (shawn's data dir vs. darren's)
-- [ ] Document the deployment topology: PM2 processes, ports, nginx routing, user contexts
-- [ ] Create `runbooks/deploy.md` with the actual deployment steps (currently just in our heads and MEMORY.md)
-- [ ] Document how to verify a deployment is healthy (reference `scripts/smoke-test.sh`)
+- [x] Create `docs/architecture.md` with correct nginx routing diagram, dual-interface pattern, session state, deployment topology, configuration reference
+- [x] Document shared session state (both systems read/write shawn's data dir)
+- [x] Document deployment topology: 7 PM2 processes, ports, nginx routing, user context
+- [x] Deployment procedure documented in `docs/architecture.md` (no separate runbook needed — procedure is 6 commands)
+- [x] Fix incorrect nginx diagram in `.claude/strategy/indexes/infrastructure.md` (was showing `/api/registry` → 8003; actually routes to 8200)
 
-**Acceptance:** A new developer can read `docs/architecture.md` and `runbooks/deploy.md` and deploy a change to production without SSH archaeology.
+**Acceptance:** A new developer can read `docs/architecture.md` and deploy a change to production without SSH archaeology.
 
-### 2f. Observability — Partially Done (Feb 9)
+### 2f. Observability — DONE (Feb 9)
 
 - [x] Request ID middleware: every response carries `X-Request-ID` (auto-generated UUID or echoed from client) and `X-Response-Time-Ms`
 - [x] 3 tests for middleware behavior
 - [x] `ecosystem.config.cjs` adds `log_date_format` for timestamped PM2 logs
-- [ ] Verify FastAPI access logging works after PM2 restart
-- [ ] Configure `pm2-logrotate` explicitly: retain 14 days, compress after 1 day, max size 50MB per file
-- [ ] Set up basic uptime monitoring (UptimeRobot, Healthchecks.io, or cron) hitting `GET /health`
-- [ ] Add `last_request_at` to health endpoint
+- [x] Verified FastAPI access logging works — uvicorn default access log shows method, path, status on every request
+- [x] `pm2-logrotate` installed and configured: 50MB max, 14 files retained, compress, daily rotation at midnight
+- [x] Uptime monitoring: cron job every 5 minutes pings `/health`, logs failures to `logs/health-failures.log`
+- [x] `last_request_at` added to health endpoint (ISO timestamp, null before first request). 1 new test.
 
 ### Phase 2 Overall Acceptance
 
-1. ~~`scripts/smoke-test.sh` passes after every deployment~~ — deferred; `curl /health` documented in runbook
-2. **DONE** — `pytest` includes REST integration tests (310 tests, 2.3s)
+1. ~~`scripts/smoke-test.sh` passes after every deployment~~ — deferred; `curl /health` documented in `docs/architecture.md`
+2. **DONE** — `pytest` includes REST integration tests (311 tests, 2.3s)
 3. **DONE** — Unknown request fields return 422, not silent success
-4. **DONE** — `GET /health` returns API version and session count
-5. `docs/architecture.md` exists and is accurate — 2e not started, `runbooks/deploy.md` **DONE**
+4. **DONE** — `GET /health` returns API version, session count, and `last_request_at`
+5. **DONE** — `docs/architecture.md` exists with correct nginx routing, deployment procedure, topology
 6. **DONE** — PM2 restart count explained (port-bind storm, Jan 14), fix in `ecosystem.config.cjs`
-7. Request ID headers on every response — **DONE**; PM2 log rotation config and uptime monitoring — remaining
+7. **DONE** — Request ID headers on every response, pm2-logrotate (50MB/14-day/compress), cron health check every 5min
+
+**Progress:** Phase 2 complete. All sub-phases (2a-2f) done. Code changes need deployment; server-side config (logrotate, cron) already applied.
 
 ## Phase 3: Demo Readiness and BizDev Support
 
-**Goal:** The web app is impressive enough that partners focus on usefulness, not rough edges. The team has demo materials and talking points.
+**Goal:** The system works reliably across all test data, produces professional deliverables in every output format, and withstands Becca's direct testing with partner projects. The web app is impressive enough that partners focus on usefulness, not rough edges.
 
-- [ ] Prepare demo framing: "This is a registry agent, not an AI assistant"
+**Why this matters now:** Becca is the first person outside the development team who will test this system with real client projects. She will try every output format, every workflow path, and every edge case — not because she's looking for bugs, but because that's what a thorough reviewer does. Phase 3 ensures the system passes this scrutiny before it reaches external partners.
+
+### 3a. PDF Export — DONE (Feb 9)
+
+- [x] Add `fpdf2>=2.7.0` dependency (pure Python, no system libraries)
+- [x] Implement `format_pdf_report()` in `report_tools.py` — renders ReviewReport as professional PDF
+- [x] Wire PDF format through `generate_review_report()` and `export_review()`
+- [x] Remove `NotImplementedError` from `export_review()` — PDF now flows through normally
+- [x] Add REST download endpoint `GET /sessions/{session_id}/report/download-pdf`
+- [x] Add download URL in report generation response for `format=pdf`
+- [x] 5 new tests: valid PDF output, content verification (project name, requirement IDs), Unicode sanitization, integration test
+- [x] 1 new REST endpoint test: PDF download returns 404 without prior generation
+- [x] Full test suite: 317 passed, 57 deselected
+
+### 3a-bis. OpenAI Fallback Backend — DONE (Feb 9)
+
+- [x] Add `openai>=1.0.0` dependency
+- [x] Implement `_call_via_openai()` in `llm_client.py` — transparent fallback when Anthropic unavailable
+- [x] Add `openai_api_key` and `openai_model` to Settings (env vars, defaults to `gpt-4o-mini`)
+- [x] Wire into `_resolve_backend()`: auto mode tries cli → api → openai
+- [x] Error classification for OpenAI API errors (auth, billing, rate limit)
+- [x] Settings immutability: `__setattr__`/`__delattr__` prevent post-init mutation
+- [x] 10 new tests: backend selection, OpenAI routing, error classification, settings freeze
+- [x] Full suite: 327 passed, 57 deselected
+
+### 3b. Multi-Project E2E Verification
+
+Currently at n=1 confidence (Greens Lodge only). Need n=3 before demos.
+
+- [ ] **Botany Farm** (7 PDFs) — Run full workflow: discover, classify, map, extract evidence, validate, generate report. Verify all 7 documents classified correctly, requirements mapped, evidence extracted with citations.
+- [ ] **Fonthill Farms** (5 files including spreadsheet) — Same full workflow. Key test: spreadsheet ingestion (yields data), land cover map classification. This exercises the 1b and 1e changes on a different project.
+- [ ] **Greens Lodge** (19 files) — Already verified via CLI backend (Feb 9). Re-run after Phase 2 deployment to confirm behavior is identical on production.
+- [ ] Verify all three produce professional reports in markdown, DOCX, and PDF formats
+- [ ] Document any classification gaps or evidence quality issues discovered during testing
+
+### 3c. API Integration Testing — DONE (Feb 9)
+
+Every REST endpoint that the web app or Custom GPT calls needs to work correctly. Becca won't use the CLI — she'll use the web app.
+
+- [x] **Session lifecycle** (5 tests): Create, create with documents_path, list, get by ID, delete
+- [x] **Document discovery** (2 tests): Discover finds all 7 Botany Farm PDFs, classifies all with non-empty classification
+- [x] **Error paths** (4 tests): Nonexistent session → 404 on GET/discover/map, empty body → 422
+- [x] **Human review workflow** (7 tests): Set/clear override, add annotation, set/clear determination, audit log entries, aggregated review-status
+- [x] **Report generation** (3 tests): Markdown format, JSON format, download returns file or 404
+- [x] **Bug fix:** `SessionNotFoundError` now inherits `FileNotFoundError` — all REST endpoints return 404 (not 500) for missing sessions
+- [x] Full suite: 348 passed, 57 deselected (21 new integration tests)
+
+Remaining coverage for E2E (3b): evidence extraction, cross-validation, all 5 report formats. These require LLM calls and will be exercised during E2E testing on the server.
+
+### 3d. Cross-Validation Quality
+
+The cross-validation endpoint works (no longer 500s), but the quality of results needs verification. Partial coordinator output is tolerated but should be distinguishable from complete results.
+
+- [ ] Verify land tenure validation produces meaningful results for Greens Lodge (13 land registry PDFs)
+- [ ] Verify date alignment validation catches real inconsistencies (or correctly passes when dates are consistent)
+- [ ] Verify project ID validation works across multiple document versions (Greens Lodge has 3 project plan versions)
+- [ ] Document any cases where validation returns partial results and whether they're actionable
+
+### 3e. Demo Preparation
+
 - [ ] Ensure demo flow works in <3 minutes (start review to see results)
+- [ ] Prepare demo framing: "This is a registry agent, not an AI assistant"
 - [ ] Privacy and data isolation talking points documented
-- [ ] Test with Fonthill Farms and Greens Lodge projects (Becca shared these for Ecometric protocol)
-- [ ] Stage bypass capability: start at evidence extraction when documents are already mapped
 - [ ] Verify web app handles concurrent sessions without data leakage
+- [ ] Stage bypass capability: start at evidence extraction when documents are already mapped
 
 Sources: updated-registry-spec.md, review-agent-readiness.md Demo-Ready checklist
 
-**Acceptance:** A non-technical person (Dave, Gregory) can watch a demo and understand the value proposition. The web app doesn't crash, stall, or produce embarrassing output.
+### Phase 3 Overall Acceptance
+
+1. All three registration test projects (Botany Farm, Fonthill Farms, Greens Lodge) produce complete reviews without errors
+2. All 5 output formats generate and download correctly
+3. All REST API endpoints return expected responses (no 500s on any standard workflow)
+4. Cross-validation produces structured, actionable results
+5. A non-technical person (Dave, Gregory) can watch a demo and understand the value proposition
+6. Becca can run a review through the web app end-to-end and get results she'd show to a partner
+
+**Progress:** 3a (PDF export), 3a-bis (OpenAI fallback), and 3c (integration tests) complete. 3b (E2E), 3d (quality), 3e (demo prep) pending deployment.
 
 ## Phase 4: Integration and Sustained Use
 
