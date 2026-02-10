@@ -463,8 +463,6 @@ async def _call_via_cli(
         "-p",
         "--output-format", "json",
         "--model", model,
-        "--tools", "",
-        "--no-session-persistence",
     ]
 
     if system:
