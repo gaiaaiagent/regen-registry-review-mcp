@@ -40,9 +40,10 @@ module.exports = {
       // This turns a 16-hour restart storm into a few quiet retries.
       exp_backoff_restart_delay: 100,
 
-      // Memory ceiling: restart if RSS exceeds 1GB.
-      // Current baseline is ~340MB. This catches runaway growth.
-      max_memory_restart: "1G",
+      // Memory ceiling: restart if RSS exceeds 2GB.
+      // Current baseline is ~340MB. Large image-heavy PDFs (e.g. 23MB title
+      // plans) can spike to ~1.5GB during PyMuPDF extraction.
+      max_memory_restart: "2G",
 
       // Logging
       error_file: "logs/pm2-error.log",
