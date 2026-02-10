@@ -1,31 +1,43 @@
 # Project Status
 
-Last updated: 2026-02-09
+Last updated: 2026-02-10
 
 ## Production State
 
 The Registry Review MCP runs on the GAIA server (`202.61.196.119`) managed by **PM2** (not systemd) on port 8003, proxied through nginx at `https://regen.gaiaai.xyz/api/registry`. A Custom GPT and Darren's web app (`https://regen.gaiaai.xyz/registry-review/`) both consume this REST API. The MCP server is also available for direct Claude Desktop/Code integration via stdio.
 
-**Deployed version:** `2a52f2b` (Phase 1 complete + bug fixes, Feb 9). Ready to deploy: OpenAI fallback, PDF export, integration tests, 404 error fix. 348 tests pass locally.
+**Deployed version:** `944155d` (Phase 1-3 complete, Feb 10). All phases deployed and E2E verified on 3 projects. 347 tests pass locally.
 
-**Production health:** Verified healthy on Feb 9. Greens Lodge E2E: 19 docs discovered, 4/4 farm reqs covered, 122 evidence snippets, validation returns structured results (no 500), report generated. API responds on port 8003. PM2 shows `registry-review-api` online.
+**Production health:** Verified healthy on Feb 10. PM2 stable: 0 unstable restarts. CLI backend active (zero API cost). Health endpoint responds with version, session count, last_request_at.
 
 **Important:** The nginx proxy at `regen.gaiaai.xyz/api/registry` routes to port 8200 (Darren's web app), NOT directly to port 8003. Direct API access is via `regen.gaiaai.xyz/registry` (requires auth_basic) or `localhost:8003` on the server.
 
 **Other services on this server:** koi-api, koi-mcp-knowledge, regen-koi-mcp, regen-network-api, regenai-agents, koi-event-bridge. All managed via PM2 under the `shawn` user.
 
+## E2E Test Results (Feb 10)
+
+All 3 test projects run end-to-end on production (real LLM calls via CLI backend):
+
+| Project | Files | Covered | Coverage | Snippets | Validation | Report |
+|---|---|---|---|---|---|---|
+| Botany Farm | 7 PDFs | 23/23 | 100% | 125 | 14/16 passed (87%) | 12.7KB md, 8.3KB pdf |
+| Fonthill Farms | 5 files | 22/23 | 96% | 202 | 20/23 passed (87%) | 13.4KB md, 8.6KB pdf |
+| Greens Lodge | 19 files | 22/23 | 96% | 371 | 20/23 passed (87%) | 14.4KB md, 9.1KB pdf |
+
+Key observations:
+- Greens Lodge REQ-002 (land tenure) pulled 68 snippets from 17 documents — excellent cross-document evidence
+- Greens Lodge REQ-017 (monitoring plan) correctly flagged as missing — expected for registration-only projects
+- Fonthill's 23MB title plan PDF extracted successfully with 2GB memory limit
+- All reports generate clean markdown and PDF with section/page citations
+
 ## What Works
 
-The 8-stage workflow (Initialize through Completion) is functional for PDF-based registration reviews. The system processes the Botany Farm test project end-to-end: document discovery, requirement mapping against the soil-carbon-v1.2.2 checklist (23 requirements), evidence extraction with page/section citations, cross-document validation, and report generation in markdown and DOCX formats. The web app provides a professional UI with one-click review, side-by-side PDF viewing, and evidence highlighting.
+The full workflow (Initialize through Report) is production-verified for PDF-based registration reviews across 3 projects with varying complexity (7-19 files, single-farm to multi-document).
 
 Specifically verified:
 - Per-farm land tenure validation
-- Citations with document name, section number, and page reference (task-12)
-- Value vs Evidence distinction in output (task-12)
-- Supplementary evidence from multiple documents (task-12)
-- Evidence text in Comments column beneath confidence scores (task-12)
-- Sentence-boundary truncation (task-12)
-- Project ID prefixed in document references (task-12)
+- Citations with document name, section number, and page reference
+- Supplementary evidence from multiple documents (68 snippets across 17 docs)
 - Confidence scores always visible in report comments
 - Human review flagged only where needed
 - Session persistence and recovery
@@ -36,37 +48,24 @@ Specifically verified:
 - UK Land Registry document classification ("Official Copy (Register) - LT*.pdf")
 - Land cover map classification
 - Centralized LLM error handling with actionable guidance
-- Dual LLM backend: API (SDK) and CLI (`claude -p` subprocess via Max plan)
-- Auto backend prefers CLI (zero cost), falls back to API
-- Cross-validation endpoint returns structured results (Pydantic model tolerates partial coordinator output)
-- REST session creation accepts `documents_path` for path-based ingestion without manual setup
+- Triple LLM backend: CLI → API → OpenAI (auto-resolved, cheapest first)
+- Cross-validation with three-layer architecture (structural + cross-doc + LLM synthesis)
+- REST session creation accepts `documents_path` for path-based ingestion
 - PDF report generation via fpdf2 (professional layout, multi-page, automatic wrapping)
-- OpenAI fallback backend (auto-detected, transparent retry when Anthropic unavailable)
 - SessionNotFoundError returns 404 (not 500) across all REST endpoints
-- 348 tests passing (fast suite), 57 deselected
-- Health endpoint (`GET /health`) for PM2 liveness, includes `last_request_at` for staleness detection
+- 347 tests passing (fast suite), 57 deselected
+- Health endpoint (`GET /health`) with `last_request_at` for staleness detection
 - Request ID tracing (`X-Request-ID`, `X-Response-Time-Ms` on every response)
 - Request model hardening (`extra="forbid"` on all 13 request models)
 - pm2-logrotate configured (50MB max, 14-day retention, compressed, daily rotation)
-- Cron health check every 5 minutes (failures logged to `logs/health-failures.log`)
-- Architecture documented in `docs/architecture.md` (correct nginx routing, deployment procedure)
+- Cron health check every 5 minutes
+- Architecture documented in `docs/architecture.md`
 
 ## What's Broken or Missing
 
-### Blocking for Carbon Egg (registration imminent)
+### All blocking items resolved
 
-1. ~~**Mapping bug**~~ — Fixed (Feb 7, commit `467695e`).
-2. ~~**Spreadsheet ingestion**~~ — Implemented (Feb 7).
-3. ~~**Meta-project architecture**~~ — Implemented (Feb 7, scope filtering).
-4. ~~**CarbonEg-specific requirements**~~ — Addressed via scope filtering.
-5. ~~**API credits exhausted**~~ — Resolved. CLI backend deployed (`a56f16a`). Auto mode prefers CLI (Max plan, zero cost), falls back to API. Claude Code v2.1.37 installed on GAIA.
-
-### Blocking for demos and BizDev
-
-6. ~~**Report formatting**~~ — Fixed (Feb 7).
-7. ~~**PDF download**~~ — Implemented (Feb 9). Uses fpdf2 for PDF rendering. `format=pdf` in report generation, `GET /report/download-pdf` for download. 6 new tests.
-8. ~~**Duplicate value field**~~ — Fixed (Feb 7).
-9. ~~**Supplementary evidence quality**~~ — Verified (Feb 9). Greens Lodge REQ-002 pulled evidence from 17 documents with section/page citations.
+1-9. All previously blocking items (mapping bug, spreadsheet ingestion, report formatting, CLI backend, PDF download, etc.) are fixed and deployed.
 
 ### Needed but not blocking
 
@@ -75,38 +74,33 @@ Specifically verified:
 12. **Bypass workflow stages** — Ability to skip document discovery and requirement mapping, starting directly at evidence extraction.
 13. **Issuance Review Agent** — Scoped by Becca but not implemented. Post-registration priority.
 14. **Geospatial processing** — Stub exists. Long-term.
+15. **Large PDF memory handling** — 23MB image-heavy PDFs (title plans) spike memory to ~1.5GB during PyMuPDF extraction. Current fix: 2GB memory limit. Proper fix: size-based extraction strategy or streaming.
+16. **LLM call deduplication** — Validation synthesis has no application-level cache (evidence extraction does). Low priority given the single LLM call per session.
 
-## Recent Changes (Feb 7)
+## Recent Changes (Feb 10)
 
-### Committed and deployed
+### Deployed (commit `944155d`)
 
-- **Phase 1a-1d** — Mapping bug, spreadsheet ingestion, report formatting, multi-project scope. All deployed as commit `a7c7a5f`.
-- **UK Land Registry classification** — 3 new patterns for `land_tenure` (Official Copy, Land Registry, LT title numbers), new `land_cover_map` type with 4 patterns. Greens Lodge went from 26% to 100% classification. Deployed as commit `6433b13`.
-- **Test data** — Becca's 415-file archive organized into `examples/test-data/` with clean directory structure. GIS files gitignored (192MB).
+- **CLI flag fix** — Claude Code v2.0.1 removed `--tools` and `--no-session-persistence` flags. Every CLI LLM call was failing. Removed obsolete flags.
+- **PM2 memory limit** — Increased from 1GB to 2GB for large PDF extraction (23MB Fonthill title plan).
+- **Validation model defaults** — `DateAlignmentValidation`, `ProjectIDValidation`, `ContradictionCheck` now tolerate partial cross-document results (same pattern as earlier `LandTenureValidation` fix).
 
-### Also committed and deployed (Feb 7, later)
+### Previously deployed (commits `69f68b3` through `a5a756b`)
 
-- **LLM error handling (1f)** — Centralized error classification, fatal errors propagate with actionable guidance. 8 new tests.
-- **Claude CLI backend (1g)** — Unified `call_llm()` with dual backend. Auto prefers CLI (Max plan). Fixed hardcoded model bug. 20 new tests. Deployed as `a56f16a`.
-- **CLI flag fix** — Removed non-existent `--max-tokens`, added `--tools ""` for pure LLM mode. Verified against claude v2.1.37.
-
-### Deployed (Feb 9, commit `2a52f2b`)
-
-- **Phase 1h polish** — Unified REST error handling (`_llm_error_response()`), auth→401/billing→402. 7 new tests.
-- **documents_path passthrough** — `CreateSessionRequest` now accepts and forwards `documents_path` to `create_session()`. Removes need to manually set path after session creation.
-- **Cross-validation Pydantic fix** — `LandTenureValidation.fields`, `area_consistent`, and `tenure_type_consistent` now have safe defaults. `/validate` no longer 500s when the coordinator doesn't produce field-level results.
-- **310 tests passing** (fast suite), 57 deselected (expensive).
+- **OpenAI fallback backend** — Auto-detected, transparent retry when Anthropic unavailable.
+- **PDF export via fpdf2** — Professional layout, multi-page, automatic wrapping.
+- **Integration tests** — 21 new tests covering session lifecycle, discovery, error paths, human review, reports.
+- **404 error fix** — `SessionNotFoundError` inherits `FileNotFoundError` for clean 404 handling.
+- **Phase 2 operational foundations** — Health endpoint, model hardening, request tracing, PM2 fix, architecture docs.
 
 ## Key Dates and Context
 
 - Carbon Egg registration: described as "this month" on Feb 3
 - ETHDenver/Boulder hackathon: starting around Feb 7 (Shawn, Darren, Eve attending)
+- **Demo ready:** Feb 10 — all 3 E2E projects verified on production
 - Next team check-in target: Wednesday Feb 11
 - BizDev calls potentially starting as early as first week of Feb
-- Last code change: Feb 9 (Phase 3a+3c — PDF export, OpenAI fallback, integration tests, 404 error fix)
-- PM2 restart mystery: diagnosed Feb 9 — port-bind storm on Jan 14, fix in `ecosystem.config.cjs`
-- Phase 2 fully complete: all 2a-2f items done (code + server-side config)
-- Phase 3a (PDF export) + 3c (integration tests) complete. Ready for deploy + E2E (3b)
+- Claude Code CLI on GAIA: v2.0.1 (rebranded from claude v2.1.37)
 
 ## Test Data Available
 
@@ -121,11 +115,10 @@ Becca's test data extracted to `examples/test-data/` with clean directory struct
 
 ## Immediate Next Actions
 
-Phases 1, 2, 3a (PDF export), and 3c (integration tests) complete. All code changes ready for deployment.
+All phases through 3e complete. System is demo-ready.
 
-Next steps:
-1. **Commit + push** — 3 logical commits (OpenAI fallback, PDF export, integration tests + 404 fix)
-2. **Deploy to GAIA** — `git pull`, `uv sync`, `pm2 delete && pm2 start ecosystem.config.cjs && pm2 save`
-3. **Phase 3b: E2E testing** — Botany Farm, Fonthill Farms, Greens Lodge (n=3 confidence needed)
-4. Coordinate with Darren on request model hardening (verify web app doesn't send extra fields → 422)
-5. Phase 3d-3e: Cross-validation quality + demo preparation. Team check-in target: Wednesday Feb 11.
+Next priorities:
+1. **Wednesday check-in** (Feb 11) — Present E2E results, discuss Carbon Egg timeline
+2. **Coordinate with Darren** — Verify web app doesn't send extra fields (request model hardening → 422)
+3. **Issuance review agent** — Becca's next priority after registration reviews are solid
+4. **Architecture redesign** — Four-layer concurrent model (see `.claude/strategy/architecture/first-principles-redesign.md`)
