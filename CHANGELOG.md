@@ -2,6 +2,49 @@
 
 All notable changes to the Registry Review MCP Server are documented here.
 
+## [Unreleased] — feat/ocr-fallback (Issue #4)
+
+OCR fallback pipeline prototype for image-heavy registry documents. Opt-in
+via `REGISTRY_REVIEW_OCR_ENABLED=true`; disabled by default so existing
+deployments are unaffected.
+
+### Added
+- **`extractors/ocr.py`** — new module with `is_tesseract_available()`
+  (memoized probe via PyMuPDF's `get_tessdata`, graceful degradation when
+  Tesseract is missing), `ocr_page()` (per-page OCR with auto / blocks /
+  full modes), `page_needs_ocr()` (density-plus-image-blocks heuristic),
+  and a deterministic cache keyed on `(filepath, mtime, page, mode,
+  language, dpi)`.
+- **`fast_extract_pdf` integration** — after the PyMuPDF4LLM pass, any
+  page whose extracted text drops below the density threshold AND whose
+  underlying PDF page contains at least one image block is OCRed, with
+  recovered text spliced into the chunk under an
+  `<!-- OCR-recovered page N -->` marker so downstream consumers can
+  distinguish native from recovered content. The extractor return value
+  now includes an `ocr` sub-dictionary (`mode`, `pages_recovered`,
+  `language`, `dpi`) regardless of whether OCR ran, giving callers a
+  stable schema to inspect.
+- **Settings** — `ocr_enabled`, `ocr_density_threshold`, `ocr_language`,
+  `ocr_dpi`, all with conservative defaults (`False`, 50 chars, `eng`,
+  150dpi).
+- **`tests/test_ocr_fallback.py`** — 18 tests covering probe memoization,
+  graceful degradation when Tesseract is absent, one-time warning
+  behavior, the density-plus-images heuristic, cache-key determinism and
+  mtime invalidation, and the stable `ocr` schema on the fast extractor
+  result.
+- **Install helper** — `~/.claude/local/scripts/install-tesseract-for-ra-agent.sh`
+  for operators on Arch / CachyOS, with Debian / Fedora / macOS hints in
+  the script header.
+
+### Not yet
+- No accuracy / benchmark test against the Rockscape fixture — Tesseract
+  is not installed on the development machine yet, so the next step is
+  running the helper script and executing a marked-expensive fixture
+  suite.
+- No automatic enablement. Once the fixture run confirms precision and
+  recall are acceptable, flip the default to `True` and add a
+  configuration note.
+
 ## [2.1.0] - 2026-04-21
 
 Packaging and distribution fixes so `uvx registry-review-mcp` resolves bundled
