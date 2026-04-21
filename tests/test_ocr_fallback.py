@@ -251,9 +251,8 @@ class TestOcrRealRoundtrip:
 
     def test_image_only_pdf_recovered_via_ocr(self, tmp_path):
         pytest.importorskip("PIL.Image")
-        from PIL import Image, ImageDraw, ImageFont
-
         import pymupdf
+        from PIL import Image, ImageDraw, ImageFont
 
         from registry_review_mcp.extractors.ocr import is_tesseract_available
 
@@ -291,8 +290,9 @@ class TestOcrRealRoundtrip:
 
         # Point OCR cache at a pristine tmp dir so repeat runs can be
         # measured without interference from the user's real cache.
-        from registry_review_mcp.config.settings import settings
         import os
+
+        from registry_review_mcp.config.settings import settings
 
         settings.__dict__["_frozen"] = False
         settings.ocr_enabled = True
