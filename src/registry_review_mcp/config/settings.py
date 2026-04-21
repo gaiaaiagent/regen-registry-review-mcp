@@ -31,13 +31,15 @@ def _get_xdg_cache_home() -> Path:
     return Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
 
 
-def _get_project_root() -> Path:
-    """Get the project root directory based on this file's location.
+def _get_bundled_data_dir() -> Path:
+    """Get the bundled data directory inside the installed package.
 
-    Used for accessing bundled resources like default checklists.
-    Path: config/settings.py → registry_review_mcp → src → project_root
+    Path: config/settings.py → registry_review_mcp (parent.parent) / data
+    This path resolves correctly whether the package is running from source
+    (src/registry_review_mcp/data/) or from an installed wheel
+    (site-packages/registry_review_mcp/data/).
     """
-    return Path(__file__).resolve().parent.parent.parent.parent
+    return Path(__file__).resolve().parent.parent / "data"
 
 
 # Application identifier for XDG directories
@@ -96,8 +98,10 @@ class Settings(BaseSettings):
     sessions_dir: Path = Field(default_factory=lambda: _get_xdg_data_home() / APP_NAME / "sessions")
     cache_dir: Path = Field(default_factory=lambda: _get_xdg_cache_home() / APP_NAME)
 
-    # Checklists are bundled with the package, read from project directory
-    checklists_dir: Path = Field(default_factory=lambda: _get_project_root() / "data" / "checklists")
+    # Checklists are bundled inside the installed package so uvx/PyPI installs
+    # resolve the correct path without requiring a source checkout.
+    # Tests still override via conftest.py, preserving isolation.
+    checklists_dir: Path = Field(default_factory=lambda: _get_bundled_data_dir() / "checklists")
 
     # Session
     session_lock_timeout: int = 30  # seconds

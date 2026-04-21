@@ -301,16 +301,27 @@ class TestSessionTools:
 
 
 class TestChecklist:
-    """Test checklist loading."""
+    """Test checklist loading.
+
+    Checklists are now bundled inside the installed package at
+    src/registry_review_mcp/data/checklists/ so they resolve correctly after a
+    PyPI install. Tests locate the file through the same bundled path rather
+    than the legacy repo-root data/ directory.
+    """
+
+    @staticmethod
+    def _bundled_checklist_path() -> Path:
+        from registry_review_mcp.config.settings import _get_bundled_data_dir
+        return _get_bundled_data_dir() / "checklists" / "soil-carbon-v1.2.2.json"
 
     def test_checklist_exists(self):
-        """Test that soil carbon checklist exists."""
-        checklist_path = Path(__file__).parent.parent / "data" / "checklists" / "soil-carbon-v1.2.2.json"
-        assert checklist_path.exists()
+        """Test that soil carbon checklist exists in the bundled package data."""
+        checklist_path = self._bundled_checklist_path()
+        assert checklist_path.exists(), f"Bundled checklist not found at {checklist_path}"
 
     def test_checklist_structure(self):
         """Test checklist has correct structure."""
-        checklist_path = Path(__file__).parent.parent / "data" / "checklists" / "soil-carbon-v1.2.2.json"
+        checklist_path = self._bundled_checklist_path()
 
         with open(checklist_path, "r") as f:
             checklist = json.load(f)

@@ -40,7 +40,8 @@ logger = logging.getLogger(__name__)
 
 mcp = FastMCP("Regen Registry Review")
 
-logger.info("Initializing Registry Review MCP Server v2.0.0")
+from registry_review_mcp import __version__ as _pkg_version
+logger.info("Initializing Registry Review MCP Server v%s", _pkg_version)
 
 # ============================================================================
 # Session Management Tools

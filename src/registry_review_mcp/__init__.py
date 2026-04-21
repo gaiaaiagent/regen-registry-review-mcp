@@ -3,7 +3,7 @@
 Automated registry review workflows for carbon credit project registration.
 """
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 __author__ = "Shawn Anderson"
 
 from .server import main
