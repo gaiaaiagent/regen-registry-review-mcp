@@ -1,0 +1,31 @@
+# Fixture manifest.
+#
+# Describes the shape and location contract for each benchmark fixture.
+# Consumed by future `scripts/bench_ocr.py` and by the evaluation harness
+# (tests/evaluation/, Phase F). Tests read the env var pointed to by `env`;
+# if the env var is unset the fixture-dependent test is skipped.
+
+[burton_latimer]
+env = "RRM_FIXTURE_BURTON_LATIMER"
+kind = "ecometric_soil_carbon"
+methodology = "Ecometric Soil Carbon v1.2.2"
+methodology_version = "1.2.2"
+pdf_count = 36
+xlsx_count = 16
+shp_count = 10
+ground_truth = "Burton Latimer Farms Project Registration Registry Agent Review.docx"
+# Baseline captured against v2.2.0 of the MCP.
+bench_baseline_version = "2.2.0"
+bench_rescue_rate = 0.909        # 50 / 55 sparse pages
+bench_char_recovery_pct = 11.3   # +11.3% vs fast-path only
+bench_runtime_seconds = 228
+
+[botany_farm]
+env = "RRM_FIXTURE_BOTANY_FARM"
+kind = "ecometric_soil_carbon"
+methodology = "Ecometric Soil Carbon v1.2.2"
+methodology_version = "1.2.2"
+# Historical fixture; partial materials set.
+signature_page = "GHG Emissions"
+signature_before_chars = 1655
+signature_after_chars = 5792
