@@ -87,7 +87,14 @@ def _warn_tesseract_missing_once() -> None:
     )
 
 
-def _ocr_cache_path(cache_root: Path, filepath: str, page_num: int, mode: str, language: str, dpi: int) -> Path:
+def _ocr_cache_path(
+    cache_root: Path,
+    filepath: str,
+    page_num: int,
+    mode: str,
+    language: str,
+    dpi: int,
+) -> Path:
     """Deterministic cache path for a single OCRed page.
 
     Keying on ``mtime`` so a re-exported PDF invalidates its cache entries
@@ -163,7 +170,11 @@ def ocr_page(
 
     try:
         if page_num < 0 or page_num >= doc.page_count:
-            logger.warning("OCR requested for out-of-range page %s (doc has %s pages)", page_num, doc.page_count)
+            logger.warning(
+                "OCR requested for out-of-range page %s (doc has %s pages)",
+                page_num,
+                doc.page_count,
+            )
             return None
 
         page = doc[page_num]

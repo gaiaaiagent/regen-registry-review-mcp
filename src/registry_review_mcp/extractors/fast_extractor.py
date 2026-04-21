@@ -106,7 +106,8 @@ async def fast_extract_pdf(filepath: str) -> dict[str, Any]:
             density_threshold = int(getattr(settings, "ocr_density_threshold", 50))
             ocr_language = str(getattr(settings, "ocr_language", "eng"))
             ocr_dpi = int(getattr(settings, "ocr_dpi", 150))
-            cache_root = Path(getattr(settings, "cache_dir", Path.home() / ".cache" / "registry-review-mcp"))
+            _default_cache = Path.home() / ".cache" / "registry-review-mcp"
+            cache_root = Path(getattr(settings, "cache_dir", _default_cache))
         except Exception as exc:
             logger.debug("OCR settings probe failed, leaving fallback disabled: %s", exc)
             ocr_enabled = False
