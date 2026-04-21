@@ -117,7 +117,7 @@ class Settings(BaseSettings):
     # AND contains at least one image block. Tesseract absence is non-fatal:
     # the fast extractor logs a one-time warning and continues with the
     # native PyMuPDF4LLM output.
-    ocr_enabled: bool = Field(default=False)
+    ocr_enabled: bool = Field(default=True)
     ocr_density_threshold: int = Field(default=50, ge=0)
     ocr_language: str = Field(default="eng")
     ocr_dpi: int = Field(default=150, ge=72, le=600)

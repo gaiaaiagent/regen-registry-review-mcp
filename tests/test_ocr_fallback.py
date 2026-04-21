@@ -37,6 +37,22 @@ def _clean_tesseract_state():
     _reset_tesseract_probe()
 
 
+class TestOcrSettingsDefaults:
+    """Regression guard for the v2.2.0 default-flip.
+
+    OCR is now enabled out-of-box so operators who install the package and
+    run it against image-heavy PDFs get the rescue automatically. This test
+    pins the default so an accidental revert to False surfaces loudly.
+    """
+
+    def test_ocr_enabled_default_is_true(self):
+        from registry_review_mcp.config.settings import Settings
+
+        # Isolate from host env vars that might override the class default.
+        fresh = Settings(_env_file=None)
+        assert fresh.ocr_enabled is True
+
+
 class TestTesseractProbe:
     """is_tesseract_available() behavior."""
 

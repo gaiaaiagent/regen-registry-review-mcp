@@ -2,6 +2,38 @@
 
 All notable changes to the Registry Review MCP Server are documented here.
 
+## [2.2.0] - 2026-04-21
+
+OCR fallback is now **enabled by default**. Image-heavy registry PDFs
+(Ecometric Soil Carbon monitoring reports, InDesign-derived submissions,
+scan-based inputs) recover text automatically when Tesseract is installed on
+the host; text-native PDFs continue on the fast path with zero new work.
+
+### Changed
+- **OCR fallback default flipped from `False` to `True`.** Set
+  `REGISTRY_REVIEW_OCR_ENABLED=false` to opt out. Hosts without Tesseract
+  degrade gracefully — the `is_tesseract_available()` probe returns `False`,
+  a one-time warning is logged, and the fast extractor continues on the
+  native PyMuPDF4LLM output unchanged.
+
+### Added
+- **Benchmark fixtures** — `tests/fixtures/README.md` and
+  `tests/fixtures/fixtures.toml` declare the env-var contract
+  (`RRM_FIXTURE_BURTON_LATIMER`, `RRM_FIXTURE_BOTANY_FARM`), per-OS Tesseract
+  install recipes, and the v2.2.0 Burton Latimer baseline (90.9%
+  sparse-page rescue, +11.3% character recovery across 36 PDFs).
+- **Default-flip regression test** — `tests/test_ocr_fallback.py` asserts
+  `Settings().ocr_enabled is True` so any future accidental revert surfaces
+  in CI.
+
+### Notes
+- Install Tesseract: `pacman -S tesseract tesseract-data-eng` (Arch /
+  CachyOS), `apt install tesseract-ocr tesseract-ocr-eng` (Debian /
+  Ubuntu), `dnf install tesseract tesseract-langpack-eng` (Fedora), or
+  `brew install tesseract` (macOS).
+- Multi-language OCR (e.g. CSSCP Czech-Slovak submissions): install the
+  extra language pack and set `REGISTRY_REVIEW_OCR_LANGUAGE=eng+ces`.
+
 ## [Unreleased] — feat/ocr-fallback (Issue #4)
 
 OCR fallback pipeline prototype for image-heavy registry documents. Opt-in
