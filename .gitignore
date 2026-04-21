@@ -238,3 +238,4 @@ examples/test-data/**/*.md
 
 # Claude conversation logs (may contain sensitive data)
 .claude/logging/**/*.jsonl
+.letta/
