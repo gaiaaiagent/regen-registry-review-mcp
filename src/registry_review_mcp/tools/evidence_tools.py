@@ -19,10 +19,10 @@ from typing import Any
 
 from ..config.settings import settings
 from ..models.evidence import (
+    EvidenceExtractionResult,
     EvidenceSnippet,
     MappedDocument,
     RequirementEvidence,
-    EvidenceExtractionResult,
 )
 from ..utils.llm_client import call_llm, classify_api_error
 from ..utils.state import StateManager
@@ -509,6 +509,51 @@ async def extract_evidence_with_llm(
         return []
 
 
+async def _convert_mapped_spreadsheets(docs_to_convert: list[dict[str, Any]]) -> int:
+    """Lazy spreadsheet conversion for the evidence-extraction pipeline.
+
+    Mirrors ``batch_convert_pdfs_parallel`` for XLSX/XLS/CSV/TSV documents:
+    reads each file via ``spreadsheet_extractor.extract_spreadsheet``, writes a
+    ``.fast.md`` sidecar next to the source, and updates the doc dict so that
+    ``get_markdown_content`` can find the content downstream.
+
+    Unlike PDFs, spreadsheet extraction is already structured (openpyxl / csv)
+    so one pass suffices — no HQ variant is ever needed. We mark
+    ``hq_status = "not_applicable"`` and ``active_quality = "fast"`` to match
+    the convention set by ``document_processor.fast_extract_all``.
+
+    Per-file failures are logged and annotated on the doc (``fast_status =
+    "failed"``, ``fast_error`` populated) so the batch continues. The return
+    value is the count of successful conversions.
+    """
+    from ..extractors.spreadsheet_extractor import extract_spreadsheet
+
+    converted = 0
+    for doc in docs_to_convert:
+        filepath = doc["filepath"]
+        try:
+            result = await extract_spreadsheet(filepath)
+            src_path = Path(filepath)
+            fast_md_path = src_path.with_suffix(".fast.md")
+            fast_md_path.write_text(result["markdown"], encoding="utf-8")
+
+            doc["fast_status"] = "complete"
+            doc["fast_markdown_path"] = str(fast_md_path)
+            doc["fast_extracted_at"] = result["extracted_at"]
+            doc["fast_page_count"] = result["page_count"]
+            doc["fast_char_count"] = result["total_chars"]
+            doc["markdown_path"] = str(fast_md_path)
+            doc["has_markdown"] = True
+            doc["active_quality"] = "fast"
+            doc["hq_status"] = "not_applicable"
+            converted += 1
+        except Exception as exc:
+            logger.warning(f"Lazy spreadsheet extraction failed for {filepath}: {exc}")
+            doc["fast_status"] = "failed"
+            doc["fast_error"] = str(exc)
+    return converted
+
+
 async def extract_all_evidence(session_id: str) -> dict[str, Any]:
     """Optimized evidence extraction with LLM and document caching.
 
@@ -578,7 +623,6 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
     if pdfs_to_convert:
         from ..extractors.marker_extractor import batch_convert_pdfs_parallel
         from .document_tools import calculate_optimal_workers
-        from pathlib import Path
 
         pdf_count = len(pdfs_to_convert)
         total_docs = len(documents)
@@ -627,10 +671,45 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
 
         except Exception as e:
             print(f"⚠️  PDF conversion failed: {e}", flush=True)
-            print(f"   Continuing with available documents...", flush=True)
+            print("   Continuing with available documents...", flush=True)
 
     else:
-        print(f"✓ All mapped documents already have markdown", flush=True)
+        print("✓ All mapped PDFs already have markdown", flush=True)
+
+    # ========================================================================
+    # Phase 1.6: Lazy Spreadsheet Conversion (Only Mapped XLSX/CSV/TSV)
+    # ========================================================================
+    # Spreadsheets classified during discovery but never converted in the
+    # PDF-only lazy path caused "No markdown available for *.xlsx" warnings
+    # and left XLSX evidence invisible to the LLM. Phase D closes that gap.
+    from ..utils.patterns import SPREADSHEET_EXTENSIONS
+
+    spreadsheets_to_convert = [
+        doc for doc in documents
+        if doc["document_id"] in mapped_doc_ids
+        and Path(doc["filepath"]).suffix.lower() in SPREADSHEET_EXTENSIONS
+        and not doc.get("has_markdown")
+    ]
+
+    if spreadsheets_to_convert:
+        sheet_count = len(spreadsheets_to_convert)
+        total_docs = len(documents)
+        print(
+            f"\n📊 Converting {sheet_count}/{total_docs} mapped spreadsheet(s) to markdown...",
+            flush=True,
+        )
+        try:
+            converted = await _convert_mapped_spreadsheets(spreadsheets_to_convert)
+            print(f"✅ Converted {converted}/{sheet_count} spreadsheet(s)", flush=True)
+
+            # Persist the updated doc records
+            docs_data["documents"] = documents
+            state_manager.write_json("documents.json", docs_data)
+        except Exception as e:
+            print(f"⚠️  Spreadsheet conversion failed: {e}", flush=True)
+            print("   Continuing with available documents...", flush=True)
+    else:
+        print("✓ All mapped spreadsheets already have markdown", flush=True)
 
     print(f"\n📄 Loading {len(documents)} documents into memory...", flush=True)
 
@@ -653,13 +732,13 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
         else:
             print(f"  ✗ Failed to load {doc['filename']}", flush=True)
 
-    print(f"\n✅ All documents cached in memory", flush=True)
+    print("\n✅ All documents cached in memory", flush=True)
 
     # ========================================================================
     # Phase 3: Extract Evidence (Parallel)
     # ========================================================================
 
-    print(f"\n🔍 Extracting evidence with LLM...\n", flush=True)
+    print("\n🔍 Extracting evidence with LLM...\n", flush=True)
 
     # Process requirements in parallel (rate-limited)
     semaphore = asyncio.Semaphore(5)  # Max 5 concurrent LLM calls
@@ -778,7 +857,7 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
 
     overall_coverage = (covered + (partial * 0.5)) / len(all_evidence) if all_evidence else 0.0
 
-    print(f"\n✅ Evidence extraction complete:", flush=True)
+    print("\n✅ Evidence extraction complete:", flush=True)
     print(f"   • Covered: {covered} ({covered/len(requirements)*100:.0f}%)", flush=True)
     print(f"   • Partial: {partial} ({partial/len(requirements)*100:.0f}%)", flush=True)
     print(f"   • Missing: {missing} ({missing/len(requirements)*100:.0f}%)", flush=True)

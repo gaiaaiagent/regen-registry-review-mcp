@@ -22,6 +22,18 @@ logger = logging.getLogger(__name__)
 
 MAX_ROWS_PER_SHEET = 10_000
 
+# Char caps that keep LLM payloads under TELUS Cloudflare gateway's edge timeout.
+# Observed behaviour: prompts approaching 100K chars (≈25K tokens) routinely
+# trip 504/524 on the GPT-OSS-120B endpoint because inference exceeds the edge
+# idle budget. Capping well below that ceiling keeps per-document prompts fast
+# enough to complete while preserving representative evidence rows.
+#
+# Two caps apply. The per-sheet cap protects against one huge sheet blowing the
+# budget alone; the per-workbook cap protects against the multi-sheet case
+# where individually compliant sheets still sum to an oversized total.
+MAX_CHARS_PER_SHEET = 40_000
+MAX_CHARS_PER_WORKBOOK = 60_000
+
 
 def _sanitize_cell(value: Any) -> str:
     """Convert a cell value to a pipe-safe markdown string."""
@@ -52,6 +64,31 @@ def _rows_to_markdown(headers: list[str], rows: list[list[str]]) -> str:
         lines.append("| " + " | ".join(safe) + " |")
 
     return "\n".join(lines)
+
+
+def _truncate_table_by_chars(
+    headers: list[str],
+    rows: list[list[str]],
+    cap: int,
+) -> tuple[str, int]:
+    """Binary-search the largest row count whose rendered table fits under ``cap``.
+
+    Returns (markdown, rows_kept). Called only when the full render exceeds
+    ``cap``; the footer caller adds the truncation annotation.
+    """
+    lo, hi = 0, len(rows)
+    best_md = _rows_to_markdown(headers, [])
+    best_kept = 0
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        md = _rows_to_markdown(headers, rows[:mid])
+        if len(md) <= cap:
+            best_md = md
+            best_kept = mid
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return best_md, best_kept
 
 
 def _extract_xlsx(filepath: Path) -> tuple[str, int, int, int]:
@@ -107,9 +144,22 @@ def _extract_xlsx(filepath: Path) -> tuple[str, int, int, int]:
         tables_found += 1
 
         table_md = _rows_to_markdown(headers, data_rows)
+        char_truncated_count: int | None = None
+        if len(table_md) > MAX_CHARS_PER_SHEET:
+            table_md, char_truncated_count = _truncate_table_by_chars(
+                headers, data_rows, MAX_CHARS_PER_SHEET
+            )
         section = f'--- Sheet "{name}" ({idx} of {sheet_count}) ---\n\n{table_md}'
         if truncated:
-            section += f"\n\n*Truncated: showing first {MAX_ROWS_PER_SHEET:,} of {len(all_rows) - 1:,} data rows*"
+            section += (
+                f"\n\n*Truncated by row cap: showing first {MAX_ROWS_PER_SHEET:,} "
+                f"of {len(all_rows) - 1:,} data rows*"
+            )
+        if char_truncated_count is not None:
+            section += (
+                f"\n\n*Truncated by char cap ({MAX_CHARS_PER_SHEET:,}): kept "
+                f"{char_truncated_count:,} of {len(data_rows):,} rows on this sheet*"
+            )
         sections.append(section)
 
     wb.close()
@@ -150,9 +200,22 @@ def _extract_csv(filepath: Path) -> tuple[str, int, int, int]:
         truncated = True
 
     table_md = _rows_to_markdown(headers, data_rows)
+    char_truncated_count: int | None = None
+    if len(table_md) > MAX_CHARS_PER_SHEET:
+        table_md, char_truncated_count = _truncate_table_by_chars(
+            headers, data_rows, MAX_CHARS_PER_SHEET
+        )
     section = f'--- Sheet "{name}" (1 of 1) ---\n\n{table_md}'
     if truncated:
-        section += f"\n\n*Truncated: showing first {MAX_ROWS_PER_SHEET:,} of {len(all_rows) - 1:,} data rows*"
+        section += (
+            f"\n\n*Truncated by row cap: showing first {MAX_ROWS_PER_SHEET:,} "
+            f"of {len(all_rows) - 1:,} data rows*"
+        )
+    if char_truncated_count is not None:
+        section += (
+            f"\n\n*Truncated by char cap ({MAX_CHARS_PER_SHEET:,}): kept "
+            f"{char_truncated_count:,} of {len(data_rows):,} rows on this file*"
+        )
 
     return section, 1, len(data_rows), 1 if data_rows else 0
 
@@ -200,6 +263,22 @@ async def extract_spreadsheet(filepath: str) -> dict[str, Any]:
         raise DocumentExtractionError(
             f"Unsupported spreadsheet format: {suffix}",
             details={"filepath": filepath, "suffix": suffix},
+        )
+
+    # Workbook-level cap: multi-sheet files can individually pass the per-sheet
+    # cap yet still blow the TELUS gateway budget in aggregate. When the combined
+    # markdown exceeds MAX_CHARS_PER_WORKBOOK, keep the prefix that fits and
+    # annotate the cut so the LLM (and the reviewer) sees the truncation.
+    if len(markdown) > MAX_CHARS_PER_WORKBOOK:
+        original_len = len(markdown)
+        cut_at = markdown.rfind("\n\n", 0, MAX_CHARS_PER_WORKBOOK)
+        if cut_at <= 0:
+            cut_at = MAX_CHARS_PER_WORKBOOK
+        markdown = markdown[:cut_at] + (
+            f"\n\n*Truncated by workbook cap ({MAX_CHARS_PER_WORKBOOK:,} chars): "
+            f"kept first {cut_at:,} of {original_len:,} total chars across "
+            f"{sheet_count} sheet(s). Full data remains on disk at "
+            f"{file_path.name}.*"
         )
 
     result = {

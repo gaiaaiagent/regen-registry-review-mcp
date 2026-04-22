@@ -2,6 +2,81 @@
 
 All notable changes to the Registry Review MCP Server are documented here.
 
+## [2.3.0] - 2026-04-22
+
+Spreadsheet evidence is now visible to the evidence-extraction pipeline.
+Previously, XLSX/CSV/TSV files mapped to a requirement were classified during
+discovery but never converted to markdown in the lazy extraction path, so
+`get_markdown_content` logged `No markdown available` and the LLM never saw
+tabular evidence. This release closes that gap.
+
+### Added
+- **Lazy spreadsheet conversion** in `evidence_tools.extract_all_evidence` —
+  XLSX/XLS/CSV/TSV documents mapped to any requirement are now converted to
+  markdown sidecars alongside the PDF batch, using the existing
+  `spreadsheet_extractor.extract_spreadsheet` implementation. Sidecar naming
+  convention matches `document_processor.fast_extract_all` (`*.fast.md`).
+- **Per-sheet and per-workbook character caps** in `spreadsheet_extractor`.
+  `MAX_CHARS_PER_SHEET = 40_000` protects against a single fat sheet blowing
+  the LLM-prompt budget; `MAX_CHARS_PER_WORKBOOK = 60_000` protects against
+  the multi-sheet case where individually compliant sheets still aggregate
+  past the gateway edge timeout. Both caps annotate the truncation in the
+  markdown footer so the LLM (and the reviewer) knows the evidence is
+  partial and where the full data lives on disk.
+- **Phase D regression harness** — `tests/evaluation/test_v2_3_0_baseline.py`
+  replaces the v2.2.0 regression suite. Parametrized over Burton Latimer and
+  Rockscape Farms. Gated behind `regression` marker. Deselected by default.
+- **Nine new fast-suite tests** across `tests/test_xlsx_lazy_extraction.py`
+  (four tests covering the wiring: xlsx sidecar, csv sidecar, per-file failure
+  handling, batch continuation past one broken doc) and
+  `tests/test_xlsx_large_sheet_cap.py` (five tests covering the caps:
+  row-cap trigger, row-cap non-trigger on small sheets, char-cap trigger,
+  char-cap non-trigger, workbook-cap trigger on multi-sheet input).
+- **Archived v2.2.0 baselines** — moved to
+  `tests/evaluation/baselines/archived/` so any future investigation can
+  replay against the PDF-only-era numbers. The active regression test only
+  checks v2.3.0 going forward.
+
+### Changed
+- **Burton Latimer agreement rose from 95.7% (v2.2.0) to 100.0% (v2.3.0).**
+  XLSX sampling plan records + historic yields now visible to the LLM;
+  under-scoring dropped from 4.3% to 0.0%. Over-scoring unchanged at 0.0%.
+- **Rockscape Farms agreement rose from 91.3% (v2.2.0) to 100.0% (v2.3.0).**
+  Same mechanism; under-scoring dropped from 8.7% to 0.0%. Over-scoring
+  unchanged at 0.0%.
+- **REQ-017 Monitoring Plan systemic bias** (named in Phase C as Phase E's
+  top tuning target) resolved incidentally — the XLSX sampling plans contain
+  the monitoring schedule evidence REQ-017 was previously missing.
+
+### Fixed
+- Document dicts for spreadsheets now get `has_markdown`, `markdown_path`,
+  `active_quality`, and `fast_status` annotated on successful conversion,
+  matching the PDF lazy path convention, so `get_markdown_content` resolves
+  cleanly on subsequent cache-warm runs.
+- Removed redundant inner `from pathlib import Path` inside
+  `extract_all_evidence` that had a subtle scope-analysis interaction with
+  the module-level import.
+
+### Performance
+- Max XLSX markdown sidecar size dropped from 372K chars (pre-cap) to 55K
+  chars after the per-workbook cap. Representative evidence rows are
+  preserved verbatim; the remainder is summarized in a footer.
+- Full-pipeline wall-clock on Burton Latimer (cache-warm Phase D re-run):
+  36.7 min on TELUS GPT-OSS-120B. Rockscape Farms: 43.8 min.
+- Cost: $0 (sovereign TELUS stack).
+
+### Notes
+- XLSX payloads routinely encountered Cloudflare 504/524 gateway timeouts
+  on the TELUS GPT-OSS-120B endpoint during Phase D development. The root
+  cause is edge proxy idle-timeout (~100 s) not token-budget exhaustion;
+  the new char caps keep per-document prompts tractable without reducing
+  the model's context window. Future work (Phase E+) may explore explicit
+  concurrency throttling, prompt chunking for very wide sheets, and
+  alternative edge routes.
+- The `MAX_CHARS_PER_SHEET` / `MAX_CHARS_PER_WORKBOOK` values are empirical
+  and tuned against observed TELUS behavior. Hosts with different gateway
+  timeouts may want to relax them via a future env-var override.
+
 ## [2.2.0] - 2026-04-21
 
 OCR fallback is now **enabled by default**. Image-heavy registry PDFs
