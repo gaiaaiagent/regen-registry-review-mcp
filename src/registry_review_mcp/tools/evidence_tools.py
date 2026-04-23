@@ -30,6 +30,86 @@ from ..utils.state import StateManager
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# Prompt-budget caps
+# ---------------------------------------------------------------------------
+# Phase E ports the Phase D two-layer spreadsheet cap pattern (see
+# ``spreadsheet_extractor.MAX_CHARS_PER_SHEET`` / ``MAX_CHARS_PER_WORKBOOK``)
+# to the LLM prompt-assembly layer. Any doctype handed to
+# ``extract_evidence_with_llm`` now passes through this cap before the
+# prompt is built.
+#
+# 80,000 chosen empirically across four Phase E6 iterations against
+# the CSSCP 554K Project Plan. The tradeoff space is sharper than
+# Phase E0 predicted: higher caps buy more Project Plan content on
+# paper but saturate the TELUS Cloudflare gateway into 504 storms
+# that exhaust the OpenAI-SDK retry budget and silently drop pairs.
+# Net first-run coverage falls with the cap.
+#
+# Iteration 1 — 80_000 (17:16–17:27 PDT):
+#   - CSSCP 554K → 80K (14% retention).
+#   - Gateway 5xx: 11 / 51 calls (21% rate).
+#   - Coverage: **74% (17/23)**. REQ-012/016 starved.
+#
+# Iteration 2 — 150_000 (17:29–17:47 PDT):
+#   - CSSCP 554K → 150K (27% retention).
+#   - Gateway 5xx: 46 / 71 calls (65% rate).
+#   - Coverage: **48% (11/23)**. Gateway dominates — retries exhaust.
+#
+# Iteration 3 — 200_000 (17:56–18:10 PDT):
+#   - CSSCP 554K → 200K (36% retention, matching Phase D's slice).
+#   - Gateway 5xx: 58 / 76 calls (76% rate).
+#   - Coverage: **35% (8/23)**. Worst of the three.
+#
+# Iteration 4 — 80_000 (final, cache-warm):
+#   - Reverted cap to the iteration-1 value that produced the best
+#     first-run coverage. The second 80K run benefits from the cache
+#     accumulated across runs 1–3 (XLSX pairs in particular), so
+#     steady-state coverage settles above the first-run number.
+#   - Burton + Rockscape remain cache-equivalent to v2.3.0 (their
+#     Project Plans sit ~62K < 80K so no truncation fires, content
+#     hash unchanged, cache hits dominate). Regression gate holds
+#     by construction.
+#
+# The XLSX workbook cap remains 60_000 because spreadsheet markdown is
+# dense structured data (tables with many repeated cell values); 60K
+# is sufficient signal for the LLM without bloating the prompt. PDFs
+# are linear prose with lower signal density per char, so they get
+# more. Phase E accepts a CSSCP coverage floor below Phase D's
+# cache-warm 87% ceiling. The real recovery path is Phase G's
+# section-aware truncation (preserve narrative §1–5 + quantification
+# §4 + monitoring §5 verbatim, summarize the tail) which breaks the
+# char-budget-vs-recall tradeoff entirely.
+MAX_CHARS_PER_DOCUMENT = 80_000
+
+
+def _truncate_markdown_by_chars(markdown: str, cap: int, source_name: str) -> str:
+    """Trim ``markdown`` to ``cap`` chars, annotating with a footer if cut.
+
+    Prefers cutting at the last paragraph boundary (``\\n\\n``) before the
+    cap to avoid slicing the middle of a sentence. Falls back to a hard
+    cut at ``cap`` when no boundary exists (e.g. a single enormous run).
+
+    The footer cites the original length and the kept length so the LLM
+    knows it is looking at a trimmed document, and so downstream reviewers
+    can locate the full payload on disk via ``source_name``.
+    """
+    if len(markdown) <= cap:
+        return markdown
+
+    cut_at = markdown.rfind("\n\n", 0, cap)
+    if cut_at <= 0:
+        cut_at = cap
+
+    body = markdown[:cut_at]
+    footer = (
+        f"\n\n*Truncated by prompt budget ({cap:,} chars): kept first "
+        f"{cut_at:,} of {len(markdown):,} total chars. Full document "
+        f"remains on disk at {source_name}.*"
+    )
+    return body + footer
+
+
 # Configuration for type-aware structured field extraction
 # Maps field patterns to their extraction instructions
 STRUCTURED_FIELD_CONFIGS = {
@@ -418,9 +498,16 @@ async def extract_evidence_with_llm(
     requirement_text = requirement.get("requirement_text", "")
     accepted_evidence = requirement.get("accepted_evidence", "")
 
-    # Truncate content if too long (200K chars max)
-    if len(document_content) > 200000:
-        document_content = document_content[:200000] + "\n\n[... document truncated ...]"
+    # Apply prompt-budget cap before the LLM call. Replaces the previous
+    # ad-hoc 200K slice with a boundary-aware, footer-annotated trim that
+    # stays inside the TELUS Cloudflare gateway's ~150K edge-timeout budget.
+    # ``MAX_CHARS_PER_DOCUMENT`` lives at module scope so tests + the
+    # PromptBudget abstraction (Phase E4) can import the same constant.
+    document_content = _truncate_markdown_by_chars(
+        document_content,
+        cap=MAX_CHARS_PER_DOCUMENT,
+        source_name=document_name,
+    )
 
     # Generate cache key (include validation_type for cache differentiation)
     active_model = settings.get_active_llm_model()

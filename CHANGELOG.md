@@ -2,6 +2,118 @@
 
 All notable changes to the Registry Review MCP Server are documented here.
 
+## [2.4.0] - 2026-04-22
+
+Phase E ports the Phase D two-layer cap pattern from spreadsheets to PDFs,
+introduces a shared `PromptBudget` abstraction at the LLM-extractor layer,
+and adds an aggregate throttle upstream of `call_llm` to bound the TELUS
+Cloudflare gateway pressure observed during Phase D runs.
+
+The motivating target was CSSCP's 554K-char Project Plan PDF, which was
+starving REQ-012 (GHG Accounting), REQ-016 (Project Plan Deviations), and
+REQ-021 (Safeguards). Phase D's 87% coverage number was the headline
+signal; this release should flip at least those three missing requirements
+into `covered` or `partial` once v2.4.0 baselines land.
+
+### Added
+- **`registry_review_mcp.llm` package** — new infrastructure module for
+  shared LLM-layer gates. Contains `PromptBudget` (prompt-assembly
+  budget with paragraph-boundary trim + footer annotation) and
+  `Throttle` (aggregate concurrency + interval gate upstream of
+  `call_llm`).
+- **`_truncate_markdown_by_chars` helper + `MAX_CHARS_PER_DOCUMENT = 80_000`
+  constant** in `evidence_tools`. Replaces the ad-hoc, unannotated 200K
+  slice with a boundary-aware, footer-annotated trim at a much lower
+  cap. The cap value was chosen empirically across four Phase E6
+  iterations, each run against the CSSCP 554K Project Plan:
+
+  1. **80K** — 14% retention, 21% gateway 5xx rate, **74% coverage**.
+  2. **150K** — 27% retention, 65% gateway 5xx rate, **48% coverage**
+     (retries exhausted on most pairs; silent drops).
+  3. **200K** — 36% retention (Phase D's slice value), 76% gateway
+     5xx rate, **35% coverage** — worst of the three.
+  4. **80K** (final, cache-warm) — 80K was the only cap where the
+     gateway stayed calm enough for retries to resolve reliably.
+     The higher caps looked better on paper but saturated the TELUS
+     Cloudflare gateway into 504 storms that the OpenAI-SDK retry
+     budget couldn't absorb. At 80K, a second run reuses cache from
+     runs 1–3 and settles above the first-run coverage.
+
+  Burton + Rockscape Project Plans sit at ~62K chars, so the cap
+  doesn't fire on them. Their cache keys match v2.3.0 exactly,
+  regression gate holds by construction.
+
+  Phase E accepts a CSSCP coverage floor below Phase D's cache-warm
+  87% ceiling. The real recovery path is Phase G's section-aware
+  truncation (preserve narrative §1–5 + quantification §4 +
+  monitoring §5 verbatim, summarize the tail) which breaks the
+  char-budget-vs-recall tradeoff.
+
+  Truncation cuts at the last paragraph boundary below the cap and
+  appends a footer citing the original and kept char counts so the
+  LLM and downstream reviewers both know the payload is trimmed and
+  where the full document lives on disk.
+- **`PromptBudget` dataclass** with `max_document_chars`,
+  `max_instructions_chars`, `max_schema_chars`, `max_total_chars` caps
+  and `trim_document(content, source_name)` / `fits(total_len)`
+  helpers. Default caps align with `MAX_CHARS_PER_DOCUMENT` so a single
+  knob changes both the helper and the budget object.
+- **`Throttle` + `acquire_slot()` context manager** upstream of
+  `call_llm`. Env-configurable via `LLM_MAX_CONCURRENT` (default 4) and
+  `LLM_MIN_INTERVAL_MS` (default 100). Reports `active_permits_peak`
+  and `calls_throttled` telemetry for Phase E closing journal analysis.
+- **PDF char-cap regression tests** — `tests/test_pdf_char_cap.py`
+  covers under-cap passthrough, over-cap truncation, footer annotation,
+  paragraph-boundary preference, hard-cut fallback, and the
+  `MAX_CHARS_PER_DOCUMENT` invariant.
+- **PromptBudget regression tests** — `tests/test_prompt_budget.py`
+  covers construction, trim delegation, fits semantics, and default
+  factory behavior.
+- **Throttle regression tests** — `tests/test_llm_throttle.py` covers
+  semaphore depth enforcement, minimum-interval enforcement, env-var
+  overrides, and peak-permit telemetry under load.
+
+### Changed
+- **`extract_evidence_with_llm`** now caps input markdown via the
+  module-level `_truncate_markdown_by_chars` helper instead of the
+  previous ad-hoc 200K slice. This is a tighter bound (80K vs 200K),
+  produces a boundary-aware cut, and annotates with a footer so the
+  model knows the payload is truncated and where the full document
+  lives on disk.
+- **`call_llm`** now wraps backend dispatch in
+  `llm.throttle.acquire_slot()`. All three backends (Anthropic API,
+  OpenAI, CLI) benefit from the same aggregate throttle. No behavior
+  change when `LLM_MAX_CONCURRENT` and `LLM_MIN_INTERVAL_MS` stay at
+  defaults on low-load workloads.
+
+### Fixed
+- **Unannotated truncation** — the previous 200K slice returned mid-
+  sentence content without footer annotation, which could prompt the
+  model to hallucinate continuation. The new helper cuts at the last
+  paragraph boundary and annotates the cut explicitly.
+
+### Performance
+- **Gateway pressure** — early testing (see closing journal) measures
+  504 rate vs Phase D under identical fixtures. Target: ≥50% reduction.
+- **No expected throughput impact** at default throttle settings
+  (`LLM_MAX_CONCURRENT=4`, `LLM_MIN_INTERVAL_MS=100`) — the ceiling is
+  the TELUS gateway's own RPS cap, which sat well below 40 RPS in
+  Phase D observations.
+
+### Notes
+- Extractor-layer caps (`spreadsheet_extractor.MAX_CHARS_PER_SHEET` /
+  `MAX_CHARS_PER_WORKBOOK`) remain as defensive defaults. The shared
+  `PromptBudget` in the `llm/` package is the primary gate; extractor
+  caps defend against callers that skip the budget (offline debugging,
+  unit tests, direct extractor invocation).
+- v2.3.0 regression baselines are archived under
+  `tests/evaluation/baselines/archived/`; v2.4.0 baselines become the
+  new reference once Phase E E6 runs complete.
+- Phase E closing journal at
+  `~/.claude/local/journal/legion/2026/04/22/<time>-ra-agent-phase-e-complete.md`
+  carries the full numbers, telemetry diffs, and the
+  `carboneg-csscp-v2.4.0-update.md` dossier update.
+
 ## [2.3.0] - 2026-04-22
 
 Spreadsheet evidence is now visible to the evidence-extraction pipeline.

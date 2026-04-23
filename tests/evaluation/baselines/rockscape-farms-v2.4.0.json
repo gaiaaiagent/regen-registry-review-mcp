@@ -1,0 +1,666 @@
+{
+  "schema_version": "v2.2.0",
+  "fixture_name": "rockscape-farms",
+  "phase": "e",
+  "run_date": "2026-04-23",
+  "review_json": "/home/shawn/.claude/local/ventures/docs/regen-ai/phase-e/artifacts/rockscape-farms-2026-04-23-review.json",
+  "ground_truth_json": "/home/shawn/.claude/local/ventures/docs/regen-ai/phase-e/ground-truth/rockscape-farms-ground-truth.json",
+  "n_requirements": 23,
+  "matched_pairs": 23,
+  "unmatched_gt": 0,
+  "unmatched_ra": 0,
+  "exact_agreement": 1.0,
+  "exact_agreement_ci_low": 0.8569,
+  "exact_agreement_ci_high": 1.0,
+  "under_scoring": 0.0,
+  "over_scoring": 0.0,
+  "under_scoring_count": 0,
+  "over_scoring_count": 0,
+  "confusion_matrix": {
+    "covered": {
+      "approved": 23,
+      "approved_with_comments": 0,
+      "empty": 0,
+      "not_approved": 0,
+      "partial": 0,
+      "with_comments": 0
+    },
+    "flagged": {
+      "approved": 0,
+      "approved_with_comments": 0,
+      "empty": 0,
+      "not_approved": 0,
+      "partial": 0,
+      "with_comments": 0
+    },
+    "missing": {
+      "approved": 0,
+      "approved_with_comments": 0,
+      "empty": 0,
+      "not_approved": 0,
+      "partial": 0,
+      "with_comments": 0
+    },
+    "partial": {
+      "approved": 0,
+      "approved_with_comments": 0,
+      "empty": 0,
+      "not_approved": 0,
+      "partial": 0,
+      "with_comments": 0
+    },
+    "suggested": {
+      "approved": 0,
+      "approved_with_comments": 0,
+      "empty": 0,
+      "not_approved": 0,
+      "partial": 0,
+      "with_comments": 0
+    },
+    "unmatched": {
+      "approved": 0,
+      "approved_with_comments": 0,
+      "empty": 0,
+      "not_approved": 0,
+      "partial": 0,
+      "with_comments": 0
+    }
+  },
+  "per_category": {
+    "General": {
+      "n": 1,
+      "agreed": 1,
+      "under": 0,
+      "over": 0,
+      "rate": 1.0
+    },
+    "Land  Tenure": {
+      "n": 1,
+      "agreed": 1,
+      "under": 0,
+      "over": 0,
+      "rate": 1.0
+    },
+    "Project  Area": {
+      "n": 2,
+      "agreed": 2,
+      "under": 0,
+      "over": 0,
+      "rate": 1.0
+    },
+    "Project Boundary": {
+      "n": 1,
+      "agreed": 1,
+      "under": 0,
+      "over": 0,
+      "rate": 1.0
+    },
+    "Project Ownership": {
+      "n": 1,
+      "agreed": 1,
+      "under": 0,
+      "over": 0,
+      "rate": 1.0
+    },
+    "Project Start Date": {
+      "n": 1,
+      "agreed": 1,
+      "under": 0,
+      "over": 0,
+      "rate": 1.0
+    },
+    "Ecosystem Type": {
+      "n": 2,
+      "agreed": 2,
+      "under": 0,
+      "over": 0,
+      "rate": 1.0
+    },
+    "Crediting Period": {
+      "n": 1,
+      "agreed": 1,
+      "under": 0,
+      "over": 0,
+      "rate": 1.0
+    },
+    "GHG Accounting": {
+      "n": 3,
+      "agreed": 3,
+      "under": 0,
+      "over": 0,
+      "rate": 1.0
+    },
+    "Regulatory Compliance": {
+      "n": 1,
+      "agreed": 1,
+      "under": 0,
+      "over": 0,
+      "rate": 1.0
+    },
+    "Registration on Other Registries": {
+      "n": 1,
+      "agreed": 1,
+      "under": 0,
+      "over": 0,
+      "rate": 1.0
+    },
+    "Project Plan Deviations": {
+      "n": 1,
+      "agreed": 1,
+      "under": 0,
+      "over": 0,
+      "rate": 1.0
+    },
+    "Monitoring Plan": {
+      "n": 1,
+      "agreed": 1,
+      "under": 0,
+      "over": 0,
+      "rate": 1.0
+    },
+    "Risk Management": {
+      "n": 1,
+      "agreed": 1,
+      "under": 0,
+      "over": 0,
+      "rate": 1.0
+    },
+    "Safeguards": {
+      "n": 5,
+      "agreed": 5,
+      "under": 0,
+      "over": 0,
+      "rate": 1.0
+    }
+  },
+  "per_row": [
+    {
+      "gt_requirement_text": "Projects shall apply the latest version of the applicable credit class and methodology   Source: Program Guide, Section 8.1.3",
+      "gt_category": "General",
+      "gt_verdict": "approved",
+      "gt_comments": "",
+      "ra_requirement_id": "REQ-001",
+      "ra_requirement_text": "Projects shall apply the latest version of the applicable credit class and methodology",
+      "ra_category": "General",
+      "ra_status": "covered",
+      "ra_confidence": 0.98,
+      "ra_snippets": 7,
+      "ra_page_citations": [
+        "108196Rockscape23 Project Plan.pdf (Section 1.3 Credit Class and Methodology, p.6)",
+        "108196Rockscape23 Project Plan.pdf (Section 3.1 Applicability of Credit Class and Methodology, p.19)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 1.3. Credit Class and Methodology, p.6)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 1.3. Credit Class and Methodology, p.6)",
+        "108196Rockscape23 Project Plan.pdf (Section 1.3 Credit Class and Methodology, p.6)"
+      ],
+      "match_ratio": 0.973,
+      "direction": "agreed"
+    },
+    {
+      "gt_requirement_text": "Provide evidence of legal land tenure and control over the project area for the crediting period. In the case of leased land this must inclu",
+      "gt_category": "Land  Tenure",
+      "gt_verdict": "approved",
+      "gt_comments": "Project area ownership clear between land registry and Project Plan",
+      "ra_requirement_id": "REQ-002",
+      "ra_requirement_text": "Provide evidence of legal land tenure and control over the project area for the crediting period. In the case of leased land this must include landowner approval",
+      "ra_category": "Land Tenure",
+      "ra_status": "covered",
+      "ra_confidence": 0.99,
+      "ra_snippets": 15,
+      "ra_page_citations": [
+        "Official Copy (Register) - HS387712.pdf (Section B: Proprietorship Register, p.2)",
+        "Official Copy (Register) - HS387712.pdf (Section A: Property Register, p.2)",
+        "Official Copy (Register) - HS345081.pdf (Section A: Property Register, p.2)",
+        "Official Copy (Register) - HS345081.pdf (Section B: Proprietorship Register, p.3)",
+        "Official Copy (Register) - HS364136.pdf (Section B: Proprietorship Register, p.2)"
+      ],
+      "match_ratio": 0.9756,
+      "direction": "agreed"
+    },
+    {
+      "gt_requirement_text": "Demonstrate the property was not converted from natural ecosystems in the ten years before the project start date.  Source: Program Guide, S",
+      "gt_category": "Project  Area",
+      "gt_verdict": "approved",
+      "gt_comments": "",
+      "ra_requirement_id": "REQ-003",
+      "ra_requirement_text": "Demonstrate the property was not converted from natural ecosystems in the ten years before the project start date",
+      "ra_category": "Project Area",
+      "ra_status": "covered",
+      "ra_confidence": 0.98,
+      "ra_snippets": 11,
+      "ra_page_citations": [
+        "108196Rockscape23 Project Plan.pdf (Section 1.4. Project Eligibility, p.7)",
+        "108196Rockscape23 Project Plan.pdf (Section 3.1. Prior Land Use Eligibility, p.19)",
+        "108196Rockscape23 Project Plan.pdf (Section Appendix \u2013 Land Cover Maps, p.32)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 1.4. Project Eligibility, p.7)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 3.1. Prior Land Use Eligibility, p.18)"
+      ],
+      "match_ratio": 0.9293,
+      "direction": "agreed"
+    },
+    {
+      "gt_requirement_text": "Clearly define geographic boundaries of the project area with clear demarcation of areas eligible or ineligible for credit estimation.   Sou",
+      "gt_category": "Project  Area",
+      "gt_verdict": "approved",
+      "gt_comments": "Gross area 280.58 ha",
+      "ra_requirement_id": "REQ-004",
+      "ra_requirement_text": "Clearly define geographic boundaries of the project area with clear demarcation of areas eligible or ineligible for credit estimation",
+      "ra_category": "Project Area",
+      "ra_status": "covered",
+      "ra_confidence": 0.96,
+      "ra_snippets": 16,
+      "ra_page_citations": [
+        "108196Rockscape23 Project Plan.pdf (Section 3.2. Project Boundary, p.20)",
+        "108196Rockscape23 Project Plan.pdf (Section 5. Monitoring \u2013 Sampling Method, p.29)",
+        "108196Rockscape23 Project Plan.pdf (Section 5. Monitoring \u2013 Sampling Method, p.29)",
+        "108196Rockscape23 Project Plan.pdf (Section 5. Monitoring \u2013 Sampling Method, p.30)",
+        "108196Rockscape23 Project Plan.pdf (Section Appendix \u2013 Land Cover Maps, p.32)"
+      ],
+      "match_ratio": 1.0,
+      "direction": "agreed"
+    },
+    {
+      "gt_requirement_text": "Describe the project boundary, including relevant GHG sinks, sources, reservoirs, and other relevant ecological indicators. (if applicable) ",
+      "gt_category": "Project Boundary",
+      "gt_verdict": "approved",
+      "gt_comments": "",
+      "ra_requirement_id": "REQ-005",
+      "ra_requirement_text": "Describe the project boundary, including relevant GHG sinks, sources, reservoirs, and other relevant ecological indicators (if applicable)",
+      "ra_category": "Project Boundary",
+      "ra_status": "covered",
+      "ra_confidence": 0.99,
+      "ra_snippets": 5,
+      "ra_page_citations": [
+        "108196Rockscape23 Project Plan.pdf (Section 3.2. Project Boundary, p.20)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 3.2. Project Boundary, p.19)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 1.2. Summary Description of the Project, p.4)",
+        "108196Rockscape23 Project Plan.pdf (Section 3.2. Project Boundary, p.20)",
+        "108196Rockscape23 Project Plan.pdf (Section 1.2. Summary Description of the Project, p.4)"
+      ],
+      "match_ratio": 1.0,
+      "direction": "agreed"
+    },
+    {
+      "gt_requirement_text": "The project proponent must stipulate the ownership of credits and how they are distributed among stakeholders.  Source: Program Guide, Secti",
+      "gt_category": "Project Ownership",
+      "gt_verdict": "approved",
+      "gt_comments": "",
+      "ra_requirement_id": "REQ-006",
+      "ra_requirement_text": "The project proponent must stipulate the ownership of credits and how they are distributed among stakeholders",
+      "ra_category": "Project Ownership",
+      "ra_status": "covered",
+      "ra_confidence": 0.99,
+      "ra_snippets": 7,
+      "ra_page_citations": [
+        "108196Rockscape23 Project Plan.pdf (Section 1.7. Project Ownership, p.9)",
+        "108196Rockscape23 Project Plan.pdf (Section 1.6. Project Actors, p.8)",
+        "108196Rockscape23 Project Plan.pdf (Section Land Ownership, p.37)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 1.7. Project Ownership, p.8)",
+        "108196Rockscape23 Public Project Plan.pdf (Section Land Ownership, p.36)"
+      ],
+      "match_ratio": 1.0,
+      "direction": "agreed"
+    },
+    {
+      "gt_requirement_text": "Project must stipulate the Project Start Date and justify how it meets the eligibility requirements   Source: Program Guide, Section 8.6",
+      "gt_category": "Project Start Date",
+      "gt_verdict": "approved",
+      "gt_comments": "Start date as 01/01/2023",
+      "ra_requirement_id": "REQ-007",
+      "ra_requirement_text": "Project must stipulate the Project Start Date and justify how it meets the eligibility requirements",
+      "ra_category": "Project Start Date",
+      "ra_status": "covered",
+      "ra_confidence": 0.99,
+      "ra_snippets": 3,
+      "ra_page_citations": [
+        "108196Rockscape23 Project Plan.pdf (Section 1.8. Project Start Date, p.9)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 1.8. Project Start Date, p.8)",
+        "108196Rockscape23 Project Plan.pdf (Section 1.8. Project Start Date, p.9)"
+      ],
+      "match_ratio": 0.9998,
+      "direction": "agreed"
+    },
+    {
+      "gt_requirement_text": "Classification: Identify and classify the ecosystem being restored or managed, with details on vegetation types, soil characteristics, and c",
+      "gt_category": "Ecosystem Type",
+      "gt_verdict": "approved",
+      "gt_comments": "",
+      "ra_requirement_id": "REQ-008",
+      "ra_requirement_text": "Classification: Identify and classify the ecosystem being restored or managed, with details on vegetation types, soil characteristics, and climate zone",
+      "ra_category": "Ecosystem Type",
+      "ra_status": "covered",
+      "ra_confidence": 0.98,
+      "ra_snippets": 49,
+      "ra_page_citations": [
+        "108196Rockscape23 Project Plan.pdf (Section Habitat, p.11)",
+        "108196Rockscape23 Project Plan.pdf (Section Environmental Conditions of Project Area, p.11)",
+        "108196Rockscape23 Project Plan.pdf (Section 3.1. Applicability of Credit Class and Methodology, p.19)",
+        "108196Rockscape23 Project Plan.pdf (Section 3.1. Applicability of Credit Class and Methodology, p.19)",
+        "108196Rockscape23 Project Plan.pdf (Section 1.2. Summary Description of the Project, p.4)"
+      ],
+      "match_ratio": 1.0,
+      "direction": "agreed"
+    },
+    {
+      "gt_requirement_text": "Conditions of applicability: Project area ecosystem type may not change within 5 years prior to project start state.    Source: Credit Class",
+      "gt_category": "Ecosystem Type",
+      "gt_verdict": "approved",
+      "gt_comments": "",
+      "ra_requirement_id": "REQ-009",
+      "ra_requirement_text": "Conditions of applicability: Project area ecosystem type may not change within 5 years prior to project start state",
+      "ra_category": "Ecosystem Type",
+      "ra_status": "covered",
+      "ra_confidence": 0.98,
+      "ra_snippets": 33,
+      "ra_page_citations": [
+        "108196Rockscape23 Project Plan.pdf (Section 1.4. Project Eligibility, p.7)",
+        "108196Rockscape23 Project Plan.pdf (Section 3.1. Applicability of Credit Class and Methodology, p.19)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 1.4. Project Eligibility, p.7)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 3.1. Prior Land Use Eligibility, p.18)",
+        "108196Rockscape23 Project Plan.pdf (Section 1.4. Project Eligibility, p.7)"
+      ],
+      "match_ratio": 1.0,
+      "direction": "agreed"
+    },
+    {
+      "gt_requirement_text": "Define the crediting period and ensure compliance with credit class rules, which allows for a 10 year crediting period with option to renew ",
+      "gt_category": "Crediting Period",
+      "gt_verdict": "approved",
+      "gt_comments": "Crediting period is 10 years 01/01/2023 to 31/12/2032..",
+      "ra_requirement_id": "REQ-010",
+      "ra_requirement_text": "Define the crediting period and ensure compliance with credit class rules, which allows for a 10 year crediting period with option to renew",
+      "ra_category": "Crediting Period",
+      "ra_status": "covered",
+      "ra_confidence": 0.99,
+      "ra_snippets": 6,
+      "ra_page_citations": [
+        "108196Rockscape23 Project Plan.pdf (Section 1.4. Project Eligibility, p.7)",
+        "108196Rockscape23 Project Plan.pdf (Section 1.9. Project Crediting Period, p.9)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 1.4. Project Eligibility, p.7)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 1.9. Project Crediting Period, p.8)",
+        "108196Rockscape23 Project Plan.pdf (Section 1.4. Project Eligibility, p.7)"
+      ],
+      "match_ratio": 0.9629,
+      "direction": "agreed"
+    },
+    {
+      "gt_requirement_text": "Additionality: prove that additionality test has been undertaken using one of the listed tests   Source: Credit Class, Section 5.1",
+      "gt_category": "GHG Accounting",
+      "gt_verdict": "approved",
+      "gt_comments": "",
+      "ra_requirement_id": "REQ-011",
+      "ra_requirement_text": "Additionality: prove that additionality test has been undertaken using one of the listed tests",
+      "ra_category": "GHG Accounting",
+      "ra_status": "covered",
+      "ra_confidence": 0.99,
+      "ra_snippets": 4,
+      "ra_page_citations": [
+        "108196Rockscape23 Project Plan.pdf (Section 3.4. Additionality, p.22)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 3.4. Additionality, p.21)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 3.4. Additionality, p.21)",
+        "108196Rockscape23 Project Plan.pdf (Section 3.4. Additionality, p.22)"
+      ],
+      "match_ratio": 0.9968,
+      "direction": "agreed"
+    },
+    {
+      "gt_requirement_text": "Leakage: Demonstrate that leakage is >10% reduction in baseline yield  Source: Credit Class, Section 5.2",
+      "gt_category": "GHG Accounting",
+      "gt_verdict": "approved",
+      "gt_comments": "Leakage considered de minimis",
+      "ra_requirement_id": "REQ-012",
+      "ra_requirement_text": "Leakage: Demonstrate that leakage is >10% reduction in baseline yield",
+      "ra_category": "GHG Accounting",
+      "ra_status": "covered",
+      "ra_confidence": 0.98,
+      "ra_snippets": 3,
+      "ra_page_citations": [
+        "108196Rockscape23 Project Plan.pdf (Section 4.3. Leakage, p.24)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 4.3. Leakage, p.23)",
+        "108196Rockscape23 Project Plan.pdf (Section 4.3. Leakage, p.24)"
+      ],
+      "match_ratio": 0.9523,
+      "direction": "agreed"
+    },
+    {
+      "gt_requirement_text": "Permanence Period: the project shall have a 10-year permanence period   Source: Credit Class, Section 5.3",
+      "gt_category": "GHG Accounting",
+      "gt_verdict": "approved",
+      "gt_comments": "Stated as 01/01/2033 to 31/12/2042.",
+      "ra_requirement_id": "REQ-013",
+      "ra_requirement_text": "Permanence Period: the project shall have a 10-year permanence period",
+      "ra_category": "GHG Accounting",
+      "ra_status": "covered",
+      "ra_confidence": 0.99,
+      "ra_snippets": 8,
+      "ra_page_citations": [
+        "108196Rockscape23 Project Plan.pdf (Section 1.10. Permanence Period, p.10)",
+        "108196Rockscape23 Project Plan.pdf (Section 1.4. Project Eligibility, p.7)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 1.10. Permanence Period, p.9)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 1.4. Project Eligibility, p.7)",
+        "108196Rockscape23 Project Plan.pdf (Section 1.10. Permanence Period, p.10)"
+      ],
+      "match_ratio": 0.9523,
+      "direction": "agreed"
+    },
+    {
+      "gt_requirement_text": "Provide attestation of regulatory compliance demonstrating the project is materially compliant to all laws, regulations, and other legally b",
+      "gt_category": "Regulatory Compliance",
+      "gt_verdict": "approved",
+      "gt_comments": "",
+      "ra_requirement_id": "REQ-014",
+      "ra_requirement_text": "Provide attestation of regulatory compliance demonstrating the project is materially compliant to all laws, regulations, and other legally binding mandates directly related to project activities",
+      "ra_category": "Regulatory Compliance",
+      "ra_status": "covered",
+      "ra_confidence": 0.98,
+      "ra_snippets": 10,
+      "ra_page_citations": [
+        "108196Rockscape23 Project Plan.pdf (Section 1.4. Project Eligibility, p.4)",
+        "108196Rockscape23 Project Plan.pdf (Section 1.14. Compliance with Laws, Statutes, and Other Regulatory Frameworks, p.16)",
+        "108196Rockscape23 Project Plan.pdf (Section 3.4. Additionality, p.22)",
+        "108196Rockscape23 Project Plan.pdf (Section Rules and Regulations Relating to Activities Carried Out, p.33)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 1.14. Compliance with Laws, Statutes, and Other Regulatory Frameworks, p.15)"
+      ],
+      "match_ratio": 1.0,
+      "direction": "agreed"
+    },
+    {
+      "gt_requirement_text": "Project Proponents must disclose if they have applied, been listed, registered, or issued credits under another registry, or if they have kn",
+      "gt_category": "Registration on Other Registries",
+      "gt_verdict": "approved",
+      "gt_comments": "This project has not been registered in any other GHG or environmental crediting programs",
+      "ra_requirement_id": "REQ-015",
+      "ra_requirement_text": "Project Proponents must disclose if they have applied, been listed, registered, or issued credits under another registry, or if they have known plans to apply in the future",
+      "ra_category": "Registration on Other Registries",
+      "ra_status": "covered",
+      "ra_confidence": 0.98,
+      "ra_snippets": 3,
+      "ra_page_citations": [
+        "108196Rockscape23 Project Plan.pdf (Section 1.15. Participation in Other GHG or Environmental Crediting Programs, p.16)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 1.15. Participation in Other GHG or Environmental Crediting Programs, p.15)",
+        "108196Rockscape23 Project Plan.pdf (Section 1.15. Participation in Other GHG or Environmental Crediting Programs, p.16)"
+      ],
+      "match_ratio": 1.0,
+      "direction": "agreed"
+    },
+    {
+      "gt_requirement_text": "Project Plan deviations must provide evidence that the proposed deviation meets the conservativeness standards of the Credit Protocol.  Sour",
+      "gt_category": "Project Plan Deviations",
+      "gt_verdict": "approved",
+      "gt_comments": "No deviations referenced or submitted",
+      "ra_requirement_id": "REQ-016",
+      "ra_requirement_text": "Project Plan deviations must provide evidence that the proposed deviation meets the conservativeness standards of the Credit Protocol",
+      "ra_category": "Project Plan Deviations",
+      "ra_status": "covered",
+      "ra_confidence": 0.98,
+      "ra_snippets": 3,
+      "ra_page_citations": [
+        "108196Rockscape23 Project Plan.pdf (Section 3.5. Credit Class & Methodology Deviations, p.23)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 3.5. Credit Class & Methodology Deviations, p.22)",
+        "108196Rockscape23 Project Plan.pdf (Section 3.5. Credit Class & Methodology Deviations, p.23)"
+      ],
+      "match_ratio": 1.0,
+      "direction": "agreed"
+    },
+    {
+      "gt_requirement_text": "Provide a detailed plan for ongoing monitoring, including indicators, methods, and responsibilities.   Source: Methodology, Section 5.1",
+      "gt_category": "Monitoring Plan",
+      "gt_verdict": "approved",
+      "gt_comments": "Includes sampling method, laboratory analysis, AI training, AI accuracy, GHG emissions monitoring procedures",
+      "ra_requirement_id": "REQ-017",
+      "ra_requirement_text": "Provide a detailed plan for ongoing monitoring, including indicators, methods, and responsibilities",
+      "ra_category": "Monitoring Plan",
+      "ra_status": "covered",
+      "ra_confidence": 0.96,
+      "ra_snippets": 46,
+      "ra_page_citations": [
+        "Y631_22850_CC_CSV.CSV (Section Monitoring Schedule, p.1)",
+        "Y631_22850_CC_CSV.CSV (Section Soil Sampling Protocol, p.1)",
+        "Y631_22850_CC_CSV.CSV (Section Monitoring Responsibilities, p.1)",
+        "Y631_22967_CC_CSV.CSV (Section Soil Sampling Data, p.1)",
+        "Y631_22852_CC_CSV.CSV (Section Y631_22852_CC_CSV, p.1)"
+      ],
+      "match_ratio": 1.0,
+      "direction": "agreed"
+    },
+    {
+      "gt_requirement_text": "Provide buffer pool contributions of each issuance of 20%  Source: Credit Class, Section 5.4",
+      "gt_category": "Risk Management",
+      "gt_verdict": "approved",
+      "gt_comments": "20% of each credit issuance (as quantified by the latest monitoring report) is required for this credit class, with 10% allocated to the Crediting Term Buffer Pool and 10% to the Permanence Reversal B",
+      "ra_requirement_id": "REQ-018",
+      "ra_requirement_text": "Provide buffer pool contributions of each issuance of 20%",
+      "ra_category": "Risk Management",
+      "ra_status": "covered",
+      "ra_confidence": 0.99,
+      "ra_snippets": 3,
+      "ra_page_citations": [
+        "108196Rockscape23 Project Plan.pdf (Section Buffer Pools, p.26)",
+        "108196Rockscape23 Public Project Plan.pdf (Section Buffer Pools, p.25)",
+        "108196Rockscape23 Project Plan.pdf (Section Buffer Pools, p.26)"
+      ],
+      "match_ratio": 0.9203,
+      "direction": "agreed"
+    },
+    {
+      "gt_requirement_text": "Environmental, socio-economic safeguards: Project Proponents  must identify and address any negative environmental and socio-economic impact",
+      "gt_category": "Safeguards",
+      "gt_verdict": "approved",
+      "gt_comments": "No further documentation was supplied beyond the referenced material in the Project Plan.",
+      "ra_requirement_id": "REQ-019",
+      "ra_requirement_text": "Environmental, socio-economic safeguards: Project Proponents must identify and address any negative environmental and socio-economic impacts of Project Activities and engage with local stakeholders to mitigate them",
+      "ra_category": "Safeguards",
+      "ra_status": "covered",
+      "ra_confidence": 0.96,
+      "ra_snippets": 15,
+      "ra_page_citations": [
+        "108196Rockscape23 Project Plan.pdf (Section 2.1 No Net Harm, p.17)",
+        "108196Rockscape23 Project Plan.pdf (Section 2.1 No Net Harm, p.17)",
+        "108196Rockscape23 Project Plan.pdf (Section 2.2 Local Stakeholder Consultation, p.17)",
+        "108196Rockscape23 Project Plan.pdf (Section 2.3 Environmental Impact, p.18)",
+        "108196Rockscape23 Project Plan.pdf (Section 2.4 Public Comment, p.18)"
+      ],
+      "match_ratio": 1.0,
+      "direction": "agreed"
+    },
+    {
+      "gt_requirement_text": "No Net Harm: detail any potential negative socio-economic and environmental impacts of the project and the steps taken to mitigate them.  So",
+      "gt_category": "Safeguards",
+      "gt_verdict": "approved",
+      "gt_comments": "No further documentation was supplied beyond the referenced material in the Project Plan.",
+      "ra_requirement_id": "REQ-020",
+      "ra_requirement_text": "No Net Harm: detail any potential negative socio-economic and environmental impacts of the project and the steps taken to mitigate them",
+      "ra_category": "Safeguards",
+      "ra_status": "covered",
+      "ra_confidence": 0.98,
+      "ra_snippets": 17,
+      "ra_page_citations": [
+        "108196Rockscape23 Project Plan.pdf (Section 2.1. No Net Harm, p.17)",
+        "108196Rockscape23 Project Plan.pdf (Section 2.1. No Net Harm, p.17)",
+        "108196Rockscape23 Project Plan.pdf (Section 2.2. Local Stakeholder Consultation, p.17)",
+        "108196Rockscape23 Project Plan.pdf (Section 2.3. Environmental Impact, p.18)",
+        "108196Rockscape23 Project Plan.pdf (Section 2.4. Public Comment, p.18)"
+      ],
+      "match_ratio": 1.0,
+      "direction": "agreed"
+    },
+    {
+      "gt_requirement_text": "Local Stakeholder Consultation: Project Proponent must indicate how local stakeholders were identified and consulted prior to project implem",
+      "gt_category": "Safeguards",
+      "gt_verdict": "approved",
+      "gt_comments": "No further documentation was supplied beyond the referenced material in the Project Plan.",
+      "ra_requirement_id": "REQ-021",
+      "ra_requirement_text": "Local Stakeholder Consultation: Project Proponent must indicate how local stakeholders were identified and consulted prior to project implementation",
+      "ra_category": "Safeguards",
+      "ra_status": "covered",
+      "ra_confidence": 0.97,
+      "ra_snippets": 7,
+      "ra_page_citations": [
+        "108196Rockscape23 Project Plan.pdf (Section 2.2. Local Stakeholder Consultation, p.17)",
+        "108196Rockscape23 Project Plan.pdf (Section 2.1. No Net Harm, p.17)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 2.1. No Net Harm, p.16)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 2.2. Local Stakeholder Consultation, p.16)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 2.2. Local Stakeholder Consultation, p.17)"
+      ],
+      "match_ratio": 1.0,
+      "direction": "agreed"
+    },
+    {
+      "gt_requirement_text": "Environmental Impact: Project Proponent must indicate if environmental impact assessments were undertaken and describe the process and findi",
+      "gt_category": "Safeguards",
+      "gt_verdict": "approved",
+      "gt_comments": "Whole farm enterprise emissions was conducted",
+      "ra_requirement_id": "REQ-022",
+      "ra_requirement_text": "Environmental Impact: Project Proponent must indicate if environmental impact assessments were undertaken and describe the process and findings",
+      "ra_category": "Safeguards",
+      "ra_status": "covered",
+      "ra_confidence": 0.96,
+      "ra_snippets": 5,
+      "ra_page_citations": [
+        "108196Rockscape23 Project Plan.pdf (Section 2.3. Environmental Impact, p.18)",
+        "108196Rockscape23 Project Plan.pdf (Section 2.1. No Net Harm, p.17)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 2.3. Environmental Impact, p.17)",
+        "108196Rockscape23 Project Plan.pdf (Section 2.3. Environmental Impact, p.18)",
+        "108196Rockscape23 Project Plan.pdf (Section 2.1. No Net Harm, p.17)"
+      ],
+      "match_ratio": 1.0,
+      "direction": "agreed"
+    },
+    {
+      "gt_requirement_text": "Public comment: Specify if community public consultation was undertaken during the project implementation and how comments were addressed.  ",
+      "gt_category": "Safeguards",
+      "gt_verdict": "approved",
+      "gt_comments": "N/A due project characteristics",
+      "ra_requirement_id": "REQ-023",
+      "ra_requirement_text": "Public comment: Specify if community public consultation was undertaken during the project implementation and how comments were addressed",
+      "ra_category": "Safeguards",
+      "ra_status": "covered",
+      "ra_confidence": 0.98,
+      "ra_snippets": 5,
+      "ra_page_citations": [
+        "108196Rockscape23 Project Plan.pdf (Section 2.4. Public Comment, p.18)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 2.4. Public Comment, p.17)",
+        "108196Rockscape23 Public Project Plan.pdf (Section 2.1. No Net Harm, p.16)",
+        "108196Rockscape23 Project Plan.pdf (Section 2.1. No Net Harm, p.17)",
+        "108196Rockscape23 Project Plan.pdf (Section 2.4. Public Comment, p.18)"
+      ],
+      "match_ratio": 1.0,
+      "direction": "agreed"
+    }
+  ],
+  "baseline_comparison": {
+    "baseline_path": "/home/shawn/.claude/local/ventures/docs/regen-ai/repos/regen-registry-review-mcp/tests/evaluation/baselines/rockscape-farms-v2.3.0.json",
+    "baseline_exact_agreement": 1.0,
+    "baseline_under_scoring": 0.0,
+    "baseline_over_scoring": 0.0,
+    "delta_exact_agreement": 0.0,
+    "delta_under_scoring": 0.0,
+    "delta_over_scoring": 0.0,
+    "epsilon_agreement": 0.02,
+    "epsilon_under_scoring": 0.05,
+    "epsilon_over_scoring": 0.01,
+    "passes_agreement": true,
+    "passes_under_scoring": true,
+    "passes_over_scoring": true,
+    "passes_all": true
+  }
+}

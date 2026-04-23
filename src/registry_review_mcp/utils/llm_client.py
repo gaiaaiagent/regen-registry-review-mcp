@@ -369,11 +369,17 @@ async def call_llm(
         logger.info(f"LLM backend: {backend} (model: {display_model})")
         _backend_logged = True
 
-    if backend == "api":
-        return await _call_via_api(prompt, system, model, max_tokens)
-    if backend == "openai":
-        return await _call_via_openai(prompt, system, max_tokens)
-    return await _call_via_cli(prompt, system, model, max_tokens)
+    # Phase E: aggregate throttle. Bounds concurrency across the whole
+    # process (defaults: LLM_MAX_CONCURRENT=4, LLM_MIN_INTERVAL_MS=100).
+    # Sits upstream of backend dispatch so every entry point benefits.
+    from ..llm.throttle import acquire_slot
+
+    async with acquire_slot():
+        if backend == "api":
+            return await _call_via_api(prompt, system, model, max_tokens)
+        if backend == "openai":
+            return await _call_via_openai(prompt, system, max_tokens)
+        return await _call_via_cli(prompt, system, model, max_tokens)
 
 
 async def _call_via_api(

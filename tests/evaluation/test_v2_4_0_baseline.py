@@ -1,4 +1,4 @@
-"""Slow regression test — asserts full-pipeline agreement ≥ v2.3.0 baseline.
+"""Slow regression test — asserts full-pipeline agreement ≥ v2.4.0 baseline.
 
 Runs the actual driver (ra-agent-run-fixture.sh) via subprocess for each
 registered fixture, then invokes ra-agent-diff.py with --baseline and asserts
@@ -75,11 +75,11 @@ def telus_available() -> bool:
 @pytest.mark.expensive
 @pytest.mark.regression
 @pytest.mark.parametrize("fixture", FIXTURES)
-def test_v2_3_0_baseline(fixture: str, telus_available: bool, tmp_path: Path):
+def test_v2_4_0_baseline(fixture: str, telus_available: bool, tmp_path: Path):
     """Run full pipeline against fixture, assert diff vs. baseline passes."""
     if not telus_available:
         pytest.xfail("TELUS GPT-OSS endpoint unreachable — skipping regression")
-    baseline = BASELINES_DIR / f"{fixture}-v2.3.0.json"
+    baseline = BASELINES_DIR / f"{fixture}-v2.4.0.json"
     if not baseline.exists():
         pytest.skip(f"No baseline committed yet for {fixture}")
     if not DRIVER_SH.exists() or not DIFF_PY.exists():
@@ -94,7 +94,7 @@ def test_v2_3_0_baseline(fixture: str, telus_available: bool, tmp_path: Path):
     # --- Step 1: run the driver (~20 min wall-clock, $0 on TELUS) ---
     driver_cmd = [
         "bash", str(DRIVER_SH), fixture,
-        "--phase", "d",
+        "--phase", "e",
         "--output-root", str(output_root),
     ]
     env = dict(os.environ)
@@ -113,7 +113,7 @@ def test_v2_3_0_baseline(fixture: str, telus_available: bool, tmp_path: Path):
         )
 
     # Sanity: artifacts produced
-    art_dir = output_root / "phase-d" / "artifacts"
+    art_dir = output_root / "phase-e" / "artifacts"
     reviews = list(art_dir.glob(f"{fixture}-*-review.json"))
     assert reviews, f"No review JSON found in {art_dir}"
 
@@ -121,7 +121,7 @@ def test_v2_3_0_baseline(fixture: str, telus_available: bool, tmp_path: Path):
     diff_cmd = [
         "uv", "run", "python", str(DIFF_PY),
         "--fixture", fixture,
-        "--phase", "d",
+        "--phase", "e",
         "--output-root", str(output_root),
         "--baseline", str(baseline),
     ]
@@ -140,7 +140,7 @@ def test_v2_3_0_baseline(fixture: str, telus_available: bool, tmp_path: Path):
 
     # --- Step 3: load diff JSON and assert baseline_comparison passes ---
     diff_jsons = sorted(
-        (output_root / "phase-d" / "diffs").glob(f"{fixture}-*-diff.json"),
+        (output_root / "phase-e" / "diffs").glob(f"{fixture}-*-diff.json"),
         reverse=True,
     )
     assert diff_jsons, "No diff JSON produced"
