@@ -5,18 +5,16 @@ from mcp.types import TextContent
 from ..tools import mapping_tools
 from ..utils.state import StateManager
 from .helpers import (
-    text_content,
     format_error,
-    format_workflow_header,
     format_next_steps_section,
+    format_workflow_header,
     get_or_select_session,
+    text_content,
     validate_session_exists,
 )
 
 
-async def requirement_mapping_prompt(
-    session_id: str | None = None
-) -> list[TextContent]:
+async def requirement_mapping_prompt(session_id: str | None = None) -> list[TextContent]:
     """Map discovered documents to checklist requirements (Stage 3).
 
     This prompt loads the checklist, analyzes documents, and suggests
@@ -29,9 +27,7 @@ async def requirement_mapping_prompt(
         Formatted mapping results with human review interface
     """
     # Get or select session
-    session_id, auto_selected, error = await get_or_select_session(
-        session_id, None, None, "Requirement Mapping"
-    )
+    session_id, auto_selected, error = await get_or_select_session(session_id, None, None, "Requirement Mapping")
 
     if error:
         return error
@@ -53,7 +49,7 @@ async def requirement_mapping_prompt(
         return format_error(
             "Document Discovery Not Complete",
             "You must complete Stage 2 (Document Discovery) before mapping requirements.",
-            "Run `/B-document-discovery` first to discover and classify all project documents."
+            "Run `/B-document-discovery` first to discover and classify all project documents.",
         )
 
     # Run requirement mapping
@@ -65,9 +61,9 @@ async def requirement_mapping_prompt(
         confidence_breakdown = status.get("confidence_breakdown", {})
 
         confidence_text = f"""**Confidence Breakdown:**
-  - 🟢 **High confidence** (>75%): {confidence_breakdown.get('high', 0)} mappings
-  - 🟡 **Medium confidence** (50-75%): {confidence_breakdown.get('medium', 0)} mappings
-  - 🟠 **Low confidence** (<50%): {confidence_breakdown.get('low', 0)} mappings
+  - 🟢 **High confidence** (>75%): {confidence_breakdown.get("high", 0)} mappings
+  - 🟡 **Medium confidence** (50-75%): {confidence_breakdown.get("medium", 0)} mappings
+  - 🟠 **Low confidence** (<50%): {confidence_breakdown.get("low", 0)} mappings
 """
 
         # Load documents for summary
@@ -83,12 +79,12 @@ async def requirement_mapping_prompt(
 
         content = f"""## ✅ Mapping Complete
 
-Successfully mapped **{results['mapped_count']}/{results['total_requirements']} requirements** ({coverage_pct}% coverage)
+Successfully mapped **{results["mapped_count"]}/{results["total_requirements"]} requirements** ({coverage_pct}% coverage)
 
 ### Summary
-- **Total Requirements:** {results['total_requirements']}
-- **Mapped:** {results['mapped_count']} requirements have suggested documents
-- **Unmapped:** {results['unmapped_count']} requirements need attention
+- **Total Requirements:** {results["total_requirements"]}
+- **Mapped:** {results["mapped_count"]} requirements have suggested documents
+- **Unmapped:** {results["unmapped_count"]} requirements need attention
 - **Documents Analyzed:** {doc_count}
 - **Methodology:** {methodology}
 
@@ -117,7 +113,7 @@ load_session {session_id}
 
 Look at the `mappings` array in the JSON output to see which documents are mapped to which requirements.
 
-### ⚠️ Fix Unmapped Requirements ({results['unmapped_count']} need attention)
+### ⚠️ Fix Unmapped Requirements ({results["unmapped_count"]} need attention)
 
 If requirements are unmapped, you can:
 
@@ -160,11 +156,14 @@ remove_mapping {session_id} REQ-007 "doc-wrong-document"
 ```
 """
 
-        next_steps = format_next_steps_section([
-            "Review mappings: `load_session {session_id}`",
-            "Fix unmapped requirements (if needed)",
-            "Run evidence extraction: `/D-evidence-extraction`",
-        ], "Next Step: Evidence Extraction")
+        next_steps = format_next_steps_section(
+            [
+                "Review mappings: `load_session {session_id}`",
+                "Fix unmapped requirements (if needed)",
+                "Run evidence extraction: `/D-evidence-extraction`",
+            ],
+            "Next Step: Evidence Extraction",
+        )
 
         message = header + content + next_steps
 
@@ -174,7 +173,7 @@ remove_mapping {session_id} REQ-007 "doc-wrong-document"
         return format_error(
             "Checklist Not Found",
             f"Could not load checklist for methodology: {methodology}",
-            f"Error details: {str(e)}\n\nPlease ensure the checklist file exists in the checklists directory."
+            f"Error details: {str(e)}\n\nPlease ensure the checklist file exists in the checklists directory.",
         )
 
     except ValueError as e:
@@ -183,18 +182,14 @@ remove_mapping {session_id} REQ-007 "doc-wrong-document"
             return format_error(
                 "No Documents Found",
                 "Cannot map requirements without documents.",
-                "Run Stage 2 first: `/B-document-discovery`"
+                "Run Stage 2 first: `/B-document-discovery`",
             )
         else:
-            return format_error(
-                "Mapping Failed",
-                error_msg,
-                "Please check the session state and try again."
-            )
+            return format_error("Mapping Failed", error_msg, "Please check the session state and try again.")
 
     except Exception as e:
         return format_error(
             "Requirement Mapping Failed",
             f"An error occurred during requirement mapping: {str(e)}",
-            "Please check the session and try again, or contact support if the issue persists."
+            "Please check the session and try again, or contact support if the issue persists.",
         )

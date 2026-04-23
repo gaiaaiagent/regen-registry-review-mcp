@@ -2438,13 +2438,14 @@ wheels = [
 
 [[package]]
 name = "registry-review-mcp"
-version = "2.4.0"
+version = "2.5.0"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "fastapi" },
     { name = "fiona" },
     { name = "fpdf2" },
+    { name = "jinja2" },
     { name = "marker-pdf" },
     { name = "mcp", extra = ["cli"] },
     { name = "openai" },
@@ -2481,6 +2482,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "fiona", specifier = ">=1.9.0" },
     { name = "fpdf2", specifier = ">=2.7.0" },
+    { name = "jinja2", specifier = ">=3.1.0" },
     { name = "marker-pdf", specifier = ">=0.2.17" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.21.0" },
     { name = "openai", specifier = ">=1.0.0" },

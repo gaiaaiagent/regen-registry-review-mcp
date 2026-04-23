@@ -1,17 +1,17 @@
 """Tests for cost tracking functionality."""
 
-import pytest
 from pathlib import Path
 
+import pytest
+
 from registry_review_mcp.config.settings import settings
-from registry_review_mcp.utils.cost_tracker import CostTracker
 from registry_review_mcp.extractors.llm_extractors import (
     DateExtractor,
     LandTenureExtractor,
     ProjectIDExtractor,
     set_cost_tracker,
 )
-
+from registry_review_mcp.utils.cost_tracker import CostTracker
 
 pytestmark = [
     pytest.mark.expensive,

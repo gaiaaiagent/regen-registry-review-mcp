@@ -11,11 +11,9 @@ Memory-Aware Scheduling:
 
 import asyncio
 import logging
-import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
-from pathlib import Path
 from typing import Any, Callable, Coroutine
 
 import psutil
@@ -34,12 +32,13 @@ def check_memory_for_conversion() -> tuple[bool, float]:
     Returns:
         Tuple of (is_available, available_gb)
     """
-    available_gb = psutil.virtual_memory().available / (1024 ** 3)
+    available_gb = psutil.virtual_memory().available / (1024**3)
     return available_gb >= MIN_MEMORY_GB, round(available_gb, 1)
 
 
 class JobStatus(str, Enum):
     """Status of a background job."""
+
     PENDING = "pending"
     RUNNING = "running"
     WAITING_FOR_MEMORY = "waiting_for_memory"
@@ -51,6 +50,7 @@ class JobStatus(str, Enum):
 @dataclass
 class ConversionJob:
     """Tracks a PDF conversion job with progress and memory status."""
+
     job_id: str
     session_id: str
     document_ids: list[str]
@@ -91,8 +91,7 @@ class ConversionJob:
                 "required_gb": self.memory_required_gb,
                 "waiting_since": self.memory_wait_started.isoformat() if self.memory_wait_started else None,
                 "message": (
-                    f"Waiting for memory: {self.memory_available_gb}GB available, "
-                    f"{self.memory_required_gb}GB required"
+                    f"Waiting for memory: {self.memory_available_gb}GB available, {self.memory_required_gb}GB required"
                 ),
             }
 
@@ -151,6 +150,7 @@ class JobManager:
             Job ID for tracking
         """
         import uuid
+
         job_id = f"job-{uuid.uuid4().hex[:12]}"
 
         job = ConversionJob(
@@ -244,10 +244,7 @@ class JobManager:
             job.progress = 1.0
             job.current_file = None
 
-            logger.info(
-                f"Job {job.job_id} completed: "
-                f"{job.files_completed}/{job.files_total} documents converted"
-            )
+            logger.info(f"Job {job.job_id} completed: {job.files_completed}/{job.files_total} documents converted")
 
         except asyncio.CancelledError:
             job.status = JobStatus.CANCELLED
@@ -302,16 +299,13 @@ class JobManager:
             job.memory_available_gb = available_gb
 
             if has_memory:
-                logger.info(
-                    f"Job {job.job_id}: Memory available ({available_gb}GB). Resuming."
-                )
+                logger.info(f"Job {job.job_id}: Memory available ({available_gb}GB). Resuming.")
                 job.status = JobStatus.RUNNING
                 job.memory_wait_started = None
                 return
 
             logger.debug(
-                f"Job {job.job_id}: Still waiting for memory "
-                f"({available_gb}GB available, waited {total_wait}s)"
+                f"Job {job.job_id}: Still waiting for memory ({available_gb}GB available, waited {total_wait}s)"
             )
 
         # Timed out waiting for memory

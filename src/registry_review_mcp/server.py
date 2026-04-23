@@ -9,9 +9,6 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import TextContent
 
 from .config.settings import settings
-from .models import errors as mcp_errors
-from .tools import session_tools, document_tools, evidence_tools, validation_tools, report_tools, upload_tools, mapping_tools
-from .utils.tool_helpers import with_error_handling
 from .prompts import (
     A_initialize,
     B_document_discovery,
@@ -22,6 +19,14 @@ from .prompts import (
     G_human_review,
     H_completion,
 )
+from .tools import (
+    document_tools,
+    evidence_tools,
+    mapping_tools,
+    session_tools,
+    upload_tools,
+)
+from .utils.tool_helpers import with_error_handling
 
 # ============================================================================
 # Logging Setup (CRITICAL: Must write to stderr, NOT stdout)
@@ -41,6 +46,7 @@ logger = logging.getLogger(__name__)
 mcp = FastMCP("Regen Registry Review")
 
 from registry_review_mcp import __version__ as _pkg_version
+
 logger.info("Initializing Registry Review MCP Server v%s", _pkg_version)
 
 # ============================================================================
@@ -157,10 +163,7 @@ async def start_review(
 
     discovery_result = await document_tools.discover_documents(session_result["session_id"])
 
-    return json.dumps({
-        "session": session_result,
-        "discovery": discovery_result
-    }, indent=2)
+    return json.dumps({"session": session_result, "discovery": discovery_result}, indent=2)
 
 
 @mcp.tool()
@@ -320,9 +323,7 @@ async def extract_pdf_text(
         Extracted text content with metadata
     """
     page_range = (start_page, end_page) if start_page and end_page else None
-    results = await document_tools.extract_pdf_text(
-        filepath, page_range, extract_tables
-    )
+    results = await document_tools.extract_pdf_text(filepath, page_range, extract_tables)
 
     return json.dumps(results, indent=2)
 
@@ -364,11 +365,7 @@ async def map_all_requirements(session_id: str) -> str:
 
 @mcp.tool()
 @with_error_handling("confirm_mapping")
-async def confirm_mapping(
-    session_id: str,
-    requirement_id: str,
-    document_ids: list[str]
-) -> str:
+async def confirm_mapping(session_id: str, requirement_id: str, document_ids: list[str]) -> str:
     """Confirm or manually set document mappings for a requirement.
 
     Args:
@@ -385,11 +382,7 @@ async def confirm_mapping(
 
 @mcp.tool()
 @with_error_handling("remove_mapping")
-async def remove_mapping(
-    session_id: str,
-    requirement_id: str,
-    document_id: str
-) -> str:
+async def remove_mapping(session_id: str, requirement_id: str, document_id: str) -> str:
     """Remove a document from a requirement mapping.
 
     Args:
@@ -439,6 +432,7 @@ async def extract_evidence(session_id: str) -> str:
         Summary of evidence extraction results with coverage statistics
     """
     from .tools.evidence_tools import extract_all_evidence
+
     results = await extract_all_evidence(session_id)
     return json.dumps(results, indent=2)
 
@@ -477,7 +471,9 @@ def list_capabilities() -> list[TextContent]:
         # Add dynamic timestamp
         capabilities += f"\n\n**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M UTC')}"
     except FileNotFoundError:
-        capabilities = "# Regen Registry Review MCP Server\n\n**Error:** CAPABILITIES.md not found. See documentation for details."
+        capabilities = (
+            "# Regen Registry Review MCP Server\n\n**Error:** CAPABILITIES.md not found. See documentation for details."
+        )
 
     return [TextContent(type="text", text=capabilities)]
 
@@ -508,7 +504,7 @@ async def initialize(project: str) -> list[TextContent]:
 @mcp.prompt(name="B-document-discovery")
 async def document_discovery(project: str = "") -> list[TextContent]:
     """Discover and classify project documents - provide session ID or project name (optional, auto-selects latest)"""
-    session_id = project if project and not "," in project else None
+    session_id = project if project and "," not in project else None
     project_name = None
     documents_path = None
     if "," in project:

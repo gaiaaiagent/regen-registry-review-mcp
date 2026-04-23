@@ -1,11 +1,12 @@
 """Tests for file upload tools."""
 
-import pytest
 import base64
 from pathlib import Path
 
-from registry_review_mcp.tools import upload_tools, session_tools
+import pytest
+
 from registry_review_mcp.models.errors import SessionNotFoundError
+from registry_review_mcp.tools import session_tools, upload_tools
 
 
 @pytest.fixture

@@ -7,22 +7,22 @@ Orchestrates:
 """
 
 import logging
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from .structural import (
-    run_structural_checks,
-    extract_all_fields_from_evidence,
-    StructuralValidationResult,
-)
 from .cross_document import (
-    run_cross_document_checks,
     CrossDocumentValidationResult,
+    run_cross_document_checks,
 )
 from .llm_synthesis import (
-    run_llm_synthesis,
     LLMSynthesisResult,
+    run_llm_synthesis,
+)
+from .structural import (
+    StructuralValidationResult,
+    extract_all_fields_from_evidence,
+    run_structural_checks,
 )
 
 logger = logging.getLogger(__name__)
@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ValidationSummary:
     """Summary statistics across all validation layers."""
+
     total_checks: int = 0
     passed: int = 0
     warnings: int = 0
@@ -47,6 +48,7 @@ class ValidationSummary:
 @dataclass
 class ValidationResult:
     """Complete validation results from all three layers."""
+
     session_id: str
     validated_at: datetime
 
@@ -71,7 +73,6 @@ class ValidationResult:
         return {
             "session_id": self.session_id,
             "validated_at": self.validated_at.isoformat(),
-
             # New three-layer structure
             "structural": {
                 "checks": [asdict(c) for c in self.structural.checks],
@@ -97,10 +98,8 @@ class ValidationResult:
                 "reasoning": self.llm_synthesis.reasoning,
                 "error": self.llm_synthesis.error,
             },
-
             # Summary
             "summary": asdict(self.summary),
-
             # Backward compatibility
             "date_alignments": self.date_alignments,
             "land_tenure": self.land_tenure,
@@ -112,9 +111,7 @@ class ValidationResult:
 
 
 def _build_summary(
-    structural: StructuralValidationResult,
-    cross_doc: CrossDocumentValidationResult,
-    llm_synthesis: LLMSynthesisResult
+    structural: StructuralValidationResult, cross_doc: CrossDocumentValidationResult, llm_synthesis: LLMSynthesisResult
 ) -> ValidationSummary:
     """Build summary statistics from all layers."""
 
@@ -124,9 +121,9 @@ def _build_summary(
     failed = structural.failed + cross_doc.failed
 
     flagged = (
-        structural.flagged_count +
-        sum(1 for c in cross_doc.checks if c.flagged_for_review) +
-        llm_synthesis.flagged_count
+        structural.flagged_count
+        + sum(1 for c in cross_doc.checks if c.flagged_for_review)
+        + llm_synthesis.flagged_count
     )
 
     pass_rate = passed / total_checks if total_checks > 0 else 0.0
@@ -145,8 +142,7 @@ def _build_summary(
 
 
 def _build_backward_compat(
-    structural: StructuralValidationResult,
-    cross_doc: CrossDocumentValidationResult
+    structural: StructuralValidationResult, cross_doc: CrossDocumentValidationResult
 ) -> dict[str, list[dict]]:
     """Build backward-compatible structures for old API consumers."""
 
@@ -278,10 +274,7 @@ async def validate_session(session_id: str) -> ValidationResult:
     compat = _build_backward_compat(structural_results, cross_doc_results)
 
     # Determine all_passed (no failures, no flags requiring review)
-    all_passed = (
-        summary.failed == 0 and
-        summary.flagged_for_review == 0
-    )
+    all_passed = summary.failed == 0 and summary.flagged_for_review == 0
 
     # Build result
     result = ValidationResult(

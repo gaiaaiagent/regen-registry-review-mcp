@@ -1,0 +1,24 @@
+# Pre-commit hooks — run the same gates CI runs, locally, before every commit.
+# Install once: ``uv run pre-commit install``. Skip ad-hoc: ``git commit --no-verify``.
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.7.4
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: pytest-fast
+        name: pytest fast suite
+        # pytest.ini selects the fast suite by default (expensive + regression
+        # markers are deselected). Matches the CI ``ci.yml`` fast-tests job.
+        entry: uv run pytest -q
+        language: system
+        types: [python]
+        pass_filenames: false
+        # Slow enough to annoy but fast enough to keep honest. Disable with
+        # SKIP=pytest-fast git commit if you genuinely need to commit red.
+        stages: [pre-commit]

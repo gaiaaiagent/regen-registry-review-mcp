@@ -5,12 +5,9 @@ Tests the complete workflow from extraction to validation,
 ensuring that hallucinations and false positives are prevented.
 """
 
+
 import pytest
-from unittest.mock import AsyncMock, Mock, patch
-from registry_review_mcp.extractors.llm_extractors import (
-    DateExtractor,
-    ProjectIDExtractor,
-)
+
 from registry_review_mcp.extractors.verification import verify_date_extraction
 
 

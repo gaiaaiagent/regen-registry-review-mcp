@@ -13,10 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from ..models.errors import SessionNotFoundError
-from ..prompts.unified_analysis import (
-    analyze_with_llm,
-    UnifiedAnalysisResult
-)
+from ..prompts.unified_analysis import UnifiedAnalysisResult, analyze_with_llm
 from ..utils.state import StateManager
 
 logger = logging.getLogger(__name__)
@@ -38,8 +35,7 @@ async def load_all_markdown(session_id: str) -> tuple[list[dict], dict[str, str]
 
     if not state_manager.exists("documents.json"):
         raise SessionNotFoundError(
-            f"Documents not discovered for session {session_id}",
-            details={"session_id": session_id}
+            f"Documents not discovered for session {session_id}", details={"session_id": session_id}
         )
 
     # Load document metadata
@@ -119,12 +115,11 @@ async def analyze_session_unified(session_id: str) -> dict[str, Any]:
     methodology = session_data.get("project_metadata", {}).get("methodology", "soil-carbon-v1.2.2")
     scope = session_data.get("project_metadata", {}).get("scope")
     from ..utils.checklist import load_checklist
+
     checklist_data = load_checklist(methodology, scope)
     requirements = checklist_data.get("requirements", [])
 
-    logger.info(
-        f"Analyzing {len(documents)} documents against {len(requirements)} requirements"
-    )
+    logger.info(f"Analyzing {len(documents)} documents against {len(requirements)} requirements")
 
     from ..utils.llm_client import classify_api_error
 
@@ -139,14 +134,10 @@ async def analyze_session_unified(session_id: str) -> dict[str, Any]:
         error_info = classify_api_error(e)
         logger.error(f"Unified analysis failed: {error_info.message}")
         if error_info.is_fatal:
-            raise type(e)(
-                f"{error_info.message}\n\nHow to fix: {error_info.guidance}"
-            ) from e
+            raise type(e)(f"{error_info.message}\n\nHow to fix: {error_info.guidance}") from e
         raise
 
-    logger.info(
-        f"Analysis complete: {result.requirements_covered}/{len(requirements)} covered"
-    )
+    logger.info(f"Analysis complete: {result.requirements_covered}/{len(requirements)} covered")
 
     # Convert to format compatible with existing system
 
@@ -163,12 +154,10 @@ async def analyze_session_unified(session_id: str) -> dict[str, Any]:
             {
                 "requirement_id": req_ev.requirement_id,
                 "requirement_text": next(
-                    (r["requirement_text"] for r in requirements if r["requirement_id"] == req_ev.requirement_id),
-                    ""
+                    (r["requirement_text"] for r in requirements if r["requirement_id"] == req_ev.requirement_id), ""
                 ),
                 "category": next(
-                    (r["category"] for r in requirements if r["requirement_id"] == req_ev.requirement_id),
-                    ""
+                    (r["category"] for r in requirements if r["requirement_id"] == req_ev.requirement_id), ""
                 ),
                 "status": req_ev.status,
                 "confidence": req_ev.confidence,
@@ -176,12 +165,9 @@ async def analyze_session_unified(session_id: str) -> dict[str, Any]:
                     {
                         "document_id": md.document_id,
                         "document_name": md.document_name,
-                        "filepath": next(
-                            (d["filepath"] for d in documents if d["document_id"] == md.document_id),
-                            ""
-                        ),
+                        "filepath": next((d["filepath"] for d in documents if d["document_id"] == md.document_id), ""),
                         "relevance_score": md.relevance_score,
-                        "keywords_found": []  # LLM doesn't use keywords
+                        "keywords_found": [],  # LLM doesn't use keywords
                     }
                     for md in req_ev.mapped_documents
                 ],
@@ -193,14 +179,14 @@ async def analyze_session_unified(session_id: str) -> dict[str, Any]:
                         "page": snip.page,
                         "section": snip.section,
                         "confidence": snip.confidence,
-                        "keywords_matched": []  # LLM doesn't use keywords
+                        "keywords_matched": [],  # LLM doesn't use keywords
                     }
                     for snip in req_ev.evidence_snippets
                 ],
-                "notes": req_ev.notes
+                "notes": req_ev.notes,
             }
             for req_ev in result.requirements_evidence
-        ]
+        ],
     }
 
     # 2. Validation format (for validation.json) - matches ValidationResult model schema
@@ -216,11 +202,7 @@ async def analyze_session_unified(session_id: str) -> dict[str, Any]:
         "project_ids": [],
         "contradictions": [],
         "validations": {
-            check.check_type: {
-                "status": check.status,
-                "message": check.message,
-                "details": check.details or {}
-            }
+            check.check_type: {"status": check.status, "message": check.message, "details": check.details or {}}
             for check in result.validation_checks
         },
         "summary": {
@@ -229,10 +211,12 @@ async def analyze_session_unified(session_id: str) -> dict[str, Any]:
             "validations_warning": sum(1 for c in result.validation_checks if c.status == "warning"),
             "validations_failed": sum(1 for c in result.validation_checks if c.status == "fail"),
             "items_flagged": 0,  # LLM ValidationCheck doesn't have flagged_for_review field
-            "pass_rate": sum(1 for c in result.validation_checks if c.status == "pass") / len(result.validation_checks) if result.validation_checks else 0.0,
-            "extraction_method": "llm"
+            "pass_rate": sum(1 for c in result.validation_checks if c.status == "pass") / len(result.validation_checks)
+            if result.validation_checks
+            else 0.0,
+            "extraction_method": "llm",
         },
-        "all_passed": all(c.status == "pass" for c in result.validation_checks) if result.validation_checks else True
+        "all_passed": all(c.status == "pass" for c in result.validation_checks) if result.validation_checks else True,
     }
 
     # 3. Extracted fields (new format)
@@ -241,7 +225,7 @@ async def analyze_session_unified(session_id: str) -> dict[str, Any]:
             "value": field.field_value,
             "source_document": field.source_document,
             "page": field.page,
-            "confidence": field.confidence
+            "confidence": field.confidence,
         }
         for field in result.extracted_fields
     }
@@ -260,7 +244,7 @@ async def analyze_session_unified(session_id: str) -> dict[str, Any]:
             "statistics.requirements_covered": result.requirements_covered,
             "statistics.requirements_partial": result.requirements_partial,
             "statistics.requirements_missing": result.requirements_missing,
-        }
+        },
     )
 
     logger.info("Results saved to session state")
@@ -270,7 +254,7 @@ async def analyze_session_unified(session_id: str) -> dict[str, Any]:
         "validation": validation_result,
         "extracted_fields": fields_result,
         "overall_assessment": result.overall_assessment,
-        "flagged_items": result.flagged_items
+        "flagged_items": result.flagged_items,
     }
 
 

@@ -13,13 +13,13 @@ Run with: python test_e2e_workflow.py
 """
 
 import asyncio
-from pathlib import Path
 import sys
+from pathlib import Path
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from registry_review_mcp.tools import session_tools, document_tools
+from registry_review_mcp.tools import document_tools, session_tools
 from registry_review_mcp.tools.evidence_tools import extract_all_evidence
 from registry_review_mcp.tools.mapping_tools import map_all_requirements
 

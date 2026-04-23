@@ -11,8 +11,8 @@ Usage:
 
 import json
 import sys
-from pathlib import Path
 from collections import defaultdict
+from pathlib import Path
 
 
 def analyze_costs():

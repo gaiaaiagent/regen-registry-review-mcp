@@ -157,7 +157,11 @@ class Settings(BaseSettings):
     # Cache LLM responses locally to avoid redundant API calls during development
     llm_cache_enabled: bool = Field(default=True)  # Enable local response caching
     llm_cache_dir: Path = Field(default_factory=lambda: _get_xdg_cache_home() / APP_NAME / "llm")
-    llm_cache_ttl: int = Field(default=604800)  # 7 days in seconds
+    # Phase F4.3 — bumped 7d → 30d. Prompts change at release cadence (weekly, not
+    # daily); a 30d TTL matches that frequency so regression re-runs never burn
+    # cache. PROMPT_VERSION in the cache key (Phase F1.4) invalidates stale
+    # entries automatically on every prompt change, so a longer TTL is safe.
+    llm_cache_ttl: int = Field(default=2592000)  # 30 days in seconds
 
     # Cost Management
     api_call_timeout_seconds: int = Field(default=30, ge=5, le=120)
@@ -177,7 +181,7 @@ class Settings(BaseSettings):
         super().__init__(**kwargs)
         self._ensure_directories()
         # Freeze settings after initialization
-        object.__setattr__(self, '_frozen', True)
+        object.__setattr__(self, "_frozen", True)
 
     def __setattr__(self, name: str, value) -> None:
         """Prevent modification of settings after initialization.
@@ -189,7 +193,7 @@ class Settings(BaseSettings):
         Raises:
             TypeError: If attempting to modify a frozen settings instance
         """
-        if getattr(self, '_frozen', False) and name != '_frozen':
+        if getattr(self, "_frozen", False) and name != "_frozen":
             raise TypeError(
                 f"Settings are immutable. Cannot modify '{name}' after initialization. "
                 f"Use environment variables to configure settings."
@@ -198,7 +202,7 @@ class Settings(BaseSettings):
 
     def __delattr__(self, name: str) -> None:
         """Prevent deletion of settings attributes."""
-        if getattr(self, '_frozen', False):
+        if getattr(self, "_frozen", False):
             raise TypeError("Settings are immutable. Cannot delete attributes.")
         super().__delattr__(name)
 
@@ -230,6 +234,35 @@ class Settings(BaseSettings):
         Mirrors get_active_llm_model() but for the OpenAI fallback backend.
         """
         return self.openai_model_dev if self.environment == "development" else self.openai_model
+
+    def get_active_executor_model(self) -> str:
+        """Return the model id of whichever backend will actually serve the call.
+
+        Phase F1/F4 cache-correctness fix: cache keys must differ per backend so a
+        model swap (e.g. GPT-OSS-120B → Gemma 4 31B → Qwen 3.6 35B A3B) does not
+        silently re-use the previous backend's cached output. Prior to Phase F,
+        the cache key embedded ``get_active_llm_model()`` — the Anthropic model
+        id — regardless of which backend actually ran, so every TELUS model
+        shared a single cache entry per (requirement, document).
+
+        Resolution order mirrors ``utils.llm_client._resolve_backend`` for the
+        non-CLI paths. CLI selection is unknowable at cache-key time (it depends
+        on an async ``which claude`` probe), so we fall through to the
+        Anthropic model id in that case; the CLI backend still uses the same
+        Anthropic model under the hood.
+        """
+        if self.llm_backend == "openai":
+            return self.get_active_openai_model()
+        if self.llm_backend == "api":
+            return self.get_active_llm_model()
+        # auto + cli: Anthropic key wins over OpenAI when both are set, per
+        # _resolve_backend's precedence; presence of OpenAI key alone implies
+        # the OpenAI backend will be selected.
+        if self.anthropic_api_key:
+            return self.get_active_llm_model()
+        if self.openai_api_key:
+            return self.get_active_openai_model()
+        return self.get_active_llm_model()
 
     def get_checklist_path(self, methodology: str) -> Path:
         """Get the path to a checklist file."""

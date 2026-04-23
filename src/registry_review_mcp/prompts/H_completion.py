@@ -4,9 +4,9 @@ from mcp.types import TextContent
 
 from ..utils.state import StateManager
 from .helpers import (
-    text_content,
-    format_workflow_header,
     format_next_steps_section,
+    format_workflow_header,
+    text_content,
 )
 
 
@@ -48,7 +48,9 @@ Then proceed through the workflow stages.""")
     manager = StateManager(session_id)
 
     if not manager.exists("session.json"):
-        sessions_list = "\n".join(f"- `{s['session_id']}`: {s['project_name']}" for s in StateManager(None).list_sessions())
+        sessions_list = "\n".join(
+            f"- `{s['session_id']}`: {s['project_name']}" for s in StateManager(None).list_sessions()
+        )
         return text_content(f"""# ❌ Error: Session Not Found
 
 Session `{session_id}` does not exist.
@@ -70,7 +72,9 @@ Use an existing session ID or create a new one:
     # Check if report has been generated
     if not manager.exists("report.md") and not manager.exists("report.json"):
         header = format_workflow_header("Complete Review", session_id, project_name, auto_selected)
-        message = header + """## ⚠️ Report Not Generated
+        message = (
+            header
+            + """## ⚠️ Report Not Generated
 
 You need to generate the report before completing the review.
 
@@ -81,6 +85,7 @@ Run Stage 5 first:
 `/report-generation`
 
 This will create Markdown and JSON reports with all findings."""
+        )
         return text_content(message)
 
     # Load statistics
@@ -152,7 +157,7 @@ This will create Markdown and JSON reports with all findings."""
         f"- **Covered:** {requirements_covered} ({coverage_pct:.1f}%)",
         f"- **Partial:** {requirements_partial}",
         f"- **Missing:** {requirements_missing}",
-        f"- **Documents Processed:** {documents_found}\n"
+        f"- **Documents Processed:** {documents_found}\n",
     ]
 
     # Add validation section if available
@@ -163,41 +168,50 @@ This will create Markdown and JSON reports with all findings."""
         validations_warning = validation_summary.get("validations_warning", 0)
         pass_rate = (validations_passed / total_validations * 100) if total_validations > 0 else 0
 
-        content.extend([
-            "### Cross-Validation Results\n",
-            f"- **Total Validations:** {total_validations}",
-            f"- **Passed:** {validations_passed} ({pass_rate:.0f}%)",
-            f"- **Failed:** {validations_failed}",
-            f"- **Warnings:** {validations_warning}",
-            f"- **Items Flagged for Review:** {total_flagged}\n"
-        ])
+        content.extend(
+            [
+                "### Cross-Validation Results\n",
+                f"- **Total Validations:** {total_validations}",
+                f"- **Passed:** {validations_passed} ({pass_rate:.0f}%)",
+                f"- **Failed:** {validations_failed}",
+                f"- **Warnings:** {validations_warning}",
+                f"- **Items Flagged for Review:** {total_flagged}\n",
+            ]
+        )
     else:
         content.append("### Cross-Validation Results\n*Note: Cross-validation was not run for this review.*\n")
 
     # Reports section
-    content.extend([
-        "## Generated Reports\n",
-        f"- **Markdown Report:** `{report_md_path}`",
-        f"- **JSON Report:** `{report_json_path}`\n",
-        "Reports include complete evidence citations, validation results, coverage analysis, and recommendations.\n",
-        "## Project Metadata\n",
-        f"- **Project Name:** {project_name}",
-        f"- **Project ID:** {project_metadata.get('project_id', 'Not specified')}",
-        f"- **Methodology:** {project_metadata.get('methodology', 'Unknown')}",
-        f"- **Proponent:** {project_metadata.get('proponent', 'Not specified')}",
-        f"- **Crediting Period:** {project_metadata.get('crediting_period', 'Not specified')}"
-    ])
+    content.extend(
+        [
+            "## Generated Reports\n",
+            f"- **Markdown Report:** `{report_md_path}`",
+            f"- **JSON Report:** `{report_json_path}`\n",
+            "Reports include complete evidence citations, validation results, coverage analysis, and recommendations.\n",
+            "## Project Metadata\n",
+            f"- **Project Name:** {project_name}",
+            f"- **Project ID:** {project_metadata.get('project_id', 'Not specified')}",
+            f"- **Methodology:** {project_metadata.get('methodology', 'Unknown')}",
+            f"- **Proponent:** {project_metadata.get('proponent', 'Not specified')}",
+            f"- **Crediting Period:** {project_metadata.get('crediting_period', 'Not specified')}",
+        ]
+    )
 
     # Next steps
     next_steps_list = [
         f"Review the reports: `cat {report_md_path}`",
         f"{'Address ' + str(total_flagged) + ' flagged items (use `/human-review`)' if has_flagged_items else 'No items flagged'}",
         "Share reports with project proponent or submit to registry",
-        f"Archive session when done: `delete_session {session_id}` (Warning: permanent deletion)"
+        f"Archive session when done: `delete_session {session_id}` (Warning: permanent deletion)",
     ]
 
     next_steps = format_next_steps_section(next_steps_list, "Next Steps")
 
-    message = header + "\n".join(content) + next_steps + "\n\n**Thank you for using Regen Registry Review MCP!**\n\nThis completes the automated review workflow."
+    message = (
+        header
+        + "\n".join(content)
+        + next_steps
+        + "\n\n**Thank you for using Regen Registry Review MCP!**\n\nThis completes the automated review workflow."
+    )
 
     return text_content(message)

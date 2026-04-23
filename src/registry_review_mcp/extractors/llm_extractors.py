@@ -21,9 +21,9 @@ from pathlib import Path
 from typing import Any, Callable
 
 from anthropic import (
-    AsyncAnthropic,
     APIConnectionError,
     APITimeoutError,
+    AsyncAnthropic,
     InternalServerError,
     RateLimitError,
 )
@@ -173,8 +173,7 @@ class BaseExtractor:
                     delay = min(delay * 2, max_delay)
                 else:
                     logger.error(
-                        f"API call failed after {max_retries + 1} attempts. "
-                        f"Final error: {error_type}: {str(e)}"
+                        f"API call failed after {max_retries + 1} attempts. Final error: {error_type}: {str(e)}"
                     )
                     raise
 
@@ -212,9 +211,7 @@ class BaseExtractor:
 
         # Validate chunking parameters
         if overlap >= chunk_size:
-            raise ValueError(
-                f"Chunk overlap ({overlap}) must be less than chunk size ({chunk_size})"
-            )
+            raise ValueError(f"Chunk overlap ({overlap}) must be less than chunk size ({chunk_size})")
 
         logger.info(
             f"Content length {len(content)} exceeds limit, splitting into boundary-aware chunks "
@@ -278,17 +275,17 @@ class BaseExtractor:
         search_region = content[search_start:target_end]
 
         # 1. Try paragraph break (double newline)
-        para_idx = search_region.rfind('\n\n')
+        para_idx = search_region.rfind("\n\n")
         if para_idx != -1:
             return search_start + para_idx + 2  # After the double newline
 
         # 2. Try sentence boundary (. ! ? followed by space/newline)
         for i in range(len(search_region) - 1, 0, -1):
-            if search_region[i-1:i] in '.!?' and search_region[i:i+1] in ' \n':
+            if search_region[i - 1 : i] in ".!?" and search_region[i : i + 1] in " \n":
                 return search_start + i + 1  # Include the space/newline after punctuation
 
         # 3. Try word boundary (space)
-        space_idx = search_region.rfind(' ')
+        space_idx = search_region.rfind(" ")
         if space_idx != -1:
             return search_start + space_idx
 
@@ -534,13 +531,7 @@ class DateExtractor(BaseExtractor):
                 model=settings.llm_model,
                 max_tokens=settings.llm_max_tokens,
                 temperature=settings.llm_temperature,
-                system=[
-                    {
-                        "type": "text",
-                        "text": DATE_EXTRACTION_PROMPT,
-                        "cache_control": {"type": "ephemeral"}
-                    }
-                ],
+                system=[{"type": "text", "text": DATE_EXTRACTION_PROMPT, "cache_control": {"type": "ephemeral"}}],
                 messages=[{"role": "user", "content": content}],
                 timeout=settings.api_call_timeout_seconds,
             )
@@ -565,6 +556,7 @@ class DateExtractor(BaseExtractor):
 
             # Verify citations against source content (prevent hallucination)
             from ..extractors.verification import verify_date_extraction
+
             verified_data = verify_date_extraction(extracted_data, chunk)
 
             # Convert to ExtractedField objects
@@ -581,9 +573,7 @@ class DateExtractor(BaseExtractor):
             logger.error(f"Date extraction failed for {chunk_name}: {e}", exc_info=True)
             raise  # Re-raise to be caught by asyncio.gather
 
-    async def extract(
-        self, markdown_content: str, images: list[Path], document_name: str
-    ) -> list[ExtractedField]:
+    async def extract(self, markdown_content: str, images: list[Path], document_name: str) -> list[ExtractedField]:
         """Extract dates from markdown and images.
 
         Args:
@@ -618,7 +608,7 @@ class DateExtractor(BaseExtractor):
         # Process all chunks in parallel using asyncio.gather
         chunk_tasks = []
         for i, chunk in enumerate(chunks):
-            chunk_name = f"{document_name} (chunk {i+1}/{len(chunks)})" if len(chunks) > 1 else document_name
+            chunk_name = f"{document_name} (chunk {i + 1}/{len(chunks)})" if len(chunks) > 1 else document_name
             task = self._process_date_chunk(chunk, chunk_images[i], chunk_name, i)
             chunk_tasks.append(task)
 
@@ -629,7 +619,7 @@ class DateExtractor(BaseExtractor):
         all_fields = []
         for i, result in enumerate(chunk_results):
             if isinstance(result, Exception):
-                chunk_name = f"{document_name} (chunk {i+1}/{len(chunks)})" if len(chunks) > 1 else document_name
+                chunk_name = f"{document_name} (chunk {i + 1}/{len(chunks)})" if len(chunks) > 1 else document_name
                 logger.error(f"Date extraction failed for {chunk_name}: {result}", exc_info=result)
             elif result:  # result is list of ExtractedField objects
                 all_fields.extend(result)
@@ -661,9 +651,7 @@ class LandTenureExtractor(BaseExtractor):
         """
         super().__init__(cache_namespace="land_tenure_extraction", client=client)
 
-    async def extract(
-        self, markdown_content: str, images: list[Path], document_name: str
-    ) -> list[ExtractedField]:
+    async def extract(self, markdown_content: str, images: list[Path], document_name: str) -> list[ExtractedField]:
         """Extract land tenure information from markdown and images.
 
         Args:
@@ -695,7 +683,7 @@ class LandTenureExtractor(BaseExtractor):
 
         all_fields = []
         for i, chunk in enumerate(chunks):
-            chunk_name = f"{document_name} (chunk {i+1}/{len(chunks)})" if len(chunks) > 1 else document_name
+            chunk_name = f"{document_name} (chunk {i + 1}/{len(chunks)})" if len(chunks) > 1 else document_name
 
             # Build message content (text + images)
             content = [
@@ -739,11 +727,7 @@ class LandTenureExtractor(BaseExtractor):
                     max_tokens=settings.llm_max_tokens,
                     temperature=settings.llm_temperature,
                     system=[
-                        {
-                            "type": "text",
-                            "text": LAND_TENURE_EXTRACTION_PROMPT,
-                            "cache_control": {"type": "ephemeral"}
-                        }
+                        {"type": "text", "text": LAND_TENURE_EXTRACTION_PROMPT, "cache_control": {"type": "ephemeral"}}
                     ],
                     messages=[{"role": "user", "content": content}],
                     timeout=settings.api_call_timeout_seconds,
@@ -831,7 +815,9 @@ class LandTenureExtractor(BaseExtractor):
         # Cache results
         self.cache.set(cache_key, [f.model_dump() for f in fields])
 
-        logger.info(f"Extracted {len(fields)} unique tenure fields from {document_name} ({len(all_fields)} total before dedup)")
+        logger.info(
+            f"Extracted {len(fields)} unique tenure fields from {document_name} ({len(all_fields)} total before dedup)"
+        )
         return fields
 
 
@@ -846,9 +832,7 @@ class ProjectIDExtractor(BaseExtractor):
         """
         super().__init__(cache_namespace="project_id_extraction", client=client)
 
-    async def extract(
-        self, markdown_content: str, images: list[Path], document_name: str
-    ) -> list[ExtractedField]:
+    async def extract(self, markdown_content: str, images: list[Path], document_name: str) -> list[ExtractedField]:
         """Extract project IDs from markdown and images.
 
         Args:
@@ -882,11 +866,7 @@ class ProjectIDExtractor(BaseExtractor):
 
         all_fields = []
         for i, chunk in enumerate(chunks):
-            chunk_name = (
-                f"{document_name} (chunk {i+1}/{len(chunks)})"
-                if len(chunks) > 1
-                else document_name
-            )
+            chunk_name = f"{document_name} (chunk {i + 1}/{len(chunks)})" if len(chunks) > 1 else document_name
 
             # Build message content (text + images)
             content = [
@@ -929,11 +909,7 @@ class ProjectIDExtractor(BaseExtractor):
                     max_tokens=settings.llm_max_tokens,
                     temperature=settings.llm_temperature,
                     system=[
-                        {
-                            "type": "text",
-                            "text": PROJECT_ID_EXTRACTION_PROMPT,
-                            "cache_control": {"type": "ephemeral"}
-                        }
+                        {"type": "text", "text": PROJECT_ID_EXTRACTION_PROMPT, "cache_control": {"type": "ephemeral"}}
                     ],
                     messages=[{"role": "user", "content": content}],
                     timeout=settings.api_call_timeout_seconds,
@@ -976,9 +952,7 @@ class ProjectIDExtractor(BaseExtractor):
                 # Invalid JSON or structure - log and continue
                 logger.error(f"Invalid response from LLM for {chunk_name}: {e}")
             except Exception as e:
-                logger.error(
-                    f"Project ID extraction failed for {chunk_name}: {e}", exc_info=True
-                )
+                logger.error(f"Project ID extraction failed for {chunk_name}: {e}", exc_info=True)
 
         # Deduplicate fields (same value, keep highest confidence)
         # For project IDs, value is the key (no field_type needed since all are "project_id")
@@ -994,8 +968,7 @@ class ProjectIDExtractor(BaseExtractor):
         self.cache.set(cache_key, [f.model_dump() for f in fields])
 
         logger.info(
-            f"Extracted {len(fields)} unique project IDs from {document_name} "
-            f"({len(all_fields)} total before dedup)"
+            f"Extracted {len(fields)} unique project IDs from {document_name} ({len(all_fields)} total before dedup)"
         )
         return fields
 
@@ -1086,9 +1059,7 @@ def extract_json_from_response(response_text: str) -> str:
     return json_str
 
 
-def validate_and_parse_extraction_response(
-    json_str: str, extractor_type: str
-) -> list[dict[str, Any]]:
+def validate_and_parse_extraction_response(json_str: str, extractor_type: str) -> list[dict[str, Any]]:
     """Validate and parse JSON extraction response.
 
     Args:
@@ -1109,9 +1080,7 @@ def validate_and_parse_extraction_response(
 
     # Validate structure is a list
     if not isinstance(data, list):
-        raise ValueError(
-            f"Expected list of extractions from {extractor_type} extractor, got {type(data).__name__}"
-        )
+        raise ValueError(f"Expected list of extractions from {extractor_type} extractor, got {type(data).__name__}")
 
     # Validate each extraction has required fields
     required_fields = {"value", "field_type", "confidence", "source", "reasoning"}
@@ -1208,9 +1177,7 @@ def group_fields_by_document(fields: list[ExtractedField]) -> list[dict]:
     return list(by_doc.values())
 
 
-async def extract_fields_with_llm(
-    session_id: str, evidence_data: dict[str, Any]
-) -> dict[str, Any]:
+async def extract_fields_with_llm(session_id: str, evidence_data: dict[str, Any]) -> dict[str, Any]:
     """
     Extract structured fields from evidence using LLM.
 

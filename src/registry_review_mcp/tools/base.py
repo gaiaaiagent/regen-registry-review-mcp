@@ -8,16 +8,17 @@ After (per tool): ~12 lines of pure business logic
 Reduction: ~80% per tool
 """
 
-from abc import ABC, abstractmethod
-from typing import TypeVar, Generic, Any
-from pydantic import BaseModel, ValidationError
 import json
 import logging
+from abc import ABC, abstractmethod
+from typing import Generic, TypeVar
+
+from pydantic import BaseModel, ValidationError
 
 logger = logging.getLogger(__name__)
 
-TArgs = TypeVar('TArgs', bound=BaseModel)
-TResult = TypeVar('TResult')
+TArgs = TypeVar("TArgs", bound=BaseModel)
+TResult = TypeVar("TResult")
 
 
 class MCPTool(ABC, Generic[TArgs, TResult]):
@@ -68,22 +69,14 @@ class MCPTool(ABC, Generic[TArgs, TResult]):
 
         Override for custom formatting if needed.
         """
-        return json.dumps({
-            "status": "success",
-            "message": message,
-            "data": result
-        }, indent=2)
+        return json.dumps({"status": "success", "message": message, "data": result}, indent=2)
 
     def format_error(self, error: Exception) -> str:
         """Format error response as JSON string.
 
         Override for custom error formatting if needed.
         """
-        error_data = {
-            "status": "error",
-            "error_type": type(error).__name__,
-            "message": str(error)
-        }
+        error_data = {"status": "error", "error_type": type(error).__name__, "message": str(error)}
 
         # Add validation details for Pydantic errors
         if isinstance(error, ValidationError):

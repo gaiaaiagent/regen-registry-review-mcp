@@ -8,12 +8,10 @@ readable test setup.
 import base64
 import time
 from pathlib import Path
-from typing import Dict, List, Any, Optional
-from dataclasses import dataclass, field
-from unittest.mock import Mock, AsyncMock
+from typing import Any, Dict, List
+from unittest.mock import AsyncMock, Mock
 
-from registry_review_mcp.tools import upload_tools, session_tools
-
+from registry_review_mcp.tools import session_tools, upload_tools
 
 # ============================================================================
 # Data Builders - Fluent interface for test data

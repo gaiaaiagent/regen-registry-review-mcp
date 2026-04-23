@@ -18,9 +18,8 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from registry_review_mcp.tools import session_tools, document_tools, mapping_tools
+from registry_review_mcp.tools import document_tools, mapping_tools, session_tools
 from registry_review_mcp.tools.evidence_tools import extract_all_evidence
-from registry_review_mcp.tools import report_tools
 
 
 async def main():

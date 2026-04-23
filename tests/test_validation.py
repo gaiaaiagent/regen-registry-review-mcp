@@ -1,17 +1,11 @@
 """Tests for cross-document validation tools."""
 
-import pytest
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from registry_review_mcp.tools import validation_tools
-from registry_review_mcp.tools import session_tools, document_tools, evidence_tools
-from registry_review_mcp.models.validation import (
-    DateField,
-    DateAlignmentValidation,
-    LandTenureField,
-    ProjectIDOccurrence,
-)
+import pytest
+
+from registry_review_mcp.tools import document_tools, validation_tools
 
 # Import factory infrastructure
 from tests.factories import SessionManager, path_based_session

@@ -6,6 +6,7 @@ are correctly filtered out from project ID extraction.
 """
 
 import pytest
+
 from registry_review_mcp.extractors.llm_extractors import _filter_invalid_project_ids
 
 

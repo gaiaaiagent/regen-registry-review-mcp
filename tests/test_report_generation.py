@@ -1,16 +1,17 @@
 """Tests for report generation tools."""
 
-import pytest
 from datetime import datetime
 from pathlib import Path
 
-from registry_review_mcp.tools import report_tools, session_tools, document_tools, evidence_tools, mapping_tools
+import pytest
+
 from registry_review_mcp.models.report import (
     ReportMetadata,
+    ReportSummary,
     RequirementFinding,
     ValidationFinding,
-    ReportSummary,
 )
+from registry_review_mcp.tools import document_tools, evidence_tools, mapping_tools, report_tools, session_tools
 
 
 @pytest.mark.usefixtures("cleanup_sessions")
@@ -475,7 +476,7 @@ class TestReportOutputQuality:
 
     def test_no_emojis_in_markdown_report(self):
         """Verify no emoji Unicode characters appear in markdown report output."""
-        from registry_review_mcp.models.report import ReviewReport, ReportMetadata, ReportSummary, RequirementFinding
+        from registry_review_mcp.models.report import RequirementFinding, ReviewReport
 
         report = ReviewReport(
             metadata=ReportMetadata(
@@ -552,7 +553,7 @@ class TestReportOutputQuality:
 
     def test_section_headers_no_emojis(self):
         """Verify section headers use plain text, not emoji prefixes."""
-        from registry_review_mcp.models.report import ReviewReport, ReportMetadata, ReportSummary, RequirementFinding
+        from registry_review_mcp.models.report import RequirementFinding, ReviewReport
 
         report = ReviewReport(
             metadata=ReportMetadata(
@@ -612,7 +613,7 @@ class TestPDFReportGeneration:
 
     def _make_report(self):
         """Build a representative ReviewReport for PDF testing."""
-        from registry_review_mcp.models.report import ReviewReport, ReportMetadata, ReportSummary
+        from registry_review_mcp.models.report import ReviewReport
 
         return ReviewReport(
             metadata=ReportMetadata(

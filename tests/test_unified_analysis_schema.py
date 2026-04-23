@@ -5,11 +5,12 @@ the Pydantic schema, ensuring the LLM returns JSON with correct field names.
 """
 
 import json
+
 import pytest
 
 from registry_review_mcp.prompts.unified_analysis import (
-    build_unified_analysis_prompt,
     UnifiedAnalysisResult,
+    build_unified_analysis_prompt,
 )
 
 

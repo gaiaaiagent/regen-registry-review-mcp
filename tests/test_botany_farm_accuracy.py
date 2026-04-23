@@ -4,8 +4,9 @@ Uses shared fixtures from conftest.py to avoid duplicate API calls and reduce co
 """
 
 import json
-import pytest
 from pathlib import Path
+
+import pytest
 
 from registry_review_mcp.config.settings import settings
 from registry_review_mcp.extractors.llm_extractors import (
@@ -13,7 +14,6 @@ from registry_review_mcp.extractors.llm_extractors import (
     LandTenureExtractor,
     ProjectIDExtractor,
 )
-
 
 pytestmark = [
     pytest.mark.expensive,

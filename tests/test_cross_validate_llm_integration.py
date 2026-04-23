@@ -1,12 +1,10 @@
 """Integration test for cross_validate() with real LLM extraction."""
 
+
 import pytest
-import json
-from pathlib import Path
 
-from registry_review_mcp.tools import session_tools, validation_tools
 from registry_review_mcp.config.settings import settings
-
+from registry_review_mcp.tools import session_tools, validation_tools
 
 pytestmark = [
     pytest.mark.expensive,

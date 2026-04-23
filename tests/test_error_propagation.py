@@ -10,15 +10,16 @@ Incident: Session creation for "Test B" (session-6543bffc727a) reported success
 but the session directory was never created, causing silent failure.
 """
 
-import pytest
 from pathlib import Path
-from unittest.mock import Mock, patch, AsyncMock
-from registry_review_mcp.tools import session_tools
+from unittest.mock import Mock, patch
+
+import pytest
+
 from registry_review_mcp.models.errors import SessionNotFoundError
+from registry_review_mcp.tools import session_tools
 from registry_review_mcp.utils.llm_client import (
     LLMAuthenticationError,
     LLMBillingError,
-    classify_api_error,
 )
 
 
@@ -299,7 +300,7 @@ class TestLandTenureValidationDefaults:
 
     def test_construction_with_explicit_values(self):
         """Explicit values should override defaults."""
-        from registry_review_mcp.models.validation import LandTenureValidation, LandTenureField
+        from registry_review_mcp.models.validation import LandTenureField, LandTenureValidation
 
         field = LandTenureField(
             owner_name="Test Owner",

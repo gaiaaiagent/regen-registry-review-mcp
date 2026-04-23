@@ -16,10 +16,10 @@ from docx.shared import RGBColor
 
 from ..models.report import (
     ReportMetadata,
-    RequirementFinding,
-    ValidationFinding,
     ReportSummary,
+    RequirementFinding,
     ReviewReport,
+    ValidationFinding,
 )
 from ..utils.state import StateManager
 
@@ -54,7 +54,7 @@ async def generate_review_report(
             "requirements_partial": 0,
             "requirements_missing": 0,
             "overall_coverage": 0.0,
-            "evidence": []
+            "evidence": [],
         }
 
     # Load validation data if available
@@ -67,11 +67,11 @@ async def generate_review_report(
                 "total_validations": 0,
                 "validations_passed": 0,
                 "validations_failed": 0,
-                "validations_warning": 0
+                "validations_warning": 0,
             },
             "date_alignments": [],
             "land_tenure": [],
-            "project_ids": []
+            "project_ids": [],
         }
 
     # Load documents data if available
@@ -92,7 +92,7 @@ async def generate_review_report(
         project_id=project_metadata.get("project_id"),
         methodology=project_metadata.get("methodology", "Unknown"),
         generated_at=datetime.now(),  # Local time
-        report_format=format
+        report_format=format,
     )
 
     # Build requirement findings
@@ -146,7 +146,7 @@ async def generate_review_report(
             evidence_summary=evidence_summary,
             page_citations=page_citations[:5],  # Limit to first 5
             human_review_required=human_review_required,
-            notes=req.get("notes")
+            notes=req.get("notes"),
         )
         requirements.append(finding)
 
@@ -154,29 +154,35 @@ async def generate_review_report(
     validations = []
 
     for date_val in validation_data.get("date_alignments", []):
-        validations.append(ValidationFinding(
-            validation_type="date_alignment",
-            status=date_val["status"],
-            message=date_val["message"],
-            flagged_for_review=date_val.get("flagged_for_review", False)
-        ))
+        validations.append(
+            ValidationFinding(
+                validation_type="date_alignment",
+                status=date_val["status"],
+                message=date_val["message"],
+                flagged_for_review=date_val.get("flagged_for_review", False),
+            )
+        )
 
     for tenure_val in validation_data.get("land_tenure", []):
-        validations.append(ValidationFinding(
-            validation_type="land_tenure",
-            status=tenure_val["status"],
-            message=tenure_val["message"],
-            details=", ".join(tenure_val.get("discrepancies", [])),
-            flagged_for_review=tenure_val.get("flagged_for_review", False)
-        ))
+        validations.append(
+            ValidationFinding(
+                validation_type="land_tenure",
+                status=tenure_val["status"],
+                message=tenure_val["message"],
+                details=", ".join(tenure_val.get("discrepancies", [])),
+                flagged_for_review=tenure_val.get("flagged_for_review", False),
+            )
+        )
 
     for pid_val in validation_data.get("project_ids", []):
-        validations.append(ValidationFinding(
-            validation_type="project_id",
-            status=pid_val["status"],
-            message=pid_val["message"],
-            flagged_for_review=pid_val.get("flagged_for_review", False)
-        ))
+        validations.append(
+            ValidationFinding(
+                validation_type="project_id",
+                status=pid_val["status"],
+                message=pid_val["message"],
+                flagged_for_review=pid_val.get("flagged_for_review", False),
+            )
+        )
 
     # Build summary
     val_summary = validation_data.get("summary", {})
@@ -193,7 +199,7 @@ async def generate_review_report(
         validations_warning=val_summary.get("validations_warning", 0),
         documents_reviewed=documents_count,
         total_evidence_snippets=total_snippets,
-        items_for_human_review=len(items_for_review)
+        items_for_human_review=len(items_for_review),
     )
 
     # Build complete report
@@ -207,8 +213,8 @@ async def generate_review_report(
             "Review items flagged for human review",
             "Verify partial requirements have sufficient evidence",
             "Address any validation warnings or failures",
-            "Make final approval decision"
-        ]
+            "Make final approval decision",
+        ],
     )
 
     # Generate output based on format
@@ -244,7 +250,7 @@ async def generate_review_report(
         "format": format,
         "report_path": str(report_path),
         "generated_at": metadata.generated_at.isoformat(),
-        "summary": summary.model_dump()
+        "summary": summary.model_dump(),
     }
 
 
@@ -278,10 +284,22 @@ def format_markdown_report(report: ReviewReport) -> str:
     lines.append("")
     lines.append("### Requirements Coverage")
     lines.append(f"- **Total Requirements:** {report.summary.requirements_total}")
-    lines.append(f"- **Covered:** {report.summary.requirements_covered} ({report.summary.requirements_covered/report.summary.requirements_total*100:.1f}%)" if report.summary.requirements_total > 0 else "- **Covered:** 0 (0.0%)")
-    lines.append(f"- **Partial:** {report.summary.requirements_partial} ({report.summary.requirements_partial/report.summary.requirements_total*100:.1f}%)" if report.summary.requirements_total > 0 else "- **Partial:** 0 (0.0%)")
-    lines.append(f"- **Missing:** {report.summary.requirements_missing} ({report.summary.requirements_missing/report.summary.requirements_total*100:.1f}%)" if report.summary.requirements_total > 0 else "- **Missing:** 0 (0.0%)")
-    lines.append(f"- **Overall Coverage:** {report.summary.overall_coverage*100:.1f}%")
+    lines.append(
+        f"- **Covered:** {report.summary.requirements_covered} ({report.summary.requirements_covered / report.summary.requirements_total * 100:.1f}%)"
+        if report.summary.requirements_total > 0
+        else "- **Covered:** 0 (0.0%)"
+    )
+    lines.append(
+        f"- **Partial:** {report.summary.requirements_partial} ({report.summary.requirements_partial / report.summary.requirements_total * 100:.1f}%)"
+        if report.summary.requirements_total > 0
+        else "- **Partial:** 0 (0.0%)"
+    )
+    lines.append(
+        f"- **Missing:** {report.summary.requirements_missing} ({report.summary.requirements_missing / report.summary.requirements_total * 100:.1f}%)"
+        if report.summary.requirements_total > 0
+        else "- **Missing:** 0 (0.0%)"
+    )
+    lines.append(f"- **Overall Coverage:** {report.summary.overall_coverage * 100:.1f}%")
     lines.append("")
 
     if report.summary.validations_total > 0:
@@ -336,11 +354,15 @@ def format_markdown_report(report: ReviewReport) -> str:
     if report.validations:
         lines.append("## Cross-Document Validation Results")
         lines.append("")
-        lines.extend(format_validation_summary_markdown({
-            "date_alignments": [v for v in report.validations if v.validation_type == "date_alignment"],
-            "land_tenure": [v for v in report.validations if v.validation_type == "land_tenure"],
-            "project_ids": [v for v in report.validations if v.validation_type == "project_id"]
-        }))
+        lines.extend(
+            format_validation_summary_markdown(
+                {
+                    "date_alignments": [v for v in report.validations if v.validation_type == "date_alignment"],
+                    "land_tenure": [v for v in report.validations if v.validation_type == "land_tenure"],
+                    "project_ids": [v for v in report.validations if v.validation_type == "project_id"],
+                }
+            )
+        )
         lines.append("")
 
     # Items for Review
@@ -395,7 +417,7 @@ def format_requirement_markdown(req: dict | RequirementFinding) -> list[str]:
 
     lines.append(f"### {req_id}: {req_text[:80]}{'...' if len(req_text) > 80 else ''}")
     lines.append(f"**Status:** {status.title()}")
-    lines.append(f"**Confidence:** {confidence:.2f} ({confidence*100:.0f}%)")
+    lines.append(f"**Confidence:** {confidence:.2f} ({confidence * 100:.0f}%)")
     lines.append(f"**Evidence:** {snippets} snippet(s) from {docs_ref} document(s)")
 
     if evidence_summary:
@@ -440,11 +462,7 @@ def format_validation_summary_markdown(validations: dict) -> list[str]:
                 message = val.message
                 flagged = val.flagged_for_review
 
-            status_label = {
-                "pass": "PASS:",
-                "warning": "WARNING:",
-                "fail": "FAIL:"
-            }.get(status, "")
+            status_label = {"pass": "PASS:", "warning": "WARNING:", "fail": "FAIL:"}.get(status, "")
 
             flag_label = " [Review]" if flagged else ""
             lines.append(f"- **{status_label}**{flag_label} {message}")
@@ -454,11 +472,7 @@ def format_validation_summary_markdown(validations: dict) -> list[str]:
     return lines
 
 
-def format_checklist_report(
-    report: ReviewReport,
-    session_data: dict[str, Any],
-    evidence_data: dict[str, Any]
-) -> str:
+def format_checklist_report(report: ReviewReport, session_data: dict[str, Any], evidence_data: dict[str, Any]) -> str:
     """Format review report as a populated registry checklist.
 
     Uses examples/checklist.md as template for structure and populates
@@ -507,52 +521,49 @@ def format_checklist_report(
 
     # Clean up template artifacts (numbered list items like "1. #")
     import re
-    header_section = re.sub(r'^\d+\.\s*#\s*$', '', header_section, flags=re.MULTILINE)
-    header_section = re.sub(r'^\d+\.\s*#\s*\*\*', '## **', header_section, flags=re.MULTILINE)
-    header_section = re.sub(r'\n{3,}', '\n\n', header_section)  # Remove excess blank lines
+
+    header_section = re.sub(r"^\d+\.\s*#\s*$", "", header_section, flags=re.MULTILINE)
+    header_section = re.sub(r"^\d+\.\s*#\s*\*\*", "## **", header_section, flags=re.MULTILINE)
+    header_section = re.sub(r"\n{3,}", "\n\n", header_section)  # Remove excess blank lines
 
     # Populate header metadata
     header_section = header_section.replace(
-        "| Project Name |  |",
-        f"| Project Name | {_escape_markdown_table(project.get('project_name', ''))} |"
+        "| Project Name |  |", f"| Project Name | {_escape_markdown_table(project.get('project_name', ''))} |"
     )
     header_section = header_section.replace(
-        "| **Project ID** | C06-___ |",
-        f"| **Project ID** | {project.get('project_id', 'C06-___')} |"
+        "| **Project ID** | C06-___ |", f"| **Project ID** | {project.get('project_id', 'C06-___')} |"
     )
     header_section = header_section.replace(
         "| **Crediting period** |  |",
-        f"| **Crediting period** | {_escape_markdown_table(_extract_crediting_period(evidence_data))} |"
+        f"| **Crediting period** | {_escape_markdown_table(_extract_crediting_period(evidence_data))} |",
     )
     header_section = header_section.replace(
         "| **Date of Submission** |  |",
-        f"| **Date of Submission** | {report.metadata.generated_at.strftime('%Y-%m-%d')} |"
+        f"| **Date of Submission** | {report.metadata.generated_at.strftime('%Y-%m-%d')} |",
     )
     header_section = header_section.replace(
-        "| **Registry Agents**  |  |",
-        f"| **Registry Agents** | AI-Assisted Review (Registry Review MCP) |"
+        "| **Registry Agents**  |  |", f"| **Registry Agents** | AI-Assisted Review (Registry Review MCP) |"
     )
     header_section = header_section.replace(
-        "| **Documents Submitted:** |  |",
-        f"| **Documents Submitted:** | {documents_display} |"
+        "| **Documents Submitted:** |  |", f"| **Documents Submitted:** | {documents_display} |"
     )
 
     # Populate Review Outcome
     coverage_pct = report.summary.overall_coverage * 100
     if coverage_pct >= 80 and report.summary.validations_failed == 0:
         outcome_status = "[X] Approved  [ ] Not Approved"
-        outcome_summary = f"All {report.summary.requirements_covered} requirements covered ({coverage_pct:.0f}% coverage)."
+        outcome_summary = (
+            f"All {report.summary.requirements_covered} requirements covered ({coverage_pct:.0f}% coverage)."
+        )
     else:
         outcome_status = "[ ] Approved  [X] Not Approved"
-        outcome_summary = f"{report.summary.requirements_covered}/{report.summary.requirements_total} requirements covered."
+        outcome_summary = (
+            f"{report.summary.requirements_covered}/{report.summary.requirements_total} requirements covered."
+        )
 
+    header_section = header_section.replace("[ ] Approved  [ ] Not Approved", outcome_status)
     header_section = header_section.replace(
-        "[ ] Approved  [ ] Not Approved",
-        outcome_status
-    )
-    header_section = header_section.replace(
-        "Outcome Summary  Required Actions:",
-        f"Outcome Summary: {outcome_summary} Required Actions:"
+        "Outcome Summary  Required Actions:", f"Outcome Summary: {outcome_summary} Required Actions:"
     )
 
     # Build the populated table
@@ -615,17 +626,17 @@ def _extract_crediting_period(evidence_data: dict[str, Any]) -> str:
                 text = snippets[0].get("text", "")
 
                 # Look for "X years" pattern
-                years_match = re.search(r'(\d+)\s*[-–]?\s*years?', text, re.IGNORECASE)
+                years_match = re.search(r"(\d+)\s*[-–]?\s*years?", text, re.IGNORECASE)
                 if years_match:
                     years = years_match.group(1)
                     # Also look for date range
-                    date_range = re.search(r'(\d{2}/\d{2}/\d{4})\s*(?:to|-|–)\s*(\d{2}/\d{2}/\d{4})', text)
+                    date_range = re.search(r"(\d{2}/\d{2}/\d{4})\s*(?:to|-|–)\s*(\d{2}/\d{2}/\d{4})", text)
                     if date_range:
                         return f"{years} years ({date_range.group(1)} to {date_range.group(2)})"
                     return f"{years} years"
 
                 # Look for date range without "years" keyword
-                date_range = re.search(r'(\d{4})\s*(?:to|-|–)\s*(\d{4})', text)
+                date_range = re.search(r"(\d{4})\s*(?:to|-|–)\s*(\d{4})", text)
                 if date_range:
                     return f"{date_range.group(1)} to {date_range.group(2)}"
 
@@ -646,16 +657,14 @@ def _escape_markdown_table(text: str) -> str:
     # Note: We preserve <br> tags for renderers that support them
     # Only escape other angle brackets for safety
     import re
+
     # Escape < and > but not <br> tags
-    text = re.sub(r'<(?!br>)', '&lt;', text)
-    text = re.sub(r'(?<!<br)>', '&gt;', text)
+    text = re.sub(r"<(?!br>)", "&lt;", text)
+    text = re.sub(r"(?<!<br)>", "&gt;", text)
     return text
 
 
-def _format_submitted_material(
-    snippets: list[dict[str, Any]],
-    project_id: str | None = None
-) -> tuple[str, str]:
+def _format_submitted_material(snippets: list[dict[str, Any]], project_id: str | None = None) -> tuple[str, str]:
     """Format evidence snippets into Submitted Material and Evidence columns.
 
     Returns:
@@ -738,8 +747,17 @@ def _extract_value(snippet: dict[str, Any]) -> str:
                 return str(fields[key])
 
         # Look for common value-like fields (name, date, period, etc.)
-        value_keys = ["owner_name", "proponent_name", "project_name", "crediting_period",
-                      "start_date", "end_date", "area", "duration", "total"]
+        value_keys = [
+            "owner_name",
+            "proponent_name",
+            "project_name",
+            "crediting_period",
+            "start_date",
+            "end_date",
+            "area",
+            "duration",
+            "total",
+        ]
         for key in value_keys:
             if key in fields and fields[key]:
                 return str(fields[key])
@@ -761,7 +779,7 @@ def _extract_value(snippet: dict[str, Any]) -> str:
         # Find first sentence end
         sentence_end = clean.find(". ")
         if sentence_end > 0 and sentence_end < 200:
-            return clean[:sentence_end + 1]
+            return clean[: sentence_end + 1]
         elif len(clean) <= 200:
             return clean
         else:
@@ -803,11 +821,7 @@ def _truncate_at_sentence(text: str, max_length: int = 1000) -> str:
     return text[:max_length] + "..."
 
 
-def _format_checklist_row(
-    req: RequirementFinding,
-    evidence_item: dict[str, Any],
-    project_id: str | None = None
-) -> str:
+def _format_checklist_row(req: RequirementFinding, evidence_item: dict[str, Any], project_id: str | None = None) -> str:
     """Format a single checklist row from requirement finding and evidence.
 
     Column structure:
@@ -859,11 +873,11 @@ def _format_checklist_row(
 
 # Color scheme for DOCX generation - semantic colors for different statuses
 DOCX_COLORS = {
-    "blue": RGBColor(0, 0, 255),        # Standard generated content
-    "green": RGBColor(34, 139, 34),     # High confidence, covered
-    "orange": RGBColor(255, 140, 0),    # Partial coverage, medium confidence
-    "red": RGBColor(220, 20, 60),       # Missing, low confidence
-    "purple": RGBColor(128, 0, 128),    # Human review required
+    "blue": RGBColor(0, 0, 255),  # Standard generated content
+    "green": RGBColor(34, 139, 34),  # High confidence, covered
+    "orange": RGBColor(255, 140, 0),  # Partial coverage, medium confidence
+    "red": RGBColor(220, 20, 60),  # Missing, low confidence
+    "purple": RGBColor(128, 0, 128),  # Human review required
 }
 
 
@@ -886,11 +900,7 @@ def _set_cell_text_colored(cell, text: str, color_name: str = "blue") -> None:
     run.font.color.rgb = DOCX_COLORS.get(color_name, DOCX_COLORS["blue"])
 
 
-def _set_cell_evidence_formatted(
-    cell,
-    evidence_item: dict,
-    project_id: str | None = None
-) -> str:
+def _set_cell_evidence_formatted(cell, evidence_item: dict, project_id: str | None = None) -> str:
     """Set cell with bold labels and blue text for submitted material.
 
     Returns evidence text for use in Comments column.
@@ -1001,7 +1011,7 @@ def format_docx_report(
     session_data: dict[str, Any],
     evidence_data: dict[str, Any],
     template_path: Path,
-    output_path: Path
+    output_path: Path,
 ) -> Path:
     """Format review report as a populated DOCX checklist.
 
@@ -1049,7 +1059,9 @@ def format_docx_report(
 
     # Format document list for DOCX (use newlines for better readability)
     if doc_names:
-        documents_display = f"{len(doc_names)} document(s):\n" + "\n".join(f"{i+1}. {name}" for i, name in enumerate(doc_names))
+        documents_display = f"{len(doc_names)} document(s):\n" + "\n".join(
+            f"{i + 1}. {name}" for i, name in enumerate(doc_names)
+        )
     else:
         documents_display = "0 documents"
 
@@ -1093,7 +1105,9 @@ def format_docx_report(
         project_id = project.get("project_id")
 
         # Skip header row (row 0), populate data rows
-        for row_idx, req in enumerate(report.requirements, start=2):  # Skip row 0 (merged header) and row 1 (column headers)
+        for row_idx, req in enumerate(
+            report.requirements, start=2
+        ):  # Skip row 0 (merged header) and row 1 (column headers)
             if row_idx >= len(checklist_table.rows):
                 break
 
@@ -1242,7 +1256,14 @@ def format_pdf_report(report: ReviewReport, output_path: Path) -> Path:
             status_label = {"pass": "PASS", "warning": "WARNING", "fail": "FAIL"}.get(val.status, val.status.upper())
             flag = " [Review]" if val.flagged_for_review else ""
             pdf.set_font("Helvetica", "", 10)
-            pdf.multi_cell(0, 6, f"**{status_label}:{flag}** {_sanitize(val.message)}", markdown=True, new_x="LMARGIN", new_y="NEXT")
+            pdf.multi_cell(
+                0,
+                6,
+                f"**{status_label}:{flag}** {_sanitize(val.message)}",
+                markdown=True,
+                new_x="LMARGIN",
+                new_y="NEXT",
+            )
         pdf.ln(4)
 
     # Items Requiring Human Review
@@ -1312,17 +1333,17 @@ def _sanitize(text: str) -> str:
     are replaced with reasonable ASCII equivalents so the PDF renders cleanly.
     """
     replacements = {
-        "\u2713": "Y",     # ✓
-        "\u2717": "X",     # ✗
-        "\u26a0": "!",     # ⚠
-        "\u2014": "--",    # em dash
-        "\u2013": "-",     # en dash
-        "\u2018": "'",     # left single quote
-        "\u2019": "'",     # right single quote
-        "\u201c": '"',     # left double quote
-        "\u201d": '"',     # right double quote
-        "\u2026": "...",   # ellipsis
-        "\u00a0": " ",     # non-breaking space
+        "\u2713": "Y",  # ✓
+        "\u2717": "X",  # ✗
+        "\u26a0": "!",  # ⚠
+        "\u2014": "--",  # em dash
+        "\u2013": "-",  # en dash
+        "\u2018": "'",  # left single quote
+        "\u2019": "'",  # right single quote
+        "\u201c": '"',  # left double quote
+        "\u201d": '"',  # right double quote
+        "\u2026": "...",  # ellipsis
+        "\u00a0": " ",  # non-breaking space
     }
     for char, repl in replacements.items():
         text = text.replace(char, repl)
@@ -1330,11 +1351,7 @@ def _sanitize(text: str) -> str:
     return text.encode("latin-1", errors="replace").decode("latin-1")
 
 
-async def export_review(
-    session_id: str,
-    output_format: str,
-    output_path: str | None = None
-) -> dict[str, Any]:
+async def export_review(session_id: str, output_format: str, output_path: str | None = None) -> dict[str, Any]:
     """
     Export review report to specified format.
 

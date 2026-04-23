@@ -11,7 +11,6 @@ Architecture:
               HQ Available → Upgrade quality
 """
 
-import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -20,8 +19,7 @@ from typing import Any
 
 import psutil
 
-from ..config.settings import settings
-from ..utils.state import StateManager, get_session_or_raise
+from ..utils.state import get_session_or_raise
 
 logger = logging.getLogger(__name__)
 
@@ -38,13 +36,14 @@ def check_memory_available(min_gb: float = MARKER_MIN_RAM_GB) -> tuple[bool, flo
     Returns:
         Tuple of (is_available, available_gb)
     """
-    available_gb = psutil.virtual_memory().available / (1024 ** 3)
+    available_gb = psutil.virtual_memory().available / (1024**3)
     return available_gb >= min_gb, round(available_gb, 1)
 
 
 @dataclass
 class DocumentStatus:
     """Status of a single document's extraction."""
+
     document_id: str
     filename: str
     fast_status: str  # "pending" | "complete" | "failed"
@@ -57,6 +56,7 @@ class DocumentStatus:
 @dataclass
 class ConversionStatus:
     """Overall conversion status for a session."""
+
     session_id: str
     total_documents: int
     pdfs_total: int
@@ -181,12 +181,14 @@ class DocumentProcessor:
                     doc["hq_status"] = "pending"
 
                 results["successful"] += 1
-                results["documents"].append({
-                    "document_id": doc_id,
-                    "filename": filename,
-                    "chars": result["total_chars"],
-                    "pages": result["page_count"],
-                })
+                results["documents"].append(
+                    {
+                        "document_id": doc_id,
+                        "filename": filename,
+                        "chars": result["total_chars"],
+                        "pages": result["page_count"],
+                    }
+                )
                 print(f"✓ ({result['total_chars']:,} chars)", flush=True)
 
             except Exception as e:
@@ -200,7 +202,9 @@ class DocumentProcessor:
         docs_data["documents"] = documents
         state.write_json("documents.json", docs_data)
 
-        print(f"\n✅ Fast extraction complete: {results['successful']} successful, {results['failed']} failed", flush=True)
+        print(
+            f"\n✅ Fast extraction complete: {results['successful']} successful, {results['failed']} failed", flush=True
+        )
 
         return {
             "session_id": self.session_id,
@@ -229,8 +233,7 @@ class DocumentProcessor:
             has_memory, available_gb = check_memory_available()
             if not has_memory:
                 logger.warning(
-                    f"Insufficient RAM for HQ conversion: {available_gb}GB available, "
-                    f"{MARKER_MIN_RAM_GB}GB required"
+                    f"Insufficient RAM for HQ conversion: {available_gb}GB available, {MARKER_MIN_RAM_GB}GB required"
                 )
                 return {
                     "session_id": self.session_id,
@@ -383,10 +386,7 @@ class DocumentProcessor:
         # Get fresh state
         state = get_session_or_raise(self.session_id)
         docs_data = state.read_json("documents.json")
-        doc = next(
-            (d for d in docs_data.get("documents", []) if d["document_id"] == doc_id),
-            None
-        )
+        doc = next((d for d in docs_data.get("documents", []) if d["document_id"] == doc_id), None)
 
         if not doc:
             return None
@@ -479,15 +479,17 @@ def get_conversion_status(session_id: str) -> ConversionStatus:
     # Build per-document status
     doc_statuses = []
     for doc in pdfs:
-        doc_statuses.append(DocumentStatus(
-            document_id=doc["document_id"],
-            filename=doc["filename"],
-            fast_status=doc.get("fast_status", "pending"),
-            hq_status=doc.get("hq_status", "pending"),
-            hq_progress=100 if doc.get("hq_status") == "complete" else 0,
-            preferred_quality=doc.get("active_quality", "none"),
-            has_content=bool(doc.get("has_markdown")),
-        ))
+        doc_statuses.append(
+            DocumentStatus(
+                document_id=doc["document_id"],
+                filename=doc["filename"],
+                fast_status=doc.get("fast_status", "pending"),
+                hq_status=doc.get("hq_status", "pending"),
+                hq_progress=100 if doc.get("hq_status") == "complete" else 0,
+                preferred_quality=doc.get("active_quality", "none"),
+                has_content=bool(doc.get("has_markdown")),
+            )
+        )
 
     # Generate message
     if hq_complete == len(pdfs) and len(pdfs) > 0:

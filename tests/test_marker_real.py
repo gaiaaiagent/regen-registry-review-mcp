@@ -9,14 +9,14 @@ Marker tests are expensive (8GB models, 30-60s per test) and should run:
 - Before releases
 """
 
-import pytest
-from pathlib import Path
 import time
+
+import pytest
 
 from registry_review_mcp.extractors.marker_extractor import (
     convert_pdf_to_markdown,
-    extract_tables_from_markdown,
     extract_section_hierarchy,
+    extract_tables_from_markdown,
 )
 
 # Mark all tests in this file as marker tests

@@ -8,24 +8,21 @@ Scheduled for removal in a future cleanup pass.
 import logging
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from difflib import SequenceMatcher
-from pathlib import Path
 from typing import Any
 
-from ..config.settings import settings
-from ..utils.tool_helpers import generate_validation_id
 from ..models.validation import (
-    DateField,
     DateAlignmentValidation,
+    DateField,
     LandTenureField,
     LandTenureValidation,
     ProjectIDOccurrence,
     ProjectIDValidation,
-    ValidationSummary,
     ValidationResult,
+    ValidationSummary,
 )
-from ..utils.state import StateManager, get_session_or_raise
+from ..utils.tool_helpers import generate_validation_id
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +41,9 @@ def extract_page_number(source: str) -> int | None:
 
     # Try various page number patterns
     patterns = [
-        r'[Pp]age\s+(\d+)',  # "Page 5" or "page 5"
-        r'[Pp]\.\s*(\d+)',   # "p. 5"
-        r'\((\d+)\)',        # "(5)"
+        r"[Pp]age\s+(\d+)",  # "Page 5" or "page 5"
+        r"[Pp]\.\s*(\d+)",  # "p. 5"
+        r"\((\d+)\)",  # "(5)"
     ]
 
     for pattern in patterns:
@@ -68,7 +65,7 @@ async def validate_date_alignment(
     field2_name: str,
     field2_value: datetime,
     field2_source: str,
-    max_delta_days: int = 120
+    max_delta_days: int = 120,
 ) -> dict[str, Any]:
     """
     Validate that two dates are within acceptable range.
@@ -108,33 +105,23 @@ async def validate_date_alignment(
         validation_id=generate_validation_id("date_alignment"),
         validation_type="date_alignment",
         date1=DateField(
-            field_name=field1_name,
-            value=field1_value,
-            source=field1_source,
-            document_id=doc1_id,
-            confidence=0.95
+            field_name=field1_name, value=field1_value, source=field1_source, document_id=doc1_id, confidence=0.95
         ),
         date2=DateField(
-            field_name=field2_name,
-            value=field2_value,
-            source=field2_source,
-            document_id=doc2_id,
-            confidence=0.95
+            field_name=field2_name, value=field2_value, source=field2_source, document_id=doc2_id, confidence=0.95
         ),
         delta_days=delta,
         max_allowed_days=max_delta_days,
         status=status,
         message=message,
-        flagged_for_review=flagged
+        flagged_for_review=flagged,
     )
 
     return validation.model_dump()
 
 
 async def validate_land_tenure(
-    session_id: str,
-    fields: list[dict[str, Any]],
-    fuzzy_match_threshold: float = 0.8
+    session_id: str, fields: list[dict[str, Any]], fuzzy_match_threshold: float = 0.8
 ) -> dict[str, Any]:
     """
     Cross-validate land tenure information from multiple documents.
@@ -159,7 +146,7 @@ async def validate_land_tenure(
             "status": "pass",
             "message": "Only one land tenure record found",
             "discrepancies": [],
-            "flagged_for_review": False
+            "flagged_for_review": False,
         }
 
     # Convert to Pydantic models
@@ -252,7 +239,7 @@ async def validate_land_tenure(
         status=status,
         message=message,
         discrepancies=discrepancies,
-        flagged_for_review=flagged
+        flagged_for_review=flagged,
     )
 
     return validation.model_dump()
@@ -263,7 +250,7 @@ async def validate_project_id(
     occurrences: list[dict[str, Any]],
     total_documents: int,
     expected_pattern: str = r"^C\d{2}-\d+$",
-    min_occurrences: int = 3
+    min_occurrences: int = 3,
 ) -> dict[str, Any]:
     """
     Validate project ID consistency across documents.
@@ -291,7 +278,7 @@ async def validate_project_id(
             "total_documents": total_documents,
             "status": "fail",
             "message": "No project IDs found in documents",
-            "flagged_for_review": True
+            "flagged_for_review": True,
         }
 
     # Convert to Pydantic models
@@ -353,7 +340,7 @@ async def validate_project_id(
         total_documents=total_documents,
         status=status,
         message=message,
-        flagged_for_review=flagged
+        flagged_for_review=flagged,
     )
 
     return validation.model_dump()
@@ -432,27 +419,31 @@ def extract_structured_fields_from_evidence(evidence_data: dict[str, Any]) -> di
 
                 elif field_name in DATE_FIELDS:
                     # Date fields
-                    dates.append({
-                        "date_type": field_name,
-                        "date_value": field_value,
-                        "date_str": field_value,
-                        "document_id": doc_id,
-                        "document_name": doc_name,
-                        "page": page,
-                        "source": req_id,
-                        "confidence": confidence,
-                    })
+                    dates.append(
+                        {
+                            "date_type": field_name,
+                            "date_value": field_value,
+                            "date_str": field_value,
+                            "document_id": doc_id,
+                            "document_name": doc_name,
+                            "page": page,
+                            "source": req_id,
+                            "confidence": confidence,
+                        }
+                    )
 
                 elif field_name == "project_id":
                     # Project ID field
-                    project_ids.append({
-                        "project_id": field_value,
-                        "document_id": doc_id,
-                        "document_name": doc_name,
-                        "page": page,
-                        "source": req_id,
-                        "confidence": confidence,
-                    })
+                    project_ids.append(
+                        {
+                            "project_id": field_value,
+                            "document_id": doc_id,
+                            "document_name": doc_name,
+                            "page": page,
+                            "source": req_id,
+                            "confidence": confidence,
+                        }
+                    )
 
     # Convert tenure dict to list
     tenure_fields = list(tenure_by_doc.values())
@@ -565,7 +556,7 @@ def calculate_validation_summary(
         validations_warning=warning,
         items_flagged=flagged,
         pass_rate=pass_rate,
-        extraction_method=extraction_method
+        extraction_method=extraction_method,
     )
 
     return summary.model_dump()

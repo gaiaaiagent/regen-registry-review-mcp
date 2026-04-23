@@ -12,14 +12,17 @@ from typing import Any, Literal
 
 from ..utils.state import get_session_or_raise
 
-
 OverrideStatus = Literal["approved", "rejected", "needs_revision", "conditional", "pending"]
 DeterminationStatus = Literal["approve", "conditional", "reject", "hold"]
 RevisionPriority = Literal["critical", "high", "medium", "low"]
 AuditActionType = Literal[
-    "override_set", "override_cleared", "annotation_added",
-    "determination_set", "determination_cleared",
-    "revision_requested", "revision_resolved",
+    "override_set",
+    "override_cleared",
+    "annotation_added",
+    "determination_set",
+    "determination_cleared",
+    "revision_requested",
+    "revision_resolved",
     "session_completed",
 ]
 
@@ -117,14 +120,16 @@ async def set_requirement_override(
         previous = annotations_data["overrides"][requirement_id]
         if "history" not in annotations_data:
             annotations_data["history"] = []
-        annotations_data["history"].append({
-            "type": "override_changed",
-            "requirement_id": requirement_id,
-            "previous_status": previous.get("status"),
-            "new_status": override_status,
-            "changed_by": reviewer,
-            "changed_at": now,
-        })
+        annotations_data["history"].append(
+            {
+                "type": "override_changed",
+                "requirement_id": requirement_id,
+                "previous_status": previous.get("status"),
+                "new_status": override_status,
+                "changed_by": reviewer,
+                "changed_at": now,
+            }
+        )
 
     annotations_data["overrides"][requirement_id] = override_entry
     annotations_data["updated_at"] = now
@@ -148,12 +153,15 @@ async def set_requirement_override(
     rejected = sum(1 for o in annotations_data["overrides"].values() if o["status"] == "rejected")
     needs_revision = sum(1 for o in annotations_data["overrides"].values() if o["status"] == "needs_revision")
 
-    state_manager.update_json("session.json", {
-        "statistics.human_overrides": total_overrides,
-        "statistics.requirements_approved": approved,
-        "statistics.requirements_rejected": rejected,
-        "statistics.requirements_needs_revision": needs_revision,
-    })
+    state_manager.update_json(
+        "session.json",
+        {
+            "statistics.human_overrides": total_overrides,
+            "statistics.requirements_approved": approved,
+            "statistics.requirements_rejected": rejected,
+            "statistics.requirements_needs_revision": needs_revision,
+        },
+    )
 
     return {
         "session_id": session_id,
@@ -351,13 +359,15 @@ async def clear_requirement_override(
     previous = annotations_data["overrides"][requirement_id]
     if "history" not in annotations_data:
         annotations_data["history"] = []
-    annotations_data["history"].append({
-        "type": "override_cleared",
-        "requirement_id": requirement_id,
-        "previous_status": previous.get("status"),
-        "cleared_by": reviewer,
-        "cleared_at": now,
-    })
+    annotations_data["history"].append(
+        {
+            "type": "override_cleared",
+            "requirement_id": requirement_id,
+            "previous_status": previous.get("status"),
+            "cleared_by": reviewer,
+            "cleared_at": now,
+        }
+    )
 
     # Remove override
     del annotations_data["overrides"][requirement_id]
@@ -422,11 +432,13 @@ async def set_final_determination(
         # Record history
         if "history" not in determination_data:
             determination_data["history"] = []
-        determination_data["history"].append({
-            "previous_determination": determination_data.get("determination"),
-            "changed_by": reviewer,
-            "changed_at": now,
-        })
+        determination_data["history"].append(
+            {
+                "previous_determination": determination_data.get("determination"),
+                "changed_by": reviewer,
+                "changed_at": now,
+            }
+        )
     else:
         determination_data = {
             "session_id": session_id,
@@ -455,11 +467,14 @@ async def set_final_determination(
     )
 
     # Update session with determination info
-    state_manager.update_json("session.json", {
-        "final_determination": determination,
-        "determination_set_at": now,
-        "determination_set_by": reviewer,
-    })
+    state_manager.update_json(
+        "session.json",
+        {
+            "final_determination": determination,
+            "determination_set_at": now,
+            "determination_set_by": reviewer,
+        },
+    )
 
     status_messages = {
         "approve": "Project APPROVED for registration",
@@ -544,12 +559,14 @@ async def clear_final_determination(
     # Record in history
     if "history" not in determination_data:
         determination_data["history"] = []
-    determination_data["history"].append({
-        "action": "cleared",
-        "previous_determination": previous_determination,
-        "cleared_by": reviewer,
-        "cleared_at": now,
-    })
+    determination_data["history"].append(
+        {
+            "action": "cleared",
+            "previous_determination": previous_determination,
+            "cleared_by": reviewer,
+            "cleared_at": now,
+        }
+    )
 
     # Clear the determination
     determination_data["determination"] = None
@@ -572,11 +589,14 @@ async def clear_final_determination(
     )
 
     # Update session
-    state_manager.update_json("session.json", {
-        "final_determination": None,
-        "determination_set_at": None,
-        "determination_set_by": None,
-    })
+    state_manager.update_json(
+        "session.json",
+        {
+            "final_determination": None,
+            "determination_set_at": None,
+            "determination_set_by": None,
+        },
+    )
 
     return {
         "session_id": session_id,
@@ -798,30 +818,31 @@ async def generate_revision_summary(
 
     # Sort by priority
     priority_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-    sorted_requests = sorted(
-        requests.items(),
-        key=lambda x: priority_order.get(x[1].get("priority", "medium"), 2)
-    )
+    sorted_requests = sorted(requests.items(), key=lambda x: priority_order.get(x[1].get("priority", "medium"), 2))
 
     for req_id, req in sorted_requests:
         priority_icon = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢"}.get(
             req.get("priority", "medium"), "⚪"
         )
-        lines.extend([
-            f"### {priority_icon} {req_id} ({req.get('priority', 'medium').upper()})",
-            f"",
-            f"{req.get('description', 'No description provided')}",
-            f"",
-            f"*Requested: {req.get('requested_at', 'Unknown')[:10]}*",
-            f"",
-        ])
+        lines.extend(
+            [
+                f"### {priority_icon} {req_id} ({req.get('priority', 'medium').upper()})",
+                f"",
+                f"{req.get('description', 'No description provided')}",
+                f"",
+                f"*Requested: {req.get('requested_at', 'Unknown')[:10]}*",
+                f"",
+            ]
+        )
 
-    lines.extend([
-        f"---",
-        f"",
-        f"Please submit revised documents addressing the items above.",
-        f"Once received, the review will be updated with the new information.",
-    ])
+    lines.extend(
+        [
+            f"---",
+            f"",
+            f"Please submit revised documents addressing the items above.",
+            f"Once received, the review will be updated with the new information.",
+        ]
+    )
 
     markdown_content = "\n".join(lines)
 

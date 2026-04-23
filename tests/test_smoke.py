@@ -9,16 +9,15 @@ Usage:
     make smoke                  # Via Makefile
 """
 
-import pytest
-from pathlib import Path
 
-from registry_review_mcp.config.settings import Settings
-from registry_review_mcp.utils.state import StateManager
-from registry_review_mcp.utils.cache import Cache
+import pytest
+
 from registry_review_mcp.extractors.verification import (
     verify_citation,
     verify_extracted_field,
 )
+from registry_review_mcp.utils.cache import Cache
+from registry_review_mcp.utils.state import StateManager
 
 
 @pytest.mark.smoke
@@ -195,9 +194,8 @@ class TestLazyLoadingPattern:
         module import time.
         """
         # These imports should work even if fiona/marker aren't installed
-        from registry_review_mcp.tools import validation_tools
-        from registry_review_mcp.tools import evidence_tools
         from registry_review_mcp.models import evidence
+        from registry_review_mcp.tools import evidence_tools, validation_tools
 
         # Verify we got actual modules
         assert hasattr(validation_tools, "cross_validate")
@@ -250,7 +248,7 @@ class TestDocumentDiscoveryEdgeCases:
         test_pdf = dot_parent / "test_document.pdf"
         test_pdf.write_bytes(b"%PDF-1.4 fake pdf content")
 
-        from registry_review_mcp.tools import session_tools, document_tools
+        from registry_review_mcp.tools import document_tools, session_tools
 
         # Create session pointing to the dot-prefixed path
         result = await session_tools.create_session(

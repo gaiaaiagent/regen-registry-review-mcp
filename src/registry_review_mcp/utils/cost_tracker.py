@@ -8,7 +8,6 @@ import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -22,10 +21,10 @@ logger = logging.getLogger(__name__)
 PRICING = {
     # Claude Sonnet 4.5 (Latest, released September 2025)
     "claude-sonnet-4-5-20250929": {
-        "input": 3.00 / 1_000_000,         # $3 per MTok
-        "output": 15.00 / 1_000_000,       # $15 per MTok
-        "cache_write": 3.75 / 1_000_000,   # $3.75 per MTok (5-min cache)
-        "cache_read": 0.30 / 1_000_000,    # $0.30 per MTok (10% of input)
+        "input": 3.00 / 1_000_000,  # $3 per MTok
+        "output": 15.00 / 1_000_000,  # $15 per MTok
+        "cache_write": 3.75 / 1_000_000,  # $3.75 per MTok (5-min cache)
+        "cache_read": 0.30 / 1_000_000,  # $0.30 per MTok (10% of input)
     },
     # Claude Sonnet 4 (Previous generation)
     "claude-sonnet-4-20250514": {
@@ -36,17 +35,17 @@ PRICING = {
     },
     # Claude Haiku 4.5 (Latest, released October 2025)
     "claude-haiku-4-5-20251015": {
-        "input": 1.00 / 1_000_000,         # $1 per MTok
-        "output": 5.00 / 1_000_000,        # $5 per MTok
-        "cache_write": 1.25 / 1_000_000,   # $1.25 per MTok (5-min cache)
-        "cache_read": 0.10 / 1_000_000,    # $0.10 per MTok (10% of input)
+        "input": 1.00 / 1_000_000,  # $1 per MTok
+        "output": 5.00 / 1_000_000,  # $5 per MTok
+        "cache_write": 1.25 / 1_000_000,  # $1.25 per MTok (5-min cache)
+        "cache_read": 0.10 / 1_000_000,  # $0.10 per MTok (10% of input)
     },
     # Claude Haiku 3.5 (Legacy)
     "claude-haiku-3-5-20241022": {
-        "input": 0.80 / 1_000_000,         # $0.80 per MTok
-        "output": 4.00 / 1_000_000,        # $4 per MTok
-        "cache_write": 1.00 / 1_000_000,   # $1 per MTok (5-min cache)
-        "cache_read": 0.08 / 1_000_000,    # $0.08 per MTok (10% of input)
+        "input": 0.80 / 1_000_000,  # $0.80 per MTok
+        "output": 4.00 / 1_000_000,  # $4 per MTok
+        "cache_write": 1.00 / 1_000_000,  # $1 per MTok (5-min cache)
+        "cache_read": 0.08 / 1_000_000,  # $0.08 per MTok (10% of input)
     },
 }
 
@@ -237,9 +236,9 @@ class CostTracker:
         """Print formatted cost summary to console."""
         summary = self.get_summary()
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"COST SUMMARY - Session: {self.session_id}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"Total API Calls:     {summary.total_api_calls}")
         print(f"Cache Hit Rate:      {summary.cache_hit_rate:.1%}")
         print(f"\nTokens:")
@@ -249,11 +248,15 @@ class CostTracker:
         print(f"  Cache Read:        {summary.total_cache_read_tokens:,}")
         print(f"\nCost:")
         print(f"  Total:             ${summary.total_cost_usd:.4f}")
-        print(f"  Per Call:          ${summary.total_cost_usd/summary.total_api_calls if summary.total_api_calls > 0 else 0:.4f}")
+        print(
+            f"  Per Call:          ${summary.total_cost_usd / summary.total_api_calls if summary.total_api_calls > 0 else 0:.4f}"
+        )
         print(f"\nDuration:")
         print(f"  Total:             {summary.total_duration_seconds:.2f}s")
-        print(f"  Average:           {summary.total_duration_seconds/summary.total_api_calls if summary.total_api_calls > 0 else 0:.2f}s")
-        print(f"{'='*60}\n")
+        print(
+            f"  Average:           {summary.total_duration_seconds / summary.total_api_calls if summary.total_api_calls > 0 else 0:.2f}s"
+        )
+        print(f"{'=' * 60}\n")
 
         # Breakdown by extractor
         if summary.api_calls:
@@ -268,4 +271,4 @@ class CostTracker:
 
             for extractor, stats in extractors.items():
                 print(f"  {extractor:15s}: {stats['calls']:2d} calls, ${stats['cost']:.4f}, {stats['tokens']:,} tokens")
-            print(f"{'='*60}\n")
+            print(f"{'=' * 60}\n")

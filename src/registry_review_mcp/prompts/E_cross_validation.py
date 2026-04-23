@@ -2,14 +2,14 @@
 
 from mcp.types import TextContent
 
+from ..models.errors import SessionNotFoundError
 from ..tools import session_tools
 from ..utils.state import StateManager
-from ..models.errors import SessionNotFoundError
 from .helpers import (
-    text_content,
     format_error,
-    format_workflow_header,
     format_next_steps_section,
+    format_workflow_header,
+    text_content,
 )
 
 
@@ -64,7 +64,7 @@ The workflow will guide you through each step.
         return format_error(
             "Session Not Found",
             f"Session '{session_id}' not found.\n\nAvailable sessions:\n{session_list}",
-            "Use one of the above session IDs or create a new session."
+            "Use one of the above session IDs or create a new session.",
         )
 
     # Check prerequisites
@@ -81,13 +81,14 @@ Then return here for cross-validation.
 """)
 
     # Extract project info
-    project_metadata = session.get('project_metadata', {})
-    project_name = project_metadata.get('project_name', 'Unknown')
+    project_metadata = session.get("project_metadata", {})
+    project_name = project_metadata.get("project_name", "Unknown")
 
     # Load evidence data and run validation
     state_manager = StateManager(session_id)
 
     from ..tools import analyze_llm
+
     validation_results = await analyze_llm.cross_validate_llm(session_id)
 
     summary = validation_results["summary"]
@@ -101,14 +102,14 @@ Then return here for cross-validation.
     content.append("**Validation Summary:**")
     content.append(f"- Total Checks: {summary['total_validations']}")
 
-    if summary['total_validations'] > 0:
-        total = summary['total_validations']
-        passed = summary.get('passed', summary.get('validations_passed', 0))
-        warnings = summary.get('warnings', summary.get('validations_warning', 0))
-        failed = summary.get('failed', summary.get('validations_failed', 0))
-        content.append(f"- ✅ Passed: {passed} ({passed/total*100:.1f}%)")
-        content.append(f"- ⚠️  Warnings: {warnings} ({warnings/total*100:.1f}%)")
-        content.append(f"- ❌ Failed: {failed} ({failed/total*100:.1f}%)")
+    if summary["total_validations"] > 0:
+        total = summary["total_validations"]
+        passed = summary.get("passed", summary.get("validations_passed", 0))
+        warnings = summary.get("warnings", summary.get("validations_warning", 0))
+        failed = summary.get("failed", summary.get("validations_failed", 0))
+        content.append(f"- ✅ Passed: {passed} ({passed / total * 100:.1f}%)")
+        content.append(f"- ⚠️  Warnings: {warnings} ({warnings / total * 100:.1f}%)")
+        content.append(f"- ❌ Failed: {failed} ({failed / total * 100:.1f}%)")
     else:
         content.append("- No validation checks performed yet.")
         content.append("- (Validation checks will be added as features are implemented)")
@@ -146,7 +147,7 @@ Then return here for cross-validation.
     for val_list in [
         validation_results.get("date_alignments", []),
         validation_results.get("land_tenure", []),
-        validation_results.get("project_ids", [])
+        validation_results.get("project_ids", []),
     ]:
         for val in val_list:
             if val.get("flagged_for_review"):
@@ -162,11 +163,14 @@ Then return here for cross-validation.
     content.append("📊 Session updated with validation statistics")
 
     # Next steps
-    next_steps = format_next_steps_section([
-        "Review the validation results above",
-        "Generate the review report: `/report-generation`",
-        "This will create Markdown and JSON reports with all findings"
-    ], "Next Step: Report Generation")
+    next_steps = format_next_steps_section(
+        [
+            "Review the validation results above",
+            "Generate the review report: `/report-generation`",
+            "This will create Markdown and JSON reports with all findings",
+        ],
+        "Next Step: Report Generation",
+    )
 
     # Update workflow progress and statistics
     workflow["cross_validation"] = "completed"
@@ -174,10 +178,7 @@ Then return here for cross-validation.
     stats["validations_passed"] = summary.get("passed", summary.get("validations_passed", 0))
     stats["validations_failed"] = summary.get("failed", summary.get("validations_failed", 0))
 
-    state_manager.update_json("session.json", {
-        "workflow_progress": workflow,
-        "statistics": stats
-    })
+    state_manager.update_json("session.json", {"workflow_progress": workflow, "statistics": stats})
 
     message = header + "\n".join(content) + next_steps
     return text_content(message)

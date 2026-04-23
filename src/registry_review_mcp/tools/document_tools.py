@@ -4,7 +4,6 @@ import base64
 import hashlib
 import shutil
 import tempfile
-import uuid
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from pathlib import Path
@@ -14,24 +13,22 @@ import psutil
 
 from ..config.settings import settings
 from ..models.errors import (
-    DocumentError,
     DocumentExtractionError,
-    SessionNotFoundError,
 )
 from ..models.schemas import Document, DocumentMetadata, DocumentSource
-from ..utils.cache import pdf_cache, gis_cache
+from ..utils.cache import gis_cache
 from ..utils.patterns import (
-    PROJECT_PLAN_PATTERNS,
     BASELINE_PATTERNS,
-    MONITORING_PATTERNS,
     GHG_PATTERNS,
-    LAND_TENURE_PATTERNS,
     LAND_COVER_PATTERNS,
-    REGISTRY_REVIEW_PATTERNS,
+    LAND_TENURE_PATTERNS,
     METHODOLOGY_PATTERNS,
-    is_pdf_file,
+    MONITORING_PATTERNS,
+    PROJECT_PLAN_PATTERNS,
+    REGISTRY_REVIEW_PATTERNS,
     is_gis_file,
     is_image_file,
+    is_pdf_file,
     is_spreadsheet_file,
     match_any,
 )
@@ -39,8 +36,7 @@ from ..utils.state import StateManager, get_session_or_raise
 
 
 def compute_file_hash(filepath: Path) -> str:
-    """Compute SHA256 hash of file content for deduplication.
-    """
+    """Compute SHA256 hash of file content for deduplication."""
     sha256_hash = hashlib.sha256()
     with open(filepath, "rb") as f:
         # Read in chunks to handle large files efficiently
@@ -86,8 +82,7 @@ def calculate_optimal_workers(num_pdfs: int) -> int:
 
 
 def generate_document_id(content_hash: str) -> str:
-    """Generate a unique document ID from content hash.
-    """
+    """Generate a unique document ID from content hash."""
     # Use first 8 chars of content hash for document ID
     short_hash = content_hash[:8]
     return f"DOC-{short_hash}"
@@ -293,9 +288,8 @@ async def add_documents(
 
         # Create temp directory for uploads
         from . import upload_tools
-        sanitized_name = upload_tools._sanitize_project_name(
-            session_data["project_metadata"]["project_name"]
-        )
+
+        sanitized_name = upload_tools._sanitize_project_name(session_data["project_metadata"]["project_name"])
         temp_dir = Path(tempfile.mkdtemp(prefix=f"registry-{sanitized_name}-"))
 
         # Write files to temp directory
@@ -331,7 +325,7 @@ async def add_documents(
             result["files_added"] = len(files_saved)
             result["message"] = f"Added {len(files_saved)} files via upload"
 
-        except Exception as e:
+        except Exception:
             # Cleanup on error
             if temp_dir.exists():
                 shutil.rmtree(temp_dir, ignore_errors=True)
@@ -433,10 +427,12 @@ async def discover_documents(session_id: str) -> dict[str, Any]:
                 dir_path = Path(directory)
                 if dir_path.exists():
                     paths_to_scan.append(dir_path)
-                    sources_scanned.append({
-                        "type": "upload",
-                        "path": str(dir_path),
-                    })
+                    sources_scanned.append(
+                        {
+                            "type": "upload",
+                            "path": str(dir_path),
+                        }
+                    )
 
         elif source_type == "path":
             path = metadata.get("path")
@@ -444,10 +440,12 @@ async def discover_documents(session_id: str) -> dict[str, Any]:
                 path_obj = Path(path)
                 if path_obj.exists():
                     paths_to_scan.append(path_obj)
-                    sources_scanned.append({
-                        "type": "path",
-                        "path": str(path_obj),
-                    })
+                    sources_scanned.append(
+                        {
+                            "type": "path",
+                            "path": str(path_obj),
+                        }
+                    )
 
     # Also check legacy documents_path for backward compatibility
     documents_path_str = session_data.get("project_metadata", {}).get("documents_path")
@@ -455,10 +453,12 @@ async def discover_documents(session_id: str) -> dict[str, Any]:
         documents_path = Path(documents_path_str)
         if documents_path.exists():
             paths_to_scan.append(documents_path)
-            sources_scanned.append({
-                "type": "legacy_path",
-                "path": str(documents_path),
-            })
+            sources_scanned.append(
+                {
+                    "type": "legacy_path",
+                    "path": str(documents_path),
+                }
+            )
 
     if not paths_to_scan:
         return {
@@ -509,7 +509,7 @@ async def discover_documents(session_id: str) -> dict[str, Any]:
     for i, file_path in enumerate(discovered_files, 1):
         # Show progress every 3 files or on last file
         if i % 3 == 0 or i == file_count:
-            percentage = (i / file_count * 100)
+            percentage = i / file_count * 100
             print(f"  ⏳ Processing {i}/{file_count} ({percentage:.0f}%): {file_path.name}", flush=True)
 
         try:
@@ -532,9 +532,7 @@ async def discover_documents(session_id: str) -> dict[str, Any]:
             doc_id = generate_document_id(content_hash)
 
             # Classify document
-            classification, confidence, method = await classify_document_by_filename(
-                str(file_path)
-            )
+            classification, confidence, method = await classify_document_by_filename(str(file_path))
 
             # Create document record
             document = Document(
@@ -556,24 +554,24 @@ async def discover_documents(session_id: str) -> dict[str, Any]:
             documents.append(doc_dict)
 
             # Update classification summary
-            classification_summary[classification] = (
-                classification_summary.get(classification, 0) + 1
-            )
+            classification_summary[classification] = classification_summary.get(classification, 0) + 1
 
-        except PermissionError as e:
+        except PermissionError:
             error_msg = f"Cannot read {file_path.name}: Permission denied"
             print(f"⚠️  {error_msg}", flush=True)
-            errors.append({
-                "filepath": str(file_path),
-                "filename": file_path.name,
-                "error_type": "permission_denied",
-                "message": error_msg,
-                "recovery_steps": [
-                    f"Check file permissions: chmod 644 {file_path}",
-                    f"Ensure you have read access to the file",
-                    "Contact system administrator if needed"
-                ]
-            })
+            errors.append(
+                {
+                    "filepath": str(file_path),
+                    "filename": file_path.name,
+                    "error_type": "permission_denied",
+                    "message": error_msg,
+                    "recovery_steps": [
+                        f"Check file permissions: chmod 644 {file_path}",
+                        f"Ensure you have read access to the file",
+                        "Contact system administrator if needed",
+                    ],
+                }
+            )
         except Exception as e:
             error_type = type(e).__name__
             error_msg = f"Failed to process {file_path.name}: {str(e)}"
@@ -585,34 +583,36 @@ async def discover_documents(session_id: str) -> dict[str, Any]:
                 recovery_steps = [
                     "The PDF file may be corrupted or encrypted",
                     f"Try opening {file_path.name} in a PDF viewer to verify it's valid",
-                    "Consider re-downloading or re-scanning the document"
+                    "Consider re-downloading or re-scanning the document",
                 ]
             elif "shapefile" in str(e).lower() or ".shp" in str(file_path):
                 recovery_steps = [
                     "Shapefile may be missing required components (.shp, .shx, .dbf)",
                     f"Verify all shapefile components are present in {file_path.parent}",
-                    "Try re-exporting the shapefile from GIS software"
+                    "Try re-exporting the shapefile from GIS software",
                 ]
             elif is_spreadsheet_file(str(file_path)):
                 recovery_steps = [
                     "The spreadsheet may be corrupted or password-protected",
                     f"Try opening {file_path.name} in Excel or LibreOffice to verify",
-                    "Re-export as .xlsx or .csv if the file is damaged"
+                    "Re-export as .xlsx or .csv if the file is damaged",
                 ]
             else:
                 recovery_steps = [
                     f"Verify the file is not corrupted: {file_path.name}",
                     "Check file format is supported (.pdf, .shp, .geojson, .tif, .xlsx, .csv)",
-                    "Try re-processing the file or contact support"
+                    "Try re-processing the file or contact support",
                 ]
 
-            errors.append({
-                "filepath": str(file_path),
-                "filename": file_path.name,
-                "error_type": error_type,
-                "message": error_msg,
-                "recovery_steps": recovery_steps
-            })
+            errors.append(
+                {
+                    "filepath": str(file_path),
+                    "filename": file_path.name,
+                    "error_type": error_type,
+                    "message": error_msg,
+                    "recovery_steps": recovery_steps,
+                }
+            )
 
     # LAZY PDF CONVERSION: Skip conversion in Stage 2, defer to Stage 4
     # Stage 4 will convert only PDFs that are mapped to requirements
@@ -666,8 +666,7 @@ async def discover_documents(session_id: str) -> dict[str, Any]:
 
 
 async def classify_document_by_filename(filepath: str) -> tuple[str, float, str]:
-    """Classify document based on filename patterns.
-    """
+    """Classify document based on filename patterns."""
     filename = Path(filepath).name.lower()
 
     # Check patterns in order of specificity
@@ -710,8 +709,7 @@ async def classify_document_by_filename(filepath: str) -> tuple[str, float, str]
 
 
 async def extract_document_metadata(file_path: Path) -> DocumentMetadata:
-    """Extract metadata from a document file.
-    """
+    """Extract metadata from a document file."""
     stat = file_path.stat()
 
     # Compute content hash for deduplication
@@ -758,8 +756,7 @@ async def extract_pdf_text(
     page_range: tuple[int, int] | None = None,
     extract_tables: bool = False,
 ) -> dict[str, Any]:
-    """Extract text content from a PDF file using marker for high-quality conversion.
-    """
+    """Extract text content from a PDF file using marker for high-quality conversion."""
     # Import marker extractor
     from ..extractors.marker_extractor import (
         convert_pdf_to_markdown,
@@ -789,8 +786,7 @@ async def extract_pdf_text(
 
 
 async def extract_gis_metadata(filepath: str) -> dict[str, Any]:
-    """Extract metadata from a GIS shapefile.
-    """
+    """Extract metadata from a GIS shapefile."""
     # Check cache
     cache_key = filepath
     cached = gis_cache.get(cache_key)
@@ -850,8 +846,7 @@ async def extract_gis_metadata(filepath: str) -> dict[str, Any]:
 
 
 async def get_document_by_id(session_id: str, document_id: str) -> dict[str, Any] | None:
-    """Get a specific document from the session.
-    """
+    """Get a specific document from the session."""
     state_manager = StateManager(session_id)
     if not state_manager.exists("documents.json"):
         return None

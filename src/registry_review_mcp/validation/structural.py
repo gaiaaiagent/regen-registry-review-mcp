@@ -25,14 +25,22 @@ PROJECT_ID_PATTERNS = [
 
 # Generic terms that shouldn't be owner names
 GENERIC_OWNER_TERMS = [
-    "the project", "the farm", "project", "farm", "landowner",
-    "owner", "proponent", "applicant", "developer"
+    "the project",
+    "the farm",
+    "project",
+    "farm",
+    "landowner",
+    "owner",
+    "proponent",
+    "applicant",
+    "developer",
 ]
 
 
 @dataclass
 class CheckResult:
     """Result of a single validation check."""
+
     check_id: str
     check_type: str  # "required", "format", "range", "consistency", "generic_value"
     field_name: str
@@ -46,6 +54,7 @@ class CheckResult:
 @dataclass
 class StructuralValidationResult:
     """Aggregated results from all structural checks."""
+
     checks: list[CheckResult] = field(default_factory=list)
 
     @property
@@ -72,47 +81,52 @@ class StructuralValidationResult:
 def _generate_check_id(check_type: str, field_name: str) -> str:
     """Generate unique check ID."""
     import uuid
+
     return f"STR-{check_type.upper()[:3]}-{field_name[:10]}-{uuid.uuid4().hex[:6]}"
 
 
 def check_required_fields(
-    all_fields: dict[str, Any],
-    required: list[str] = REQUIRED_FIELDS,
-    recommended: list[str] = RECOMMENDED_FIELDS
+    all_fields: dict[str, Any], required: list[str] = REQUIRED_FIELDS, recommended: list[str] = RECOMMENDED_FIELDS
 ) -> list[CheckResult]:
     """Check that required and recommended fields are present."""
     results = []
 
     for field_name in required:
         if field_name in all_fields and all_fields[field_name]:
-            results.append(CheckResult(
-                check_id=_generate_check_id("req", field_name),
-                check_type="required",
-                field_name=field_name,
-                status="pass",
-                message=f"Required field '{field_name}' is present",
-                value=all_fields[field_name]
-            ))
+            results.append(
+                CheckResult(
+                    check_id=_generate_check_id("req", field_name),
+                    check_type="required",
+                    field_name=field_name,
+                    status="pass",
+                    message=f"Required field '{field_name}' is present",
+                    value=all_fields[field_name],
+                )
+            )
         else:
-            results.append(CheckResult(
-                check_id=_generate_check_id("req", field_name),
-                check_type="required",
-                field_name=field_name,
-                status="fail",
-                message=f"Required field '{field_name}' is missing",
-                flagged_for_review=True
-            ))
+            results.append(
+                CheckResult(
+                    check_id=_generate_check_id("req", field_name),
+                    check_type="required",
+                    field_name=field_name,
+                    status="fail",
+                    message=f"Required field '{field_name}' is missing",
+                    flagged_for_review=True,
+                )
+            )
 
     for field_name in recommended:
         if field_name not in all_fields or not all_fields[field_name]:
-            results.append(CheckResult(
-                check_id=_generate_check_id("rec", field_name),
-                check_type="recommended",
-                field_name=field_name,
-                status="warning",
-                message=f"Recommended field '{field_name}' is missing",
-                flagged_for_review=False
-            ))
+            results.append(
+                CheckResult(
+                    check_id=_generate_check_id("rec", field_name),
+                    check_type="recommended",
+                    field_name=field_name,
+                    status="warning",
+                    message=f"Recommended field '{field_name}' is missing",
+                    flagged_for_review=False,
+                )
+            )
 
     return results
 
@@ -123,8 +137,13 @@ def check_field_formats(all_fields: dict[str, Any]) -> list[CheckResult]:
 
     # Check date formats
     date_fields = [
-        "project_start_date", "crediting_period_start", "crediting_period_end",
-        "baseline_date", "monitoring_date", "permanence_start_date", "permanence_end_date"
+        "project_start_date",
+        "crediting_period_start",
+        "crediting_period_end",
+        "baseline_date",
+        "monitoring_date",
+        "permanence_start_date",
+        "permanence_end_date",
     ]
 
     for field_name in date_fields:
@@ -139,34 +158,40 @@ def check_field_formats(all_fields: dict[str, Any]) -> list[CheckResult]:
         if DATE_PATTERN.match(str(value)):
             try:
                 datetime.fromisoformat(str(value))
-                results.append(CheckResult(
-                    check_id=_generate_check_id("fmt", field_name),
-                    check_type="format",
-                    field_name=field_name,
-                    status="pass",
-                    message=f"Date '{field_name}' has valid ISO format",
-                    value=value
-                ))
+                results.append(
+                    CheckResult(
+                        check_id=_generate_check_id("fmt", field_name),
+                        check_type="format",
+                        field_name=field_name,
+                        status="pass",
+                        message=f"Date '{field_name}' has valid ISO format",
+                        value=value,
+                    )
+                )
             except ValueError:
-                results.append(CheckResult(
+                results.append(
+                    CheckResult(
+                        check_id=_generate_check_id("fmt", field_name),
+                        check_type="format",
+                        field_name=field_name,
+                        status="warning",
+                        message=f"Date '{field_name}' matches pattern but fails parsing: {value}",
+                        value=value,
+                        flagged_for_review=True,
+                    )
+                )
+        else:
+            results.append(
+                CheckResult(
                     check_id=_generate_check_id("fmt", field_name),
                     check_type="format",
                     field_name=field_name,
                     status="warning",
-                    message=f"Date '{field_name}' matches pattern but fails parsing: {value}",
+                    message=f"Date '{field_name}' not in ISO format (YYYY-MM-DD): {value}",
                     value=value,
-                    flagged_for_review=True
-                ))
-        else:
-            results.append(CheckResult(
-                check_id=_generate_check_id("fmt", field_name),
-                check_type="format",
-                field_name=field_name,
-                status="warning",
-                message=f"Date '{field_name}' not in ISO format (YYYY-MM-DD): {value}",
-                value=value,
-                flagged_for_review=True
-            ))
+                    flagged_for_review=True,
+                )
+            )
 
     # Check project_id format
     if "project_id" in all_fields and all_fields["project_id"]:
@@ -174,34 +199,40 @@ def check_field_formats(all_fields: dict[str, Any]) -> list[CheckResult]:
 
         # Check if it's just a year (common extraction error)
         if re.match(r"^\d{4}$", pid):
-            results.append(CheckResult(
-                check_id=_generate_check_id("fmt", "project_id"),
-                check_type="format",
-                field_name="project_id",
-                status="fail",
-                message=f"Project ID appears to be a year, not an ID: '{pid}'",
-                value=pid,
-                flagged_for_review=True
-            ))
+            results.append(
+                CheckResult(
+                    check_id=_generate_check_id("fmt", "project_id"),
+                    check_type="format",
+                    field_name="project_id",
+                    status="fail",
+                    message=f"Project ID appears to be a year, not an ID: '{pid}'",
+                    value=pid,
+                    flagged_for_review=True,
+                )
+            )
         elif any(p.match(pid) for p in PROJECT_ID_PATTERNS):
-            results.append(CheckResult(
-                check_id=_generate_check_id("fmt", "project_id"),
-                check_type="format",
-                field_name="project_id",
-                status="pass",
-                message=f"Project ID has valid format: '{pid}'",
-                value=pid
-            ))
+            results.append(
+                CheckResult(
+                    check_id=_generate_check_id("fmt", "project_id"),
+                    check_type="format",
+                    field_name="project_id",
+                    status="pass",
+                    message=f"Project ID has valid format: '{pid}'",
+                    value=pid,
+                )
+            )
         else:
-            results.append(CheckResult(
-                check_id=_generate_check_id("fmt", "project_id"),
-                check_type="format",
-                field_name="project_id",
-                status="warning",
-                message=f"Project ID has non-standard format: '{pid}'",
-                value=pid,
-                flagged_for_review=True
-            ))
+            results.append(
+                CheckResult(
+                    check_id=_generate_check_id("fmt", "project_id"),
+                    check_type="format",
+                    field_name="project_id",
+                    status="warning",
+                    message=f"Project ID has non-standard format: '{pid}'",
+                    value=pid,
+                    flagged_for_review=True,
+                )
+            )
 
     return results
 
@@ -213,8 +244,12 @@ def check_field_ranges(all_fields: dict[str, Any]) -> list[CheckResult]:
 
     # Check date ranges
     date_fields = [
-        "project_start_date", "crediting_period_start", "crediting_period_end",
-        "baseline_date", "permanence_start_date", "permanence_end_date"
+        "project_start_date",
+        "crediting_period_start",
+        "crediting_period_end",
+        "baseline_date",
+        "permanence_start_date",
+        "permanence_end_date",
     ]
 
     for field_name in date_fields:
@@ -231,36 +266,42 @@ def check_field_ranges(all_fields: dict[str, Any]) -> list[CheckResult]:
             # Check: not in distant future (allow 50 years for crediting/permanence end)
             max_future = 50 if "end" in field_name or "permanence" in field_name else 2
             if date_value.year > now.year + max_future:
-                results.append(CheckResult(
-                    check_id=_generate_check_id("rng", field_name),
-                    check_type="range",
-                    field_name=field_name,
-                    status="warning",
-                    message=f"Date '{field_name}' is far in the future: {value}",
-                    value=value,
-                    flagged_for_review=True
-                ))
+                results.append(
+                    CheckResult(
+                        check_id=_generate_check_id("rng", field_name),
+                        check_type="range",
+                        field_name=field_name,
+                        status="warning",
+                        message=f"Date '{field_name}' is far in the future: {value}",
+                        value=value,
+                        flagged_for_review=True,
+                    )
+                )
 
             # Check: not too old (before 1990 for carbon projects)
             elif date_value.year < 1990:
-                results.append(CheckResult(
-                    check_id=_generate_check_id("rng", field_name),
-                    check_type="range",
-                    field_name=field_name,
-                    status="warning",
-                    message=f"Date '{field_name}' is unusually old for carbon project: {value}",
-                    value=value,
-                    flagged_for_review=True
-                ))
+                results.append(
+                    CheckResult(
+                        check_id=_generate_check_id("rng", field_name),
+                        check_type="range",
+                        field_name=field_name,
+                        status="warning",
+                        message=f"Date '{field_name}' is unusually old for carbon project: {value}",
+                        value=value,
+                        flagged_for_review=True,
+                    )
+                )
             else:
-                results.append(CheckResult(
-                    check_id=_generate_check_id("rng", field_name),
-                    check_type="range",
-                    field_name=field_name,
-                    status="pass",
-                    message=f"Date '{field_name}' is in reasonable range",
-                    value=value
-                ))
+                results.append(
+                    CheckResult(
+                        check_id=_generate_check_id("rng", field_name),
+                        check_type="range",
+                        field_name=field_name,
+                        status="pass",
+                        message=f"Date '{field_name}' is in reasonable range",
+                        value=value,
+                    )
+                )
         except (ValueError, TypeError):
             pass  # Format check handles this
 
@@ -277,68 +318,80 @@ def check_field_ranges(all_fields: dict[str, Any]) -> list[CheckResult]:
         try:
             pct = float(value)
             if pct < 0 or pct > 100:
-                results.append(CheckResult(
-                    check_id=_generate_check_id("rng", field_name),
-                    check_type="range",
-                    field_name=field_name,
-                    status="fail",
-                    message=f"Percentage '{field_name}' out of range (0-100): {pct}",
-                    value=pct,
-                    flagged_for_review=True
-                ))
+                results.append(
+                    CheckResult(
+                        check_id=_generate_check_id("rng", field_name),
+                        check_type="range",
+                        field_name=field_name,
+                        status="fail",
+                        message=f"Percentage '{field_name}' out of range (0-100): {pct}",
+                        value=pct,
+                        flagged_for_review=True,
+                    )
+                )
             else:
-                results.append(CheckResult(
+                results.append(
+                    CheckResult(
+                        check_id=_generate_check_id("rng", field_name),
+                        check_type="range",
+                        field_name=field_name,
+                        status="pass",
+                        message=f"Percentage '{field_name}' in valid range: {pct}%",
+                        value=pct,
+                    )
+                )
+        except (ValueError, TypeError):
+            results.append(
+                CheckResult(
                     check_id=_generate_check_id("rng", field_name),
                     check_type="range",
                     field_name=field_name,
-                    status="pass",
-                    message=f"Percentage '{field_name}' in valid range: {pct}%",
-                    value=pct
-                ))
-        except (ValueError, TypeError):
-            results.append(CheckResult(
-                check_id=_generate_check_id("rng", field_name),
-                check_type="range",
-                field_name=field_name,
-                status="warning",
-                message=f"Percentage '{field_name}' is not numeric: {value}",
-                value=value,
-                flagged_for_review=True
-            ))
+                    status="warning",
+                    message=f"Percentage '{field_name}' is not numeric: {value}",
+                    value=value,
+                    flagged_for_review=True,
+                )
+            )
 
     # Check area range
     if "area_hectares" in all_fields and all_fields["area_hectares"] is not None:
         try:
             area = float(all_fields["area_hectares"])
             if area <= 0:
-                results.append(CheckResult(
-                    check_id=_generate_check_id("rng", "area_hectares"),
-                    check_type="range",
-                    field_name="area_hectares",
-                    status="fail",
-                    message=f"Area must be positive: {area}",
-                    value=area,
-                    flagged_for_review=True
-                ))
+                results.append(
+                    CheckResult(
+                        check_id=_generate_check_id("rng", "area_hectares"),
+                        check_type="range",
+                        field_name="area_hectares",
+                        status="fail",
+                        message=f"Area must be positive: {area}",
+                        value=area,
+                        flagged_for_review=True,
+                    )
+                )
             elif area > 1_000_000:
-                results.append(CheckResult(
-                    check_id=_generate_check_id("rng", "area_hectares"),
-                    check_type="range",
-                    field_name="area_hectares",
-                    status="warning",
-                    message=f"Area unusually large (>1M ha): {area:,.0f}",
-                    value=area,
-                    flagged_for_review=True
-                ))
+                results.append(
+                    CheckResult(
+                        check_id=_generate_check_id("rng", "area_hectares"),
+                        check_type="range",
+                        field_name="area_hectares",
+                        status="warning",
+                        message=f"Area unusually large (>1M ha): {area:,.0f}",
+                        value=area,
+                        flagged_for_review=True,
+                    )
+                )
             else:
-                results.append(CheckResult(
-                    check_id=_generate_check_id("rng", "area_hectares"),
-                    check_type="range",
-                    field_name="area_hectares",
-                    status="pass",
-                    message=f"Area in reasonable range: {area:,.2f} ha",
-                    value=area
-                ))
+                results.append(
+                    CheckResult(
+                        check_id=_generate_check_id("rng", "area_hectares"),
+                        check_type="range",
+                        field_name="area_hectares",
+                        status="pass",
+                        message=f"Area in reasonable range: {area:,.2f} ha",
+                        value=area,
+                    )
+                )
         except (ValueError, TypeError):
             pass
 
@@ -355,24 +408,28 @@ def check_field_ranges(all_fields: dict[str, Any]) -> list[CheckResult]:
         try:
             years = int(value)
             if years <= 0 or years > 100:
-                results.append(CheckResult(
-                    check_id=_generate_check_id("rng", field_name),
-                    check_type="range",
-                    field_name=field_name,
-                    status="warning",
-                    message=f"Period '{field_name}' unusual: {years} years",
-                    value=years,
-                    flagged_for_review=True
-                ))
+                results.append(
+                    CheckResult(
+                        check_id=_generate_check_id("rng", field_name),
+                        check_type="range",
+                        field_name=field_name,
+                        status="warning",
+                        message=f"Period '{field_name}' unusual: {years} years",
+                        value=years,
+                        flagged_for_review=True,
+                    )
+                )
             else:
-                results.append(CheckResult(
-                    check_id=_generate_check_id("rng", field_name),
-                    check_type="range",
-                    field_name=field_name,
-                    status="pass",
-                    message=f"Period '{field_name}' reasonable: {years} years",
-                    value=years
-                ))
+                results.append(
+                    CheckResult(
+                        check_id=_generate_check_id("rng", field_name),
+                        check_type="range",
+                        field_name=field_name,
+                        status="pass",
+                        message=f"Period '{field_name}' reasonable: {years} years",
+                        value=years,
+                    )
+                )
         except (ValueError, TypeError):
             pass
 
@@ -393,22 +450,26 @@ def check_internal_consistency(all_fields: dict[str, Any]) -> list[CheckResult]:
             end_date = datetime.fromisoformat(str(end))
 
             if end_date <= start_date:
-                results.append(CheckResult(
-                    check_id=_generate_check_id("con", "crediting_period"),
-                    check_type="consistency",
-                    field_name="crediting_period",
-                    status="fail",
-                    message=f"Crediting period end ({end}) must be after start ({start})",
-                    flagged_for_review=True
-                ))
+                results.append(
+                    CheckResult(
+                        check_id=_generate_check_id("con", "crediting_period"),
+                        check_type="consistency",
+                        field_name="crediting_period",
+                        status="fail",
+                        message=f"Crediting period end ({end}) must be after start ({start})",
+                        flagged_for_review=True,
+                    )
+                )
             else:
-                results.append(CheckResult(
-                    check_id=_generate_check_id("con", "crediting_period"),
-                    check_type="consistency",
-                    field_name="crediting_period",
-                    status="pass",
-                    message=f"Crediting period dates are consistent ({start} to {end})"
-                ))
+                results.append(
+                    CheckResult(
+                        check_id=_generate_check_id("con", "crediting_period"),
+                        check_type="consistency",
+                        field_name="crediting_period",
+                        status="pass",
+                        message=f"Crediting period dates are consistent ({start} to {end})",
+                    )
+                )
         except (ValueError, TypeError):
             pass
 
@@ -422,14 +483,16 @@ def check_internal_consistency(all_fields: dict[str, Any]) -> list[CheckResult]:
             perm_end_date = datetime.fromisoformat(str(perm_end))
 
             if perm_end_date <= perm_start_date:
-                results.append(CheckResult(
-                    check_id=_generate_check_id("con", "permanence_period"),
-                    check_type="consistency",
-                    field_name="permanence_period",
-                    status="fail",
-                    message=f"Permanence period end must be after start",
-                    flagged_for_review=True
-                ))
+                results.append(
+                    CheckResult(
+                        check_id=_generate_check_id("con", "permanence_period"),
+                        check_type="consistency",
+                        field_name="permanence_period",
+                        status="fail",
+                        message=f"Permanence period end must be after start",
+                        flagged_for_review=True,
+                    )
+                )
         except (ValueError, TypeError):
             pass
 
@@ -446,26 +509,30 @@ def check_generic_values(all_fields: dict[str, Any]) -> list[CheckResult]:
 
         for term in GENERIC_OWNER_TERMS:
             if term in owner:
-                results.append(CheckResult(
-                    check_id=_generate_check_id("gen", "owner_name"),
-                    check_type="generic_value",
-                    field_name="owner_name",
-                    status="fail",
-                    message=f"Owner name appears generic: '{all_fields['owner_name']}' (contains '{term}')",
-                    value=all_fields["owner_name"],
-                    flagged_for_review=True
-                ))
+                results.append(
+                    CheckResult(
+                        check_id=_generate_check_id("gen", "owner_name"),
+                        check_type="generic_value",
+                        field_name="owner_name",
+                        status="fail",
+                        message=f"Owner name appears generic: '{all_fields['owner_name']}' (contains '{term}')",
+                        value=all_fields["owner_name"],
+                        flagged_for_review=True,
+                    )
+                )
                 break
         else:
             # No generic terms found
-            results.append(CheckResult(
-                check_id=_generate_check_id("gen", "owner_name"),
-                check_type="generic_value",
-                field_name="owner_name",
-                status="pass",
-                message=f"Owner name appears valid: '{all_fields['owner_name']}'",
-                value=all_fields["owner_name"]
-            ))
+            results.append(
+                CheckResult(
+                    check_id=_generate_check_id("gen", "owner_name"),
+                    check_type="generic_value",
+                    field_name="owner_name",
+                    status="pass",
+                    message=f"Owner name appears valid: '{all_fields['owner_name']}'",
+                    value=all_fields["owner_name"],
+                )
+            )
 
     return results
 
@@ -519,8 +586,7 @@ def run_structural_checks(evidence_data: dict) -> StructuralValidationResult:
     result.checks.extend(check_generic_values(all_fields))
 
     logger.info(
-        f"Structural checks complete: {result.passed} passed, "
-        f"{result.warnings} warnings, {result.failed} failed"
+        f"Structural checks complete: {result.passed} passed, {result.warnings} warnings, {result.failed} failed"
     )
 
     return result

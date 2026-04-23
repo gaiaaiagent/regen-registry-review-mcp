@@ -5,19 +5,17 @@ from mcp.types import TextContent
 from ..tools import document_tools
 from ..utils.state import StateManager
 from .helpers import (
-    text_content,
     format_error,
-    format_workflow_header,
     format_next_steps_section,
+    format_workflow_header,
     get_or_select_session,
+    text_content,
     validate_session_exists,
 )
 
 
 async def document_discovery_prompt(
-    project_name: str | None = None,
-    documents_path: str | None = None,
-    session_id: str | None = None
+    project_name: str | None = None, documents_path: str | None = None, session_id: str | None = None
 ) -> list[TextContent]:
     """Discover and classify all project documents.
 
@@ -65,7 +63,7 @@ async def document_discovery_prompt(
 
         content = f"""## ✅ Discovery Complete
 
-Found and classified **{results['documents_found']} document(s)**:
+Found and classified **{results["documents_found"]} document(s)**:
 
 {classification_text}
 
@@ -76,11 +74,14 @@ All documents have been:
 - ✅ Saved to document index
 """
 
-        next_steps = format_next_steps_section([
-            "Review the document classifications above",
-            "Run evidence extraction: `/evidence-extraction`",
-            "Or view session status: `load_session {session_id}`"
-        ], "Next Step: Evidence Extraction")
+        next_steps = format_next_steps_section(
+            [
+                "Review the document classifications above",
+                "Run evidence extraction: `/evidence-extraction`",
+                "Or view session status: `load_session {session_id}`",
+            ],
+            "Next Step: Evidence Extraction",
+        )
 
         message = header + content + next_steps
 
@@ -90,5 +91,5 @@ All documents have been:
         return format_error(
             "Document Discovery Failed",
             f"An error occurred during document discovery: {str(e)}",
-            "Please check the session and try again, or contact support if the issue persists."
+            "Please check the session and try again, or contact support if the issue persists.",
         )

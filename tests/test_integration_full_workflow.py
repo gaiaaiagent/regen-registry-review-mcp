@@ -4,30 +4,23 @@ These tests validate the full 8-stage workflow from initialization through compl
 using real examples and ensuring proper state transitions and data flow.
 """
 
-import pytest
 from pathlib import Path
 
-from registry_review_mcp.tools import session_tools, mapping_tools
-from registry_review_mcp.prompts import (
-    A_initialize as initialize,
-    B_document_discovery as document_discovery,
-    C_requirement_mapping as requirement_mapping,
-    D_evidence_extraction as evidence_extraction,
-    E_cross_validation as cross_validation,
-    F_report_generation as report_generation,
-    G_human_review as human_review,
-    H_completion as completion
-)
+import pytest
+
+from registry_review_mcp.prompts import A_initialize as initialize
+from registry_review_mcp.prompts import B_document_discovery as document_discovery
+from registry_review_mcp.prompts import C_requirement_mapping as requirement_mapping
+from registry_review_mcp.prompts import D_evidence_extraction as evidence_extraction
+from registry_review_mcp.prompts import E_cross_validation as cross_validation
+from registry_review_mcp.prompts import F_report_generation as report_generation
+from registry_review_mcp.prompts import G_human_review as human_review
+from registry_review_mcp.prompts import H_completion as completion
+from registry_review_mcp.tools import session_tools
 from registry_review_mcp.utils.state import StateManager
 
 # Import factory infrastructure
-from tests.factories import (
-    SessionBuilder,
-    SessionManager,
-    SessionAssertions,
-    path_based_session
-)
-
+from tests.factories import SessionAssertions, SessionBuilder, SessionManager, path_based_session
 
 # Mark all tests in this module as integration tests
 pytestmark = pytest.mark.integration

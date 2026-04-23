@@ -165,7 +165,7 @@ async def fast_extract_pdf(filepath: str) -> dict[str, Any]:
         full_markdown = "\n\n".join(pages_with_markers)
 
         # Count tables (simple markdown table detection)
-        table_pattern = re.compile(r'\|.*\|.*\n\|[-:| ]+\|', re.MULTILINE)
+        table_pattern = re.compile(r"\|.*\|.*\n\|[-:| ]+\|", re.MULTILINE)
         tables_found = len(table_pattern.findall(full_markdown))
 
         result = {

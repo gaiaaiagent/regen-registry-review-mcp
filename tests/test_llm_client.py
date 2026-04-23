@@ -1,16 +1,15 @@
 """Tests for centralized LLM client utilities and API error classification."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from registry_review_mcp.utils.llm_client import (
-    APIErrorInfo,
     LLMAuthenticationError,
-    LLMBillingError,
+    _resolve_backend,
     classify_api_error,
     classify_openai_error,
     get_anthropic_client,
-    _resolve_backend,
 )
 
 
@@ -18,8 +17,8 @@ class TestClassifyApiError:
     """Verify that Anthropic SDK exceptions are classified with actionable guidance."""
 
     def test_authentication_error_is_fatal(self):
-        from anthropic import AuthenticationError
         import httpx
+        from anthropic import AuthenticationError
 
         error = AuthenticationError(
             message="Invalid API key",
@@ -32,8 +31,8 @@ class TestClassifyApiError:
         assert "console.anthropic.com" in info.guidance
 
     def test_credit_balance_error_is_fatal(self):
-        from anthropic import BadRequestError
         import httpx
+        from anthropic import BadRequestError
 
         error = BadRequestError(
             message="Your credit balance is too low",
@@ -46,8 +45,8 @@ class TestClassifyApiError:
         assert "separate from Max" in info.guidance
 
     def test_rate_limit_is_transient(self):
-        from anthropic import RateLimitError
         import httpx
+        from anthropic import RateLimitError
 
         error = RateLimitError(
             message="Rate limit exceeded",
@@ -67,8 +66,8 @@ class TestClassifyApiError:
         assert info.is_fatal is False
 
     def test_generic_bad_request_is_not_fatal(self):
-        from anthropic import BadRequestError
         import httpx
+        from anthropic import BadRequestError
 
         error = BadRequestError(
             message="max_tokens must be positive",

@@ -1,6 +1,7 @@
 """Tests for LLM JSON response validation and error handling."""
 
 import pytest
+
 from registry_review_mcp.extractors.llm_extractors import (
     DateExtractor,
     LandTenureExtractor,
@@ -9,12 +10,11 @@ from registry_review_mcp.extractors.llm_extractors import (
 
 # Import factory infrastructure
 from tests.factories import (
-    unique_doc_name,
-    create_llm_mock_response,
     create_llm_client_mock,
+    create_llm_mock_response,
     mock_date_extraction,
     mock_tenure_extraction,
-    mock_project_id_extraction,
+    unique_doc_name,
 )
 
 

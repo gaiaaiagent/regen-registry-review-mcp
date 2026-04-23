@@ -3,16 +3,16 @@
 Tests for configuration, state management, and basic session operations.
 """
 
-import pytest
 import json
 from pathlib import Path
 
+import pytest
+
 from registry_review_mcp.config.settings import Settings
-from registry_review_mcp.models.schemas import Session, ProjectMetadata
-from registry_review_mcp.models.errors import SessionNotFoundError, SessionLockError
-from registry_review_mcp.utils.state import StateManager
-from registry_review_mcp.utils.cache import Cache
+from registry_review_mcp.models.errors import SessionNotFoundError
 from registry_review_mcp.tools import session_tools
+from registry_review_mcp.utils.cache import Cache
+from registry_review_mcp.utils.state import StateManager
 
 
 class TestSettings:
@@ -287,7 +287,6 @@ class TestSessionTools:
         monkeypatch.setenv("REGISTRY_REVIEW_DATA_DIR", str(temp_data_dir))
 
         # Create new settings instance (not frozen yet during __init__)
-        from registry_review_mcp.config.settings import Settings
         new_settings = Settings(data_dir=temp_data_dir)
 
         # Patch the settings in the session_tools module

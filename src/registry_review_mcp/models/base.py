@@ -12,8 +12,10 @@ Benefit: DRY principle, consistent timestamp handling, type safety
 
 import uuid
 from datetime import datetime
-from typing import Any, Annotated
-from pydantic import BaseModel as PydanticBaseModel, Field, ConfigDict
+from typing import Annotated, Any
+
+from pydantic import BaseModel as PydanticBaseModel
+from pydantic import ConfigDict, Field
 
 
 class BaseModel(PydanticBaseModel):
@@ -25,13 +27,11 @@ class BaseModel(PydanticBaseModel):
 
     model_config = ConfigDict(
         # Serialize datetime as ISO 8601 strings
-        json_encoders={
-            datetime: lambda v: v.isoformat()
-        },
+        json_encoders={datetime: lambda v: v.isoformat()},
         # Allow arbitrary types (for flexibility)
         arbitrary_types_allowed=True,
         # Validate assignments after model creation
-        validate_assignment=True
+        validate_assignment=True,
     )
 
 
@@ -48,14 +48,8 @@ class TimestampedModel(BaseModel):
             # Inherits: created_at, updated_at
     """
 
-    created_at: datetime = Field(
-        default_factory=datetime.now,
-        description="Timestamp when entity was created"
-    )
-    updated_at: datetime = Field(
-        default_factory=datetime.now,
-        description="Timestamp when entity was last updated"
-    )
+    created_at: datetime = Field(default_factory=datetime.now, description="Timestamp when entity was created")
+    updated_at: datetime = Field(default_factory=datetime.now, description="Timestamp when entity was last updated")
 
     def touch(self) -> None:
         """Update the updated_at timestamp to now."""
@@ -77,10 +71,7 @@ class IdentifiedModel(TimestampedModel):
             # Inherits: id, created_at, updated_at
     """
 
-    id: str = Field(
-        default_factory=lambda: str(uuid.uuid4()),
-        description="Unique identifier (UUID)"
-    )
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique identifier (UUID)")
 
 
 class VersionedModel(IdentifiedModel):
@@ -99,11 +90,7 @@ class VersionedModel(IdentifiedModel):
             # Inherits: id, version, created_at, updated_at
     """
 
-    version: int = Field(
-        default=1,
-        description="Version number (incremented on updates)",
-        ge=1
-    )
+    version: int = Field(default=1, description="Version number (incremented on updates)", ge=1)
 
     def increment_version(self) -> None:
         """Increment version and update timestamp."""
@@ -112,6 +99,7 @@ class VersionedModel(IdentifiedModel):
 
 
 # Example usage for common patterns
+
 
 class NamedEntity(IdentifiedModel):
     """Base for entities with names and descriptions.
@@ -147,10 +135,7 @@ class StatusTrackedModel(IdentifiedModel):
     """
 
     status: str = Field(description="Current status")
-    status_history: list[dict[str, Any]] = Field(
-        default_factory=list,
-        description="History of status changes"
-    )
+    status_history: list[dict[str, Any]] = Field(default_factory=list, description="History of status changes")
 
     def change_status(self, new_status: str, note: str | None = None) -> None:
         """Change status and record in history.
@@ -161,12 +146,9 @@ class StatusTrackedModel(IdentifiedModel):
         """
         old_status = self.status
         self.status = new_status
-        self.status_history.append({
-            "from": old_status,
-            "to": new_status,
-            "timestamp": datetime.now().isoformat(),
-            "note": note
-        })
+        self.status_history.append(
+            {"from": old_status, "to": new_status, "timestamp": datetime.now().isoformat(), "note": note}
+        )
         self.touch()
 
 

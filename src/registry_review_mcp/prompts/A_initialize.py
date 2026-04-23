@@ -1,18 +1,16 @@
 """Initialize workflow - Stage 1 of registry review."""
 
 from pathlib import Path
+
 from mcp.types import TextContent
 
 from ..config.settings import settings
 from ..tools import session_tools
 from ..utils.state import StateManager
-from .helpers import text_content, format_error
+from .helpers import format_error, text_content
 
 
-async def initialize_prompt(
-    project_name: str | None = None,
-    documents_path: str | None = None
-) -> list[TextContent]:
+async def initialize_prompt(project_name: str | None = None, documents_path: str | None = None) -> list[TextContent]:
     """Initialize a new registry review session (Stage 1).
 
     This prompt creates a new review session and prepares it for document discovery.
@@ -78,13 +76,15 @@ async def initialize_prompt(
 
                     # Match by documents_path only - one directory = one session
                     if session_path == normalized_path:
-                        duplicates.append({
-                            "session_id": session_data.get("session_id"),
-                            "project_name": session_project.get("project_name"),
-                            "created_at": session_data.get("created_at"),
-                            "status": session_data.get("status"),
-                            "workflow_progress": session_data.get("workflow_progress", {})
-                        })
+                        duplicates.append(
+                            {
+                                "session_id": session_data.get("session_id"),
+                                "project_name": session_project.get("project_name"),
+                                "created_at": session_data.get("created_at"),
+                                "status": session_data.get("status"),
+                                "workflow_progress": session_data.get("workflow_progress", {}),
+                            }
+                        )
                 except Exception:
                     # Skip corrupted sessions
                     continue
@@ -94,29 +94,29 @@ async def initialize_prompt(
         duplicate = duplicates[0]  # Show most recent
 
         # Check if user provided a different name
-        name_changed = duplicate['project_name'] != project_name
+        name_changed = duplicate["project_name"] != project_name
         name_note = ""
         if name_changed:
             name_note = f"""
-**Note:** You provided the name "{project_name}" but this directory already has an active session named "{duplicate['project_name']}".
+**Note:** You provided the name "{project_name}" but this directory already has an active session named "{duplicate["project_name"]}".
 
 🔒 **One Directory = One Session:** Each documents directory can only have one active session to avoid confusion.
 """
 
         # Get workflow progress
-        workflow = duplicate.get('workflow_progress', {})
-        completed = [stage for stage, status in workflow.items() if status == 'completed']
+        workflow = duplicate.get("workflow_progress", {})
+        completed = [stage for stage, status in workflow.items() if status == "completed"]
         progress_summary = f"{len(completed)}/7 stages completed" if completed else "Not started"
 
         message = f"""# ⚠️ Session Already Exists for This Directory
 
 {name_note}
-**Existing Session:** `{duplicate['session_id']}`
-**Project Name:** {duplicate['project_name']}
+**Existing Session:** `{duplicate["session_id"]}`
+**Project Name:** {duplicate["project_name"]}
 **Documents Path:** {documents_path}
-**Created:** {duplicate.get('created_at', 'Unknown')}
+**Created:** {duplicate.get("created_at", "Unknown")}
 **Progress:** {progress_summary}
-**Status:** {duplicate.get('status', 'active')}
+**Status:** {duplicate.get("status", "active")}
 
 ---
 
@@ -130,20 +130,20 @@ Simply run the next workflow stage (auto-selects this session):
 
 Or specify the session explicitly:
 
-`/document-discovery {duplicate['session_id']}`
+`/document-discovery {duplicate["session_id"]}`
 
 ### 📊 Check Session Status
 
 View full session details:
 
-`load_session {duplicate['session_id']}`
+`load_session {duplicate["session_id"]}`
 
 ### 🗑️ Start Fresh
 
 Delete the existing session and create a new one:
 
 ```
-delete_session {duplicate['session_id']}
+delete_session {duplicate["session_id"]}
 /initialize {project_name}, {documents_path}
 ```
 
@@ -156,9 +156,7 @@ delete_session {duplicate['session_id']}
     # Create session
     try:
         result = await session_tools.create_session(
-            project_name=project_name,
-            documents_path=documents_path,
-            methodology="soil-carbon-v1.2.2"
+            project_name=project_name, documents_path=documents_path, methodology="soil-carbon-v1.2.2"
         )
 
         session_id = result["session_id"]
@@ -173,7 +171,7 @@ delete_session {duplicate['session_id']}
 **Project:** {project_name}
 **Documents:** {documents_path}
 **Methodology:** Soil Carbon v1.2.2
-**Created:** {result['created_at']}
+**Created:** {result["created_at"]}
 
 ---
 
@@ -208,12 +206,10 @@ The prompt will auto-select your session - no need to provide the session ID!
         return format_error(
             "Document Path Not Found",
             f"The path you provided does not exist:\n`{documents_path}`",
-            "Please check:\n- The path is correct\n- The path is absolute (not relative)\n- You have permission to access the directory\n\nTry again with a valid path."
+            "Please check:\n- The path is correct\n- The path is absolute (not relative)\n- You have permission to access the directory\n\nTry again with a valid path.",
         )
 
     except Exception as e:
         return format_error(
-            "Error Creating Session",
-            f"An error occurred: {str(e)}",
-            "Please check your inputs and try again."
+            "Error Creating Session", f"An error occurred: {str(e)}", "Please check your inputs and try again."
         )

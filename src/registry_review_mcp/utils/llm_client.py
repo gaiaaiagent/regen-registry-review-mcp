@@ -267,7 +267,8 @@ async def _check_cli_available() -> bool:
 
     try:
         proc = await asyncio.create_subprocess_exec(
-            "claude", "--version",
+            "claude",
+            "--version",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -467,8 +468,10 @@ async def _call_via_cli(
     cmd = [
         "claude",
         "-p",
-        "--output-format", "json",
-        "--model", model,
+        "--output-format",
+        "json",
+        "--model",
+        model,
     ]
 
     if system:

@@ -6,7 +6,6 @@ Provides thread-safe file operations with locking to prevent corruption.
 import json
 import time
 from contextlib import contextmanager
-from pathlib import Path
 from typing import Any
 
 from ..config.settings import settings, validate_session_id
@@ -188,11 +187,7 @@ class StateManager:
         if not self.session_dir.exists():
             return []
 
-        return [
-            f.name
-            for f in self.session_dir.iterdir()
-            if f.is_file() and not f.name.startswith(".")
-        ]
+        return [f.name for f in self.session_dir.iterdir() if f.is_file() and not f.name.startswith(".")]
 
 
 def get_session_or_raise(session_id: str) -> StateManager:

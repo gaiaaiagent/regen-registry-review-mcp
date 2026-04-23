@@ -77,9 +77,7 @@ class PromptBudget:
         """
         from ..tools.evidence_tools import _truncate_markdown_by_chars
 
-        return _truncate_markdown_by_chars(
-            content, cap=self.max_document_chars, source_name=source_name
-        )
+        return _truncate_markdown_by_chars(content, cap=self.max_document_chars, source_name=source_name)
 
     def fits(self, total_len: int) -> bool:
         """True when ``total_len`` chars fit inside ``max_total_chars``."""

@@ -1,0 +1,67 @@
+name: Nightly
+
+# Full cross-model regression + CSSCP coverage run. Runs at 03:00 PDT (11:00
+# UTC — TELUS usage low-water mark) so a PR the next morning has a fresh
+# warm cache. Surfaces model drift + gateway regressions before reviewers
+# notice.
+
+on:
+  schedule:
+    - cron: "0 11 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+jobs:
+  full-matrix:
+    name: cross-model-regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        model: [gpt-oss, gemma-4-31b]
+    env:
+      TELUS_GPT_OSS_URL: ${{ secrets.TELUS_GPT_OSS_URL }}
+      TELUS_GPT_OSS_KEY: ${{ secrets.TELUS_GPT_OSS_KEY }}
+      TELUS_GEMMA_URL: ${{ secrets.TELUS_GEMMA_URL }}
+      TELUS_GEMMA_KEY: ${{ secrets.TELUS_GEMMA_KEY }}
+      LLM_MAX_CONCURRENT: "4"
+      LLM_MIN_INTERVAL_MS: "100"
+      REGISTRY_REVIEW_LLM_BACKEND: "openai"
+      REGISTRY_REVIEW_ENVIRONMENT: "production"
+      RA_SWEEP_MODEL: ${{ matrix.model }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Restore LLM response cache (per-model)
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/registry-review-mcp/llm
+          key: llm-cache-nightly-${{ matrix.model }}-${{ hashFiles('src/registry_review_mcp/**/*.py') }}
+          restore-keys: |
+            llm-cache-nightly-${{ matrix.model }}-
+            llm-cache-${{ runner.os }}-
+
+      - name: Regression suite
+        run: uv run pytest -m regression -q tests/evaluation/ --junit-xml=regression-${{ matrix.model }}.xml
+
+      - name: Upload per-model report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-${{ matrix.model }}
+          path: regression-${{ matrix.model }}.xml
+          if-no-files-found: warn

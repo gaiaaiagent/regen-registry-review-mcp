@@ -6,9 +6,9 @@ in the source documents using fuzzy text matching.
 """
 
 import logging
-from pathlib import Path
-from rapidfuzz import fuzz
 from typing import Any
+
+from rapidfuzz import fuzz
 
 logger = logging.getLogger(__name__)
 
@@ -63,8 +63,8 @@ def verify_citation(
     source_lower = source_content.lower()
 
     for i in range(0, len(source_content) - window_size + 1, step_size):
-        window = source_content[i:i + window_size]
-        window_lower = source_lower[i:i + window_size]
+        window = source_content[i : i + window_size]
+        window_lower = source_lower[i : i + window_size]
 
         # Use token_set_ratio to handle word order differences
         score = fuzz.token_set_ratio(raw_text_normalized, window_lower)
@@ -118,9 +118,7 @@ def verify_extracted_field(
         return field
 
     # Verify the citation
-    is_verified, match_score, best_snippet = verify_citation(
-        raw_text, source_content, field_type, min_similarity
-    )
+    is_verified, match_score, best_snippet = verify_citation(raw_text, source_content, field_type, min_similarity)
 
     # Update field with verification results
     field["verification_status"] = "verified" if is_verified else "failed"
@@ -136,8 +134,7 @@ def verify_extracted_field(
         )
         field["confidence"] = new_confidence
         field["verification_warning"] = (
-            f"Could not verify claimed text '{raw_text[:50]}...' in source document "
-            f"(best match: {match_score:.1f}%)"
+            f"Could not verify claimed text '{raw_text[:50]}...' in source document (best match: {match_score:.1f}%)"
         )
 
     return field
@@ -171,9 +168,7 @@ def verify_date_extraction(
     failed_count = total - verified_count
 
     if failed_count > 0:
-        logger.warning(
-            f"Citation verification: {verified_count}/{total} verified, {failed_count} failed"
-        )
+        logger.warning(f"Citation verification: {verified_count}/{total} verified, {failed_count} failed")
     else:
         logger.info(f"Citation verification: all {total} fields verified")
 

@@ -14,7 +14,7 @@ from typing import Callable, TypeVar
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 def with_error_handling(tool_name: str):
@@ -49,6 +49,7 @@ def with_error_handling(tool_name: str):
 
     Reduction: ~8 lines → 2 lines per tool
     """
+
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -64,7 +65,9 @@ def with_error_handling(tool_name: str):
                 # Re-raise to ensure MCP client sees it as a failure
                 # The MCP framework will format the error appropriately for the client
                 raise
+
         return wrapper
+
     return decorator
 
 

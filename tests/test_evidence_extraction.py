@@ -1,9 +1,9 @@
 """Tests for evidence extraction (Phase 4)."""
 
-import pytest
-from pathlib import Path
 
-from registry_review_mcp.tools import session_tools, document_tools, evidence_tools, mapping_tools
+import pytest
+
+from registry_review_mcp.tools import document_tools, evidence_tools, mapping_tools, session_tools
 from registry_review_mcp.utils.state import StateManager
 
 

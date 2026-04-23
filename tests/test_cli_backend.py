@@ -2,20 +2,19 @@
 
 import json
 import logging
-
-import pytest
 from unittest.mock import AsyncMock, patch
 
+import pytest
+
+import registry_review_mcp.utils.llm_client as llm_client_module
 from registry_review_mcp.models.errors import ConfigurationError
 from registry_review_mcp.utils.llm_client import (
     LLMBackendError,
-    _resolve_backend,
-    _call_via_api,
     _call_via_cli,
+    _resolve_backend,
     call_llm,
     classify_cli_error,
 )
-import registry_review_mcp.utils.llm_client as llm_client_module
 
 
 @pytest.fixture(autouse=True)

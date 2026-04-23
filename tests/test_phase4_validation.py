@@ -12,18 +12,18 @@ Run with:
 """
 
 import json
-import pytest
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
+import pytest
 
 from registry_review_mcp.config.settings import settings
 from registry_review_mcp.prompts.unified_analysis import (
-    build_unified_analysis_prompt,
-    ProjectMetadata,
     PriorReviewStatus,
+    ProjectMetadata,
     UnifiedAnalysisResult,
+    build_unified_analysis_prompt,
 )
-
 
 pytestmark = [
     pytest.mark.expensive,

@@ -52,8 +52,8 @@ def get_marker_models():
     if _marker_models is None:
         try:
             logger.info("Loading marker models (one-time initialization, ~5-10 seconds)...")
-            from marker.models import create_model_dict
             from marker.converters.pdf import PdfConverter
+            from marker.models import create_model_dict
 
             _marker_models = {
                 "models": create_model_dict(),
@@ -132,6 +132,7 @@ async def convert_pdf_to_markdown(
         if not USE_MARKER:
             logger.info(f"⚡ Fast extraction for {file_path.name} (PyMuPDF)")
             from .fast_extractor import fast_extract_pdf
+
             result = await fast_extract_pdf(filepath)
             # Cache the result
             pdf_markdown_cache.set(cache_key, result)
@@ -167,8 +168,8 @@ async def convert_pdf_to_markdown(
 
         # Extract results from rendered output
         full_text = rendered.markdown
-        images = rendered.images if hasattr(rendered, 'images') else {}
-        metadata = rendered.metadata if hasattr(rendered, 'metadata') else {}
+        images = rendered.images if hasattr(rendered, "images") else {}
+        metadata = rendered.metadata if hasattr(rendered, "metadata") else {}
 
         # Extract page count from metadata or estimate
         page_count = metadata.get("page_count", 0)
@@ -189,10 +190,7 @@ async def convert_pdf_to_markdown(
         pdf_markdown_cache.set(cache_key, result)
 
         char_count = len(full_text)
-        logger.info(
-            f"✅ Conversion complete: {file_path.name} "
-            f"({page_count} pages, {char_count:,} chars)"
-        )
+        logger.info(f"✅ Conversion complete: {file_path.name} ({page_count} pages, {char_count:,} chars)")
 
         return result
 
@@ -238,19 +236,15 @@ def extract_tables_from_markdown(markdown: str) -> list[dict[str, Any]]:
     # Pattern to match markdown tables (multi-line with pipes)
     # Matches sequences like: |col1|col2|\n|---|---|\n|val1|val2|
     table_pattern = re.compile(
-        r'(?:^\|.+\|[ \t]*$\n?)+',  # One or more lines starting/ending with |
-        re.MULTILINE
+        r"(?:^\|.+\|[ \t]*$\n?)+",  # One or more lines starting/ending with |
+        re.MULTILINE,
     )
 
     for match in table_pattern.finditer(markdown):
         table_text = match.group(0).strip()
 
         # Split into rows
-        rows = [
-            line.strip()
-            for line in table_text.split('\n')
-            if line.strip()
-        ]
+        rows = [line.strip() for line in table_text.split("\n") if line.strip()]
 
         # Parse each row into cells
         parsed_rows = []
@@ -258,31 +252,27 @@ def extract_tables_from_markdown(markdown: str) -> list[dict[str, Any]]:
             # Remove leading/trailing pipes and split
             cells = [
                 cell.strip()
-                for cell in row.split('|')[1:-1]  # Skip empty first/last from split
+                for cell in row.split("|")[1:-1]  # Skip empty first/last from split
             ]
             parsed_rows.append(cells)
 
         # Filter out separator rows (contain only dashes and pipes)
-        data_rows = [
-            row for row in parsed_rows
-            if row and not all(
-                all(c in '-: ' for c in cell)
-                for cell in row
-            )
-        ]
+        data_rows = [row for row in parsed_rows if row and not all(all(c in "-: " for c in cell) for cell in row)]
 
         # First row is headers, rest is data
         if data_rows:
             headers = data_rows[0] if data_rows else []
             data = data_rows[1:] if len(data_rows) > 1 else []
 
-            tables.append({
-                "headers": headers,
-                "data": data,
-                "row_count": len(data),
-                "column_count": len(headers),
-                "raw_markdown": table_text,
-            })
+            tables.append(
+                {
+                    "headers": headers,
+                    "data": data,
+                    "row_count": len(data),
+                    "column_count": len(headers),
+                    "raw_markdown": table_text,
+                }
+            )
 
     return tables
 
@@ -322,19 +312,21 @@ def extract_section_hierarchy(markdown: str) -> dict[str, Any]:
     sections = []
 
     # Pattern to match markdown headers: # Header, ## Header, etc.
-    header_pattern = re.compile(r'^(#{1,6})\s+(.+)$', re.MULTILINE)
+    header_pattern = re.compile(r"^(#{1,6})\s+(.+)$", re.MULTILINE)
 
     for match in header_pattern.finditer(markdown):
         level = len(match.group(1))  # Number of # symbols
         title = match.group(2).strip()
-        line_start = markdown[:match.start()].count('\n')
+        line_start = markdown[: match.start()].count("\n")
 
-        sections.append({
-            "level": level,
-            "title": title,
-            "line": line_start,
-            "position": match.start(),
-        })
+        sections.append(
+            {
+                "level": level,
+                "title": title,
+                "line": line_start,
+                "position": match.start(),
+            }
+        )
 
     # Build hierarchy (nested structure)
     hierarchy = _build_hierarchy_recursive(sections, 0, 1)
@@ -375,9 +367,7 @@ def _build_hierarchy_recursive(sections: list[dict], start_idx: int, target_leve
             # Look ahead for children
             children_start = i + 1
             if children_start < len(sections) and sections[children_start]["level"] > target_level:
-                section_copy["children"] = _build_hierarchy_recursive(
-                    sections, children_start, target_level + 1
-                )
+                section_copy["children"] = _build_hierarchy_recursive(sections, children_start, target_level + 1)
                 # Skip processed children
                 i = _skip_children(sections, i, target_level)
             else:
@@ -443,6 +433,7 @@ async def batch_convert_pdfs_parallel(
     # Use fast extraction by default
     if not USE_MARKER:
         from .fast_extractor import batch_fast_extract_pdfs
+
         return await batch_fast_extract_pdfs(filepaths)
 
     # Heavy marker extraction (USE_MARKER=true)

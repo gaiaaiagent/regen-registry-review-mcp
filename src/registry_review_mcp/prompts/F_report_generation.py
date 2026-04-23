@@ -1,16 +1,17 @@
 """Report generation workflow - Stage 6 of registry review."""
 
 from pathlib import Path
+
 from mcp.types import TextContent
 
+from ..models.errors import SessionNotFoundError
 from ..tools import report_tools, session_tools
 from ..utils.state import StateManager
-from ..models.errors import SessionNotFoundError
 from .helpers import (
-    text_content,
     format_error,
-    format_workflow_header,
     format_next_steps_section,
+    format_workflow_header,
+    text_content,
 )
 
 
@@ -66,7 +67,7 @@ The workflow will guide you through each step.
         return format_error(
             "Session Not Found",
             f"Session '{session_id}' not found.\n\nAvailable sessions:\n{session_list}",
-            "Use one of the above session IDs or create a new session."
+            "Use one of the above session IDs or create a new session.",
         )
 
     # Check prerequisites
@@ -85,19 +86,13 @@ Then return here for report generation.
 """)
 
     # Extract project info
-    project_metadata = session.get('project_metadata', {})
-    project_name = project_metadata.get('project_name', 'Unknown')
+    project_metadata = session.get("project_metadata", {})
+    project_name = project_metadata.get("project_name", "Unknown")
 
     # Generate reports
-    md_result = await report_tools.generate_review_report(
-        session_id=session_id,
-        format="markdown"
-    )
+    md_result = await report_tools.generate_review_report(session_id=session_id, format="markdown")
 
-    json_result = await report_tools.generate_review_report(
-        session_id=session_id,
-        format="json"
-    )
+    json_result = await report_tools.generate_review_report(session_id=session_id, format="json")
 
     summary = md_result["summary"]
     md_path = Path(md_result["report_path"])
@@ -121,47 +116,53 @@ Then return here for report generation.
         "   - Structured data for programmatic access",
         "   - All evidence and validation details",
         "   - Machine-readable format\n",
-        "### Requirements Coverage\n"
+        "### Requirements Coverage\n",
     ]
 
     if summary["requirements_total"] > 0:
-        total = summary['requirements_total']
-        content.extend([
-            f"- ✅ Covered: {summary['requirements_covered']}/{total} ({summary['requirements_covered']/total*100:.1f}%)",
-            f"- ⚠️  Partial: {summary['requirements_partial']}/{total} ({summary['requirements_partial']/total*100:.1f}%)",
-            f"- ❌ Missing: {summary['requirements_missing']}/{total} ({summary['requirements_missing']/total*100:.1f}%)",
-            f"- **Overall Coverage:** {summary['overall_coverage']*100:.1f}%\n"
-        ])
+        total = summary["requirements_total"]
+        content.extend(
+            [
+                f"- ✅ Covered: {summary['requirements_covered']}/{total} ({summary['requirements_covered'] / total * 100:.1f}%)",
+                f"- ⚠️  Partial: {summary['requirements_partial']}/{total} ({summary['requirements_partial'] / total * 100:.1f}%)",
+                f"- ❌ Missing: {summary['requirements_missing']}/{total} ({summary['requirements_missing'] / total * 100:.1f}%)",
+                f"- **Overall Coverage:** {summary['overall_coverage'] * 100:.1f}%\n",
+            ]
+        )
     else:
         content.append("No requirements data available\n")
 
     if summary.get("validations_total", 0) > 0:
-        content.extend([
-            "### Cross-Document Validation\n",
-            f"- ✅ Passed: {summary['validations_passed']}/{summary['validations_total']}",
-            f"- ⚠️  Warnings: {summary['validations_warning']}/{summary['validations_total']}",
-            f"- ❌ Failed: {summary['validations_failed']}/{summary['validations_total']}\n"
-        ])
+        content.extend(
+            [
+                "### Cross-Document Validation\n",
+                f"- ✅ Passed: {summary['validations_passed']}/{summary['validations_total']}",
+                f"- ⚠️  Warnings: {summary['validations_warning']}/{summary['validations_total']}",
+                f"- ❌ Failed: {summary['validations_failed']}/{summary['validations_total']}\n",
+            ]
+        )
 
-    content.extend([
-        "### Review Statistics\n",
-        f"- **Documents Reviewed:** {summary['documents_reviewed']}",
-        f"- **Evidence Snippets:** {summary['total_evidence_snippets']}",
-        f"- **Items for Human Review:** {summary['items_for_human_review']}\n"
-    ])
+    content.extend(
+        [
+            "### Review Statistics\n",
+            f"- **Documents Reviewed:** {summary['documents_reviewed']}",
+            f"- **Evidence Snippets:** {summary['total_evidence_snippets']}",
+            f"- **Items for Human Review:** {summary['items_for_human_review']}\n",
+        ]
+    )
 
     # Next steps
-    if summary['items_for_human_review'] > 0:
+    if summary["items_for_human_review"] > 0:
         next_steps_list = [
             f"⚠️  {summary['items_for_human_review']} items need human review",
             f"Open `{md_path}` to review detailed findings",
-            "Address flagged items before making final approval decision"
+            "Address flagged items before making final approval decision",
         ]
     else:
         next_steps_list = [
             "✅ No items flagged for review",
             f"Open `{md_path}` to review the complete findings",
-            "Make final approval decision"
+            "Make final approval decision",
         ]
 
     next_steps = format_next_steps_section(next_steps_list, "Next Steps")
@@ -171,7 +172,12 @@ Then return here for report generation.
     state_manager = StateManager(session_id)
     state_manager.update_json("session.json", {"workflow_progress": workflow})
 
-    message = header + "\n".join(content) + next_steps + f"\n\n💡 **Tip:** Use `cat {md_path}` to view the Markdown report in your terminal"
+    message = (
+        header
+        + "\n".join(content)
+        + next_steps
+        + f"\n\n💡 **Tip:** Use `cat {md_path}` to view the Markdown report in your terminal"
+    )
     return text_content(message)
 
 

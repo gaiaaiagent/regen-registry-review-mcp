@@ -29,23 +29,23 @@ if _PYTEST_RUNNING:
 # =============================================================================
 # Now safe to import from our package - settings will see /tmp paths
 # =============================================================================
+import json
+from datetime import datetime
+from pathlib import Path
+
 import pytest
 import pytest_asyncio
-import json
-from pathlib import Path
-from datetime import datetime
 
 # Load cost control plugin
 pytest_plugins = ["tests.plugins.cost_control"]
 
-from registry_review_mcp.config.settings import settings, Settings
+from registry_review_mcp.config.settings import Settings, settings
 from registry_review_mcp.extractors.llm_extractors import (
     DateExtractor,
     LandTenureExtractor,
     ProjectIDExtractor,
 )
 from registry_review_mcp.utils.safe_delete import safe_rmtree
-
 
 # Global cost tracker for aggregating all test costs
 _test_suite_costs = {

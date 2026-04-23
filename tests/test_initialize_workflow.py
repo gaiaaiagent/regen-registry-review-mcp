@@ -9,14 +9,13 @@ This test file catches critical bugs found during development:
 
 import json
 import re
+
 import pytest
-from pathlib import Path
 
-from registry_review_mcp.tools import session_tools
-from registry_review_mcp.prompts import A_initialize
-from registry_review_mcp.utils.state import StateManager
 from registry_review_mcp.config.settings import settings
-
+from registry_review_mcp.prompts import A_initialize
+from registry_review_mcp.tools import session_tools
+from registry_review_mcp.utils.state import StateManager
 
 # Test Helpers
 

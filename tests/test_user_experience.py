@@ -3,8 +3,8 @@
 import pytest
 
 from registry_review_mcp.prompts.B_document_discovery import document_discovery_prompt
-from registry_review_mcp.tools import session_tools
 from registry_review_mcp.server import start_review
+from registry_review_mcp.tools import session_tools
 
 
 class TestDocumentDiscoveryUX:

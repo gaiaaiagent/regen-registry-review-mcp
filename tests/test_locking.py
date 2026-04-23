@@ -1,8 +1,8 @@
 """Test locking mechanism in isolation."""
 
-import pytest
 import time
-from pathlib import Path
+
+import pytest
 
 from registry_review_mcp.utils.state import StateManager
 

@@ -7,15 +7,12 @@ with web applications, chat interfaces, and APIs.
 
 import base64
 import hashlib
-import re
 import os
+import re
 from pathlib import Path
 from typing import Any
-from difflib import SequenceMatcher
 
-from . import session_tools, document_tools, evidence_tools
-from ..models.errors import SessionNotFoundError
-from ..config.settings import settings
+from . import document_tools, session_tools
 
 
 def _sanitize_filename(filename: str) -> str:
@@ -30,17 +27,15 @@ def _sanitize_filename(filename: str) -> str:
 
 
 def _sanitize_project_name(project_name: str) -> str:
-    """Sanitize project name for use in directory names.
-    """
+    """Sanitize project name for use in directory names."""
     # Replace spaces and special chars with hyphens
-    sanitized = re.sub(r'[^\w\s-]', '', project_name)
-    sanitized = re.sub(r'[-\s]+', '-', sanitized)
-    return sanitized.lower().strip('-')
+    sanitized = re.sub(r"[^\w\s-]", "", project_name)
+    sanitized = re.sub(r"[-\s]+", "-", sanitized)
+    return sanitized.lower().strip("-")
 
 
 def _resolve_file_path(path_str: str) -> Path:
-    """Resolve file path, handling ElizaOS upload URL paths.
-    """
+    """Resolve file path, handling ElizaOS upload URL paths."""
     path = Path(path_str)
 
     # If already absolute and exists, use as-is
@@ -48,31 +43,31 @@ def _resolve_file_path(path_str: str) -> Path:
         return path
 
     # Check for ElizaOS media URL pattern
-    if str(path).startswith('/media/uploads/'):
+    if str(path).startswith("/media/uploads/"):
         # Try to find ElizaOS installation
         possible_roots = [
             Path.cwd(),  # Current working directory
             Path.cwd().parent,  # Parent directory
-            Path.home() / 'Workspace/RegenAI/eliza',  # Common dev location
+            Path.home() / "Workspace/RegenAI/eliza",  # Common dev location
         ]
 
         # Also check ELIZA_ROOT environment variable
-        if 'ELIZA_ROOT' in os.environ:
-            possible_roots.insert(0, Path(os.environ['ELIZA_ROOT']))
+        if "ELIZA_ROOT" in os.environ:
+            possible_roots.insert(0, Path(os.environ["ELIZA_ROOT"]))
 
         # Convert /media/uploads/... to .eliza/data/uploads/...
-        relative_part = str(path).replace('/media/', '')
+        relative_part = str(path).replace("/media/", "")
 
         for root in possible_roots:
             # Try standard ElizaOS data directory structure
-            candidate = root / 'packages/cli/.eliza/data' / relative_part
+            candidate = root / "packages/cli/.eliza/data" / relative_part
 
             if candidate.exists():
                 return candidate
 
         # Also try without packages/cli prefix (for different ElizaOS setups)
         for root in possible_roots:
-            candidate = root / '.eliza/data' / relative_part
+            candidate = root / ".eliza/data" / relative_part
 
             if candidate.exists():
                 return candidate
@@ -88,8 +83,7 @@ def _resolve_file_path(path_str: str) -> Path:
 
 
 def process_file_input(file_obj: dict[str, Any], index: int) -> dict[str, str]:
-    """Process file input from either base64 content or file path.
-    """
+    """Process file input from either base64 content or file path."""
     if not isinstance(file_obj, dict):
         raise ValueError(f"File at index {index} must be a dictionary")
 
@@ -102,8 +96,7 @@ def process_file_input(file_obj: dict[str, Any], index: int) -> dict[str, str]:
 
     if not filename:
         raise ValueError(
-            f"File at index {index} is missing 'filename' or 'name' field "
-            f"and no path to extract filename from"
+            f"File at index {index} is missing 'filename' or 'name' field and no path to extract filename from"
         )
 
     filename = _sanitize_filename(filename)
@@ -135,16 +128,10 @@ def process_file_input(file_obj: dict[str, Any], index: int) -> dict[str, str]:
 
         # Security validation: path must exist and be a file
         if not file_path.exists():
-            raise ValueError(
-                f"File '{filename}' path does not exist: {file_path}\n"
-                f"Original path: {file_path_str}"
-            )
+            raise ValueError(f"File '{filename}' path does not exist: {file_path}\nOriginal path: {file_path_str}")
 
         if not file_path.is_file():
-            raise ValueError(
-                f"File '{filename}' path is not a file: {file_path}\n"
-                f"Original path: {file_path_str}"
-            )
+            raise ValueError(f"File '{filename}' path is not a file: {file_path}\nOriginal path: {file_path_str}")
 
         # Security validation: prevent directory traversal
         try:
@@ -159,9 +146,7 @@ def process_file_input(file_obj: dict[str, Any], index: int) -> dict[str, str]:
             file_content = file_path.read_bytes()
             content_base64 = base64.b64encode(file_content).decode("utf-8")
         except Exception as e:
-            raise ValueError(
-                f"Failed to read file '{filename}' from path '{file_path_str}': {str(e)}"
-            ) from e
+            raise ValueError(f"Failed to read file '{filename}' from path '{file_path_str}': {str(e)}") from e
 
         return {
             "filename": filename,
@@ -169,17 +154,14 @@ def process_file_input(file_obj: dict[str, Any], index: int) -> dict[str, str]:
         }
 
     # Neither content_base64 nor path provided
-    raise ValueError(
-        f"File '{filename}' at index {index} must have either 'content_base64' or 'path' field"
-    )
+    raise ValueError(f"File '{filename}' at index {index} must have either 'content_base64' or 'path' field")
 
 
 def deduplicate_by_filename(
     files: list[dict[str, str]],
     existing_files: set[str] | None = None,
 ) -> tuple[list[dict[str, str]], list[str]]:
-    """Remove duplicate filenames from upload.
-    """
+    """Remove duplicate filenames from upload."""
     seen_names = existing_files or set()
     unique_files = []
     duplicates = []
@@ -199,8 +181,7 @@ def deduplicate_by_filename(
 def deduplicate_by_content(
     files: list[dict[str, str]],
 ) -> tuple[list[dict[str, str]], dict[str, str]]:
-    """Remove duplicate file contents even if filenames differ.
-    """
+    """Remove duplicate file contents even if filenames differ."""
     hash_to_file: dict[str, tuple[str, dict[str, str]]] = {}  # hash -> (filename, file_obj)
     unique_files = []
     duplicates_map = {}  # duplicate_filename -> original_filename
@@ -271,8 +252,7 @@ async def create_session_from_uploads(
     deduplicate: bool = True,
     force_new_session: bool = False,
 ) -> dict[str, Any]:
-    """Create a new registry review session from uploaded file content.
-    """
+    """Create a new registry review session from uploaded file content."""
     # Validate inputs
     if not project_name or not project_name.strip():
         raise ValueError("project_name is required and cannot be empty")
@@ -326,8 +306,7 @@ async def create_session_from_uploads(
         if len(files) == 0:
             total_dupes = len(filename_duplicates) + len(content_duplicates)
             raise ValueError(
-                f"All {original_file_count} files were duplicates. "
-                f"Set deduplicate=False to upload anyway."
+                f"All {original_file_count} files were duplicates. Set deduplicate=False to upload anyway."
             )
 
     # Create session FIRST to get session_id for persistent storage
@@ -358,9 +337,7 @@ async def create_session_from_uploads(
             try:
                 file_content = base64.b64decode(content_base64)
             except Exception as e:
-                raise ValueError(
-                    f"Failed to decode base64 content for '{filename}': {str(e)}"
-                ) from e
+                raise ValueError(f"Failed to decode base64 content for '{filename}': {str(e)}") from e
 
             # Write to persistent uploads directory (bounds-checked)
             file_path = uploads_dir / filename
@@ -369,10 +346,7 @@ async def create_session_from_uploads(
             files_saved.append(filename)
 
         # Update session with documents_path pointing to persistent storage
-        await session_tools.update_session_state(
-            session_id,
-            {"project_metadata.documents_path": str(uploads_dir)}
-        )
+        await session_tools.update_session_state(session_id, {"project_metadata.documents_path": str(uploads_dir)})
 
         # Discover documents
         discovery_result = await document_tools.discover_documents(session_id)
@@ -399,7 +373,7 @@ async def create_session_from_uploads(
             ],
         }
 
-    except Exception as e:
+    except Exception:
         # Clean up session on error (includes uploads directory)
         try:
             await session_tools.delete_session(session_id)
@@ -412,8 +386,7 @@ async def upload_additional_files(
     session_id: str,
     files: list[dict[str, str]],
 ) -> dict[str, Any]:
-    """Add additional files to an existing session.
-    """
+    """Add additional files to an existing session."""
     # Validate inputs
     if not files or len(files) == 0:
         raise ValueError("At least one file is required")
@@ -444,10 +417,7 @@ async def upload_additional_files(
     if needs_migration:
         # Migrate to persistent storage
         documents_path = session_tools.get_session_uploads_dir(session_id)
-        await session_tools.update_session_state(
-            session_id,
-            {"project_metadata.documents_path": str(documents_path)}
-        )
+        await session_tools.update_session_state(session_id, {"project_metadata.documents_path": str(documents_path)})
     else:
         documents_path = Path(documents_path_str)
 
@@ -474,9 +444,7 @@ async def upload_additional_files(
             try:
                 file_content = base64.b64decode(content_base64)
             except Exception as e:
-                raise ValueError(
-                    f"Failed to decode base64 content for '{filename}': {str(e)}"
-                ) from e
+                raise ValueError(f"Failed to decode base64 content for '{filename}': {str(e)}") from e
 
             # Write file
             file_path.write_bytes(file_content)
@@ -495,7 +463,7 @@ async def upload_additional_files(
             "documents_by_type": discovery_result["classification_summary"],
         }
 
-    except Exception as e:
+    except Exception:
         # Clean up partially written files on error
         for file_path in written_files:
             if file_path.exists():
@@ -514,8 +482,7 @@ async def start_review_from_uploads(
     deduplicate: bool = True,
     force_new_session: bool = False,
 ) -> dict[str, Any]:
-    """One-step tool to create session, upload files, and optionally extract evidence.
-    """
+    """One-step tool to create session, upload files, and optionally extract evidence."""
     # Create session from uploads
     session_result = await create_session_from_uploads(
         project_name=project_name,
@@ -535,6 +502,7 @@ async def start_review_from_uploads(
     if auto_extract and session_result["documents_found"] > 0:
         try:
             from .evidence_tools import extract_all_evidence
+
             evidence_result = await extract_all_evidence(session_id)
             response["evidence_extraction"] = evidence_result
         except Exception as e:

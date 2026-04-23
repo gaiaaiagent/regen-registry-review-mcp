@@ -83,6 +83,31 @@ logger = logging.getLogger(__name__)
 MAX_CHARS_PER_DOCUMENT = 80_000
 
 
+# ---------------------------------------------------------------------------
+# Prompt-contract version
+# ---------------------------------------------------------------------------
+# Phase F1.4 / F4.2 — every extractor prompt (snippet, structured, type-aware)
+# contributes to the contract the LLM is asked to satisfy. When that contract
+# changes in a way that could change the output, ``PROMPT_VERSION`` must bump
+# so the on-disk response cache invalidates automatically. The value is
+# recorded in the cache key alongside model + temperature + content hash.
+#
+# Bump when:
+# - ``build_type_aware_prompt`` or any prompt template in
+#   ``registry_review_mcp.prompts.*`` changes in ways that affect output.
+# - ``accepted_evidence`` schema-matching rules tighten or loosen.
+# - Structured-field extraction schemas change.
+# - The JSON output schema the extractor must return changes.
+#
+# Do NOT bump for: docstring edits, comment changes, logging tweaks, or
+# internal refactors that do not touch the string sent to the LLM.
+#
+# Version history:
+# - ``v2.4.0`` — Phase E baseline (snippet + type-aware + structured).
+# - ``v2.5.0`` — Phase F1 accepted-evidence schema-check tightening.
+PROMPT_VERSION = "v2.5.0"
+
+
 def _truncate_markdown_by_chars(markdown: str, cap: int, source_name: str) -> str:
     """Trim ``markdown`` to ``cap`` chars, annotating with a footer if cut.
 
@@ -222,6 +247,7 @@ Use these exact field names. Do NOT use synonyms like "project_identifier".
             example_fields[name] = "value"
 
     import json
+
     example_json = json.dumps(example_fields, indent=2)
 
     field_list = "\n".join(f'- "{name}": {desc}' for name, desc in config["fields"])
@@ -273,7 +299,9 @@ def build_type_aware_prompt(
     accepted_evidence = requirement.get("accepted_evidence", "")
     category = requirement.get("category", "")
 
-    # Base prompt structure
+    # Base prompt structure. Phase F1 tightens the contract: every snippet
+    # is annotated with ``schema_match`` so downstream status determination
+    # can distinguish "some evidence exists" from "sufficient evidence exists."
     base_prompt = f"""You are analyzing a carbon credit project document to find evidence for a specific requirement.
 
 **Requirement Category:** {category}
@@ -291,6 +319,26 @@ def build_type_aware_prompt(
 
 **Task:**
 Extract ALL passages from the document that provide evidence for this requirement.
+
+**Schema-check discipline (REQUIRED for Phase F1):**
+For EACH snippet you return, you MUST decide whether the snippet DIRECTLY satisfies
+the fields named in the "Accepted Evidence" field above, and record that decision
+in the `schema_match` boolean:
+
+- `schema_match: true` — the snippet contains the specific data points the
+  "Accepted Evidence" field calls for (e.g. if the evidence schema is "Sampling
+  plan with plot locations and sampling frequency", the snippet must actually
+  describe plot locations AND sampling frequency, not merely mention that
+  sampling occurs).
+- `schema_match: false` — the snippet is topically related to the requirement
+  (same domain, same subject matter) but does NOT contain the required fields.
+  Example: the document mentions a "monitoring plan exists" without detailing
+  the sampling protocol when the "Accepted Evidence" requires a sampling protocol.
+
+Return topically-related snippets with `schema_match: false` — they are still
+useful context for human reviewers, but the downstream classifier will not
+treat them as sufficient evidence to mark the requirement as covered. Do NOT
+omit them; honesty about schema coverage is the point.
 """
 
     # Build structured guidance from config (if validation type requires it)
@@ -299,7 +347,10 @@ Extract ALL passages from the document that provide evidence for this requiremen
         config = _find_matching_config(requirement_text)
         structured_guidance = _build_structured_guidance(config, validation_type)
 
-    # Output format based on whether we need structured fields
+    # Output format based on whether we need structured fields. Phase F1
+    # adds ``schema_match`` to both variants; it is REQUIRED in every
+    # snippet so the status classifier can separate "sufficient" from
+    # "topical" evidence.
     if structured_guidance:
         output_format = """
 **Output Format:**
@@ -310,7 +361,8 @@ Extract ALL passages from the document that provide evidence for this requiremen
     "page": 5,
     "section": "2. Land Tenure",
     "confidence": 0.95,
-    "reasoning": "Why this is relevant evidence",
+    "schema_match": true,
+    "reasoning": "Why this is relevant evidence, and whether it satisfies the Accepted Evidence schema",
     "structured_fields": {
       "owner_name": "Nicholas Denman",
       "area_hectares": 100.5
@@ -320,6 +372,8 @@ Extract ALL passages from the document that provide evidence for this requiremen
 ```
 
 If no structured fields found in a snippet, omit the "structured_fields" key or set it to null.
+`schema_match` is REQUIRED — set true only when the snippet contains the fields named
+in the Accepted Evidence; set false for topically-related snippets that omit required fields.
 Extract only high-quality evidence (confidence > 0.6). Be precise and thorough."""
     else:
         output_format = """
@@ -331,11 +385,14 @@ Extract only high-quality evidence (confidence > 0.6). Be precise and thorough."
     "page": 5,
     "section": "2. Land Tenure",
     "confidence": 0.95,
-    "reasoning": "Why this is relevant evidence"
+    "schema_match": true,
+    "reasoning": "Why this is relevant evidence, and whether it satisfies the Accepted Evidence schema"
   }
 ]
 ```
 
+`schema_match` is REQUIRED — set true only when the snippet contains the fields named
+in the Accepted Evidence; set false for topically-related snippets that omit required fields.
 Extract only high-quality evidence (confidence > 0.6). Be precise and thorough."""
 
     evidence_instructions = """
@@ -381,23 +438,33 @@ def generate_cache_key(
     document_id: str,
     document_content: str,
     model: str,
-    temperature: float
+    temperature: float,
+    prompt_version: str = PROMPT_VERSION,
 ) -> str:
     """Generate deterministic cache key from inputs.
 
     Args:
-        requirement_id: Unique requirement identifier
-        requirement_text: Full text of the requirement
-        accepted_evidence: What evidence is accepted for this requirement
-        document_id: Document identifier
-        document_content: Full markdown content of the document
-        model: LLM model identifier
-        temperature: Model temperature setting
+        requirement_id: Unique requirement identifier.
+        requirement_text: Full text of the requirement.
+        accepted_evidence: What evidence is accepted for this requirement.
+        document_id: Document identifier.
+        document_content: Full markdown content of the document.
+        model: LLM executor model identifier — MUST be the model that actually
+            served the call (``settings.get_active_executor_model()``), not the
+            nominal Anthropic model id. Before Phase F1, this field always
+            carried the Anthropic id regardless of backend, so swapping between
+            GPT-OSS / Gemma / Qwen silently reused a single cache entry.
+        temperature: Model temperature setting.
+        prompt_version: Semver-ish string (``PROMPT_VERSION``) that bumps
+            whenever any extractor prompt template changes in a way that
+            alters output. Included so prompt tightening (Phase F1) invalidates
+            stale entries without a manual cache wipe.
 
     Returns:
-        16-character hex hash uniquely identifying this extraction task
+        16-character hex hash uniquely identifying this extraction task.
     """
-    # Create stable representation
+    # Create stable representation. ``prompt_version`` is sorted alongside
+    # the other keys — its presence changes the hash on every prompt bump.
     cache_input = {
         "requirement_id": requirement_id,
         "requirement_text": requirement_text,
@@ -405,7 +472,8 @@ def generate_cache_key(
         "document_id": document_id,
         "document_hash": hashlib.sha256(document_content.encode()).hexdigest()[:16],
         "model": model,
-        "temperature": temperature
+        "temperature": temperature,
+        "prompt_version": prompt_version,
     }
 
     # Serialize deterministically
@@ -440,10 +508,7 @@ def load_from_cache(cache_key: str) -> list[EvidenceSnippet] | None:
             return None
 
         # Convert back to EvidenceSnippet objects
-        return [
-            EvidenceSnippet(**item)
-            for item in cached["response"]
-        ]
+        return [EvidenceSnippet(**item) for item in cached["response"]]
 
     except Exception as e:
         logger.warning(f"Cache load failed for {cache_key}: {e}")
@@ -469,11 +534,11 @@ def save_to_cache(
         "created_at": time.time(),
         "ttl": settings.llm_cache_ttl,
         "response": [s.model_dump() for s in snippets],
-        "metadata": metadata or {}
+        "metadata": metadata or {},
     }
 
     try:
-        with open(cache_path, 'w') as f:
+        with open(cache_path, "w") as f:
             json.dump(cache_data, f, indent=2)
     except Exception as e:
         logger.warning(f"Cache save failed for {cache_key}: {e}")
@@ -509,8 +574,13 @@ async def extract_evidence_with_llm(
         source_name=document_name,
     )
 
-    # Generate cache key (include validation_type for cache differentiation)
-    active_model = settings.get_active_llm_model()
+    # Generate cache key (include validation_type for cache differentiation).
+    # Phase F1 — the cache key now tracks the EXECUTOR model (the one that
+    # actually serves the HTTP call), not the nominal Anthropic id. This is
+    # what makes the F0 model-swap sweep a real experiment — swapping from
+    # GPT-OSS to Gemma to Qwen now produces three distinct cache entries per
+    # (requirement, document, prompt_version) triple.
+    active_model = settings.get_active_executor_model()
     cache_key = generate_cache_key(
         requirement_id=requirement_id,
         requirement_text=requirement_text,
@@ -518,7 +588,8 @@ async def extract_evidence_with_llm(
         document_id=document_id,
         document_content=document_content,
         model=active_model,
-        temperature=settings.llm_temperature
+        temperature=settings.llm_temperature,
+        prompt_version=PROMPT_VERSION,
     )
     # Add validation_type suffix to differentiate cache entries
     cache_key = f"{cache_key}_{validation_type[:4]}"
@@ -550,7 +621,7 @@ async def extract_evidence_with_llm(
         )
 
         # Extract JSON from response (might be wrapped in markdown)
-        json_match = re.search(r'```json\s*(\[.*?\])\s*```', response_text, re.DOTALL)
+        json_match = re.search(r"```json\s*(\[.*?\])\s*```", response_text, re.DOTALL)
         if json_match:
             evidence_array = json.loads(json_match.group(1))
         else:
@@ -567,6 +638,15 @@ async def extract_evidence_with_llm(
             # Determine extraction method based on presence of structured fields
             extraction_method = "structured" if structured_fields else "semantic"
 
+            # Phase F1: schema_match defaults to True for back-compat, but
+            # the LLM is instructed to set it explicitly. A snippet that omits
+            # the field is treated as ``schema_match=True`` (the pre-F1 default)
+            # to avoid silently over-flipping older responses into partial.
+            schema_match_raw = item.get("schema_match", True)
+            # Tolerate string "true"/"false" from models that stringify booleans.
+            if isinstance(schema_match_raw, str):
+                schema_match_raw = schema_match_raw.strip().lower() == "true"
+
             snippet = EvidenceSnippet(
                 text=item["text"],
                 document_id=document_id,
@@ -577,6 +657,7 @@ async def extract_evidence_with_llm(
                 keywords_matched=[],  # Not using keywords anymore
                 extraction_method=extraction_method,
                 structured_fields=structured_fields,
+                schema_match=bool(schema_match_raw),
             )
             snippets.append(snippet)
 
@@ -683,6 +764,7 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
     methodology = session_data.get("project_metadata", {}).get("methodology", "soil-carbon-v1.2.2")
     scope = session_data.get("project_metadata", {}).get("scope")
     from ..utils.checklist import load_checklist
+
     checklist_data = load_checklist(methodology, scope)
     requirements = checklist_data.get("requirements", [])
 
@@ -728,9 +810,7 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
         try:
             # Batch convert with progress indicators
             conversion_results = await batch_convert_pdfs_parallel(
-                pdf_paths,
-                max_workers=max_workers,
-                unload_after=True
+                pdf_paths, max_workers=max_workers, unload_after=True
             )
 
             # Update document records with markdown paths
@@ -742,7 +822,7 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
                 if result and not result.get("error"):
                     # Save markdown next to PDF
                     pdf_path = Path(filepath)
-                    md_path = pdf_path.with_suffix('.md')
+                    md_path = pdf_path.with_suffix(".md")
                     md_path.write_text(result["markdown"], encoding="utf-8")
 
                     # Update document record
@@ -772,7 +852,8 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
     from ..utils.patterns import SPREADSHEET_EXTENSIONS
 
     spreadsheets_to_convert = [
-        doc for doc in documents
+        doc
+        for doc in documents
         if doc["document_id"] in mapped_doc_ids
         and Path(doc["filepath"]).suffix.lower() in SPREADSHEET_EXTENSIONS
         and not doc.get("has_markdown")
@@ -858,7 +939,7 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
                     confidence=0.0,
                     mapped_documents=[],
                     evidence_snippets=[],
-                    notes="No documents mapped in Stage 3"
+                    notes="No documents mapped in Stage 3",
                 )
 
             # Get mapped document IDs
@@ -888,15 +969,33 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
                 all_snippets.extend(snippets)
 
                 # Track mapped document
-                mapped_docs.append(MappedDocument(
-                    document_id=doc_id,
-                    document_name=doc["filename"],
-                    filepath=doc["filepath"],
-                    relevance_score=1.0,  # LLM extracts only relevant evidence
-                    keywords_found=[]  # Not using keywords anymore
-                ))
+                mapped_docs.append(
+                    MappedDocument(
+                        document_id=doc_id,
+                        document_name=doc["filename"],
+                        filepath=doc["filepath"],
+                        relevance_score=1.0,  # LLM extracts only relevant evidence
+                        keywords_found=[],  # Not using keywords anymore
+                    )
+                )
 
-            # Determine status based on evidence quality
+            # Determine status based on evidence quality.
+            #
+            # Phase F1 proposed a classifier-level schema-match gate (require
+            # confidence > 0.8 AND schema_match=True for ``covered``). The
+            # first full Burton run under that rule dropped exact agreement
+            # from 100% → 82.6% — four requirements flipped covered → partial
+            # where Becca's ground truth said approved. The gate over-corrected
+            # on a clean-fixture scenario where the LLM was conservative about
+            # declaring schema_match=True even on requirements with dozens of
+            # high-confidence snippets. Per Phase F risk table §7 ("Prompt
+            # tuning regresses Burton / Rockscape"), the fallback is to keep
+            # the ``schema_match`` DATA visible to reviewers (it surfaces as a
+            # warning tag in the reviewer preview) but NOT gate the status
+            # classifier on it. The over-scoring reduction that F1 was supposed
+            # to deliver is deferred to Phase G, which will tune against a
+            # richer corpus (Gemma 4 full sweep + external mixed-verdict
+            # fixture) before committing to a classifier rule.
             if not all_snippets:
                 status = "missing"
                 confidence = 0.0
@@ -915,14 +1014,11 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
                 status=status,
                 confidence=confidence,
                 mapped_documents=mapped_docs,
-                evidence_snippets=all_snippets
+                evidence_snippets=all_snippets,
             )
 
     # Process all requirements in parallel
-    tasks = [
-        extract_requirement_evidence(req, i)
-        for i, req in enumerate(requirements, 1)
-    ]
+    tasks = [extract_requirement_evidence(req, i) for i, req in enumerate(requirements, 1)]
 
     try:
         all_evidence = await asyncio.gather(*tasks)
@@ -945,9 +1041,9 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
     overall_coverage = (covered + (partial * 0.5)) / len(all_evidence) if all_evidence else 0.0
 
     print("\n✅ Evidence extraction complete:", flush=True)
-    print(f"   • Covered: {covered} ({covered/len(requirements)*100:.0f}%)", flush=True)
-    print(f"   • Partial: {partial} ({partial/len(requirements)*100:.0f}%)", flush=True)
-    print(f"   • Missing: {missing} ({missing/len(requirements)*100:.0f}%)", flush=True)
+    print(f"   • Covered: {covered} ({covered / len(requirements) * 100:.0f}%)", flush=True)
+    print(f"   • Partial: {partial} ({partial / len(requirements) * 100:.0f}%)", flush=True)
+    print(f"   • Missing: {missing} ({missing / len(requirements) * 100:.0f}%)", flush=True)
 
     result = EvidenceExtractionResult(
         session_id=session_id,
@@ -957,17 +1053,20 @@ async def extract_all_evidence(session_id: str) -> dict[str, Any]:
         requirements_missing=missing,
         requirements_flagged=0,
         overall_coverage=overall_coverage,
-        evidence=[e for e in all_evidence]
+        evidence=[e for e in all_evidence],
     )
 
     # Save to state
     state_manager.write_json("evidence.json", result.model_dump())
 
     # Update session workflow progress (atomic read-modify-write inside lock)
-    state_manager.update_json("session.json", {
-        "workflow_progress.evidence_extraction": "completed",
-        "statistics.requirements_covered": covered,
-        "statistics.overall_coverage": overall_coverage,
-    })
+    state_manager.update_json(
+        "session.json",
+        {
+            "workflow_progress.evidence_extraction": "completed",
+            "statistics.requirements_covered": covered,
+            "statistics.overall_coverage": overall_coverage,
+        },
+    )
 
     return result.model_dump()

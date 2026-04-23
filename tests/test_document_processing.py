@@ -1,11 +1,11 @@
 """Tests for document processing (Phase 2)."""
 
-import pytest
-from pathlib import Path
 
-from registry_review_mcp.tools import session_tools, document_tools
-from registry_review_mcp.utils.state import StateManager
+import pytest
+
+from registry_review_mcp.tools import document_tools, session_tools
 from registry_review_mcp.utils.patterns import is_spreadsheet_file
+from registry_review_mcp.utils.state import StateManager
 
 
 class TestDocumentDiscovery:
@@ -117,6 +117,7 @@ class TestMappingConventionConsistency:
         # Collect every label the mapper can return across all checklist categories
         # Use the actual checklist categories from soil-carbon-v1.2.2
         import json
+
         from registry_review_mcp.config.settings import settings
         checklist_path = settings.get_checklist_path("soil-carbon-v1.2.2")
         with open(checklist_path) as f:
@@ -226,11 +227,11 @@ class TestMappingConventionConsistency:
     def test_no_hyphenated_labels_in_mapper(self):
         """The mapper should never return hyphenated labels. All labels must use
         underscores to match the classifier convention."""
-        from registry_review_mcp.tools.mapping_tools import _infer_document_types
-
         # Test every checklist category
         import json
+
         from registry_review_mcp.config.settings import settings
+        from registry_review_mcp.tools.mapping_tools import _infer_document_types
         checklist_path = settings.get_checklist_path("soil-carbon-v1.2.2")
         with open(checklist_path) as f:
             checklist = json.load(f)

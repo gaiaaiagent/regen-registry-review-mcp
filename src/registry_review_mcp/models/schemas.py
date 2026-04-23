@@ -8,9 +8,8 @@ from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, field_validator
-from .base import BaseModel, ConfidenceScore
-from .evidence import EvidenceSnippet
 
+from .base import BaseModel, ConfidenceScore
 
 # ============================================================================
 # Session Models
@@ -186,7 +185,3 @@ class MappingCollection(BaseModel):
     confirmed_count: int
     created_at: datetime
     updated_at: datetime
-
-
-
-

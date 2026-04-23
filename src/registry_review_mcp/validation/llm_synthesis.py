@@ -10,8 +10,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from .structural import StructuralValidationResult
 from .cross_document import CrossDocumentValidationResult
+from .structural import StructuralValidationResult
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class LLMSynthesisResult:
     """Result of LLM synthesis analysis."""
+
     available: bool = False  # False if LLM not configured
     coherence_score: float | None = None  # 0.0-1.0
     compliance_status: str | None = None  # "compliant", "partial", "non_compliant"
@@ -36,7 +37,7 @@ def _build_synthesis_prompt(
     evidence_snippets: list[dict],
     structural_results: StructuralValidationResult,
     cross_doc_results: CrossDocumentValidationResult,
-    methodology_name: str = "Soil Organic Carbon"
+    methodology_name: str = "Soil Organic Carbon",
 ) -> str:
     """Build the synthesis prompt with full context."""
 
@@ -46,12 +47,14 @@ def _build_synthesis_prompt(
     # Format snippets (truncated)
     snippets_summary = []
     for i, snippet in enumerate(evidence_snippets[:10]):  # Limit to 10
-        snippets_summary.append({
-            "requirement": snippet.get("requirement_id", "unknown"),
-            "document": snippet.get("document_name", "unknown")[:40],
-            "text": snippet.get("text", "")[:150] + "...",
-            "confidence": snippet.get("confidence", 0)
-        })
+        snippets_summary.append(
+            {
+                "requirement": snippet.get("requirement_id", "unknown"),
+                "document": snippet.get("document_name", "unknown")[:40],
+                "text": snippet.get("text", "")[:150] + "...",
+                "confidence": snippet.get("confidence", 0),
+            }
+        )
 
     # Format structural check results
     structural_issues = [
@@ -129,7 +132,7 @@ def _parse_llm_response(response_text: str) -> dict[str, Any]:
     """Parse the LLM JSON response."""
 
     # Try to extract JSON from response
-    json_match = re.search(r'```json\s*(\{.*?\})\s*```', response_text, re.DOTALL)
+    json_match = re.search(r"```json\s*(\{.*?\})\s*```", response_text, re.DOTALL)
 
     if json_match:
         return json.loads(json_match.group(1))
@@ -141,7 +144,7 @@ def _parse_llm_response(response_text: str) -> dict[str, Any]:
         pass
 
     # Try to find any JSON object in response
-    brace_match = re.search(r'\{[^{}]*\}', response_text, re.DOTALL)
+    brace_match = re.search(r"\{[^{}]*\}", response_text, re.DOTALL)
     if brace_match:
         try:
             return json.loads(brace_match.group(0))
@@ -158,13 +161,15 @@ def _collect_evidence_snippets(evidence_data: dict) -> list[dict]:
     for req in evidence_data.get("evidence", []):
         req_id = req.get("requirement_id", "unknown")
         for snippet in req.get("evidence_snippets", []):
-            snippets.append({
-                "requirement_id": req_id,
-                "document_name": snippet.get("document_name", "unknown"),
-                "text": snippet.get("text", ""),
-                "confidence": snippet.get("confidence", 0),
-                "structured_fields": snippet.get("structured_fields")
-            })
+            snippets.append(
+                {
+                    "requirement_id": req_id,
+                    "document_name": snippet.get("document_name", "unknown"),
+                    "text": snippet.get("text", ""),
+                    "confidence": snippet.get("confidence", 0),
+                    "structured_fields": snippet.get("structured_fields"),
+                }
+            )
 
     return snippets
 
@@ -174,7 +179,7 @@ async def run_llm_synthesis(
     all_fields: dict[str, Any],
     structural_results: StructuralValidationResult,
     cross_doc_results: CrossDocumentValidationResult,
-    methodology_name: str = "Soil Organic Carbon"
+    methodology_name: str = "Soil Organic Carbon",
 ) -> LLMSynthesisResult:
     """Run LLM synthesis for holistic coherence assessment.
 
@@ -203,7 +208,7 @@ async def run_llm_synthesis(
             evidence_snippets=snippets,
             structural_results=structural_results,
             cross_doc_results=cross_doc_results,
-            methodology_name=methodology_name
+            methodology_name=methodology_name,
         )
 
         logger.info("Running LLM synthesis for coherence assessment")
@@ -222,7 +227,7 @@ async def run_llm_synthesis(
             coherence_score=parsed.get("coherence_score"),
             compliance_status=parsed.get("compliance_status"),
             flags_for_review=parsed.get("flags_for_review", []),
-            reasoning=parsed.get("reasoning")
+            reasoning=parsed.get("reasoning"),
         )
 
         logger.info(
@@ -235,7 +240,4 @@ async def run_llm_synthesis(
     except Exception as e:
         error_info = classify_api_error(e)
         logger.error(f"LLM synthesis failed ({error_info.category}): {error_info.message}")
-        return LLMSynthesisResult(
-            available=False,
-            error=f"{error_info.message} — {error_info.guidance}"
-        )
+        return LLMSynthesisResult(available=False, error=f"{error_info.message} — {error_info.guidance}")

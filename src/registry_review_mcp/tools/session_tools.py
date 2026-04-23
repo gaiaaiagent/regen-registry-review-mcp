@@ -10,7 +10,6 @@ from ..config.settings import settings
 from ..utils.safe_delete import safe_rmtree
 
 logger = logging.getLogger(__name__)
-from ..models.errors import SessionNotFoundError
 from ..models.schemas import (
     ProjectMetadata,
     Session,
@@ -21,8 +20,7 @@ from ..utils.state import StateManager, get_session_or_raise
 
 
 def generate_session_id() -> str:
-    """Generate a unique session ID.
-    """
+    """Generate a unique session ID."""
     return f"session-{uuid.uuid4().hex[:12]}"
 
 
@@ -128,8 +126,7 @@ async def create_session(
 
 
 async def load_session(session_id: str) -> dict[str, Any]:
-    """Load an existing session.
-    """
+    """Load an existing session."""
     state_manager = get_session_or_raise(session_id)
     session_data = state_manager.read_json("session.json")
     return session_data
@@ -139,8 +136,7 @@ async def update_session_state(
     session_id: str,
     updates: dict[str, Any],
 ) -> dict[str, Any]:
-    """Update session state with partial changes.
-    """
+    """Update session state with partial changes."""
     state_manager = get_session_or_raise(session_id)
 
     # Add updated timestamp
@@ -153,8 +149,7 @@ async def update_session_state(
 
 
 async def list_sessions() -> list[dict[str, Any]]:
-    """List all available sessions.
-    """
+    """List all available sessions."""
     sessions = []
 
     for session_dir in settings.sessions_dir.iterdir():
@@ -166,9 +161,7 @@ async def list_sessions() -> list[dict[str, Any]]:
                 sessions.append(
                     {
                         "session_id": session_data.get("session_id"),
-                        "project_name": session_data.get("project_metadata", {}).get(
-                            "project_name"
-                        ),
+                        "project_name": session_data.get("project_metadata", {}).get("project_name"),
                         "created_at": session_data.get("created_at"),
                         "updated_at": session_data.get("updated_at"),
                         "status": session_data.get("status"),
@@ -204,19 +197,13 @@ async def delete_session(session_id: str) -> dict[str, Any]:
     expected_parent = settings.sessions_dir.resolve()
 
     # AUDIT: Log deletion attempt with full context
-    logger.warning(
-        f"SESSION DELETE REQUESTED: session_id={session_id}, "
-        f"path={session_dir}, parent={expected_parent}"
-    )
+    logger.warning(f"SESSION DELETE REQUESTED: session_id={session_id}, path={session_dir}, parent={expected_parent}")
 
     # Ensure the session directory is a child of sessions_dir
     try:
         session_dir.relative_to(expected_parent)
     except ValueError:
-        logger.error(
-            f"SESSION DELETE BLOCKED: Security violation - {session_dir} "
-            f"not within {expected_parent}"
-        )
+        logger.error(f"SESSION DELETE BLOCKED: Security violation - {session_dir} not within {expected_parent}")
         raise ValueError(
             f"Security violation: session directory {session_dir} "
             f"is not within expected sessions directory {expected_parent}. "
@@ -225,19 +212,11 @@ async def delete_session(session_id: str) -> dict[str, Any]:
 
     # Additional safety: verify it looks like a session directory
     if not (session_dir / "session.json").exists():
-        logger.error(
-            f"SESSION DELETE BLOCKED: Invalid directory - no session.json in {session_dir}"
-        )
-        raise ValueError(
-            f"Invalid session directory: {session_dir} does not contain session.json. "
-            f"Deletion aborted."
-        )
+        logger.error(f"SESSION DELETE BLOCKED: Invalid directory - no session.json in {session_dir}")
+        raise ValueError(f"Invalid session directory: {session_dir} does not contain session.json. Deletion aborted.")
 
     # AUDIT: Log successful deletion with timestamp
-    logger.warning(
-        f"SESSION DELETE EXECUTING: Removing {session_dir} "
-        f"at {datetime.now(timezone.utc).isoformat()}"
-    )
+    logger.warning(f"SESSION DELETE EXECUTING: Removing {session_dir} at {datetime.now(timezone.utc).isoformat()}")
 
     # Remove entire session directory using safe_rmtree
     # force=True because we've done our own validation above
@@ -253,9 +232,7 @@ async def delete_session(session_id: str) -> dict[str, Any]:
 
 
 async def list_example_projects() -> dict[str, Any]:
-    """List example projects available in the examples directory.
-    """
-    from pathlib import Path
+    """List example projects available in the examples directory."""
 
     # Get examples directory relative to settings
     examples_dir = settings.data_dir.parent / "examples"
@@ -269,14 +246,16 @@ async def list_example_projects() -> dict[str, Any]:
 
     projects = []
     for item in sorted(examples_dir.iterdir()):
-        if item.is_dir() and not item.name.startswith('.'):
+        if item.is_dir() and not item.name.startswith("."):
             # Count files in the directory
-            file_count = sum(1 for f in item.rglob('*') if f.is_file())
-            projects.append({
-                "name": item.name,
-                "path": str(item.absolute()),
-                "file_count": file_count,
-            })
+            file_count = sum(1 for f in item.rglob("*") if f.is_file())
+            projects.append(
+                {
+                    "name": item.name,
+                    "path": str(item.absolute()),
+                    "file_count": file_count,
+                }
+            )
 
     return {
         "projects_found": len(projects),

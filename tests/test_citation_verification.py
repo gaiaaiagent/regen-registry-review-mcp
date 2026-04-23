@@ -6,10 +6,11 @@ to prevent hallucinations.
 """
 
 import pytest
+
 from registry_review_mcp.extractors.verification import (
     verify_citation,
-    verify_extracted_field,
     verify_date_extraction,
+    verify_extracted_field,
 )
 
 

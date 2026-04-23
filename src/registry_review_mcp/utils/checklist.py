@@ -32,8 +32,7 @@ def load_checklist(methodology: str, scope: str | None = None) -> dict:
 
     if scope is not None:
         checklist_data["requirements"] = [
-            req for req in checklist_data.get("requirements", [])
-            if req.get("scope") == scope
+            req for req in checklist_data.get("requirements", []) if req.get("scope") == scope
         ]
 
     return checklist_data

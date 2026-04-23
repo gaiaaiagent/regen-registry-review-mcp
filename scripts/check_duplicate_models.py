@@ -15,8 +15,8 @@ Exit codes:
 
 import ast
 import sys
-from pathlib import Path
 from collections import defaultdict
+from pathlib import Path
 
 
 def find_model_classes(file_path: Path) -> list[str]:

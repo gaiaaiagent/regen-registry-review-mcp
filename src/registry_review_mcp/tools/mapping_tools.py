@@ -7,12 +7,11 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ..models.schemas import (
-    RequirementMapping,
     MappingCollection,
-    ConfidenceScore,
+    RequirementMapping,
 )
 from ..utils.checklist import load_checklist
-from ..utils.state import StateManager, get_session_or_raise
+from ..utils.state import get_session_or_raise
 
 
 async def map_all_requirements(session_id: str) -> dict[str, Any]:
@@ -134,10 +133,13 @@ async def map_all_requirements(session_id: str) -> dict[str, Any]:
     state_manager.write_json("mappings.json", collection.model_dump(mode="json"))
 
     # Update workflow progress
-    state_manager.update_json("session.json", {
-        "workflow_progress.requirement_mapping": "completed",
-        "statistics.requirements_covered": mapped_count,
-    })
+    state_manager.update_json(
+        "session.json",
+        {
+            "workflow_progress.requirement_mapping": "completed",
+            "statistics.requirements_covered": mapped_count,
+        },
+    )
 
     # Build requirements matrix for display
     requirements_matrix = []
@@ -178,7 +180,9 @@ async def map_all_requirements(session_id: str) -> dict[str, Any]:
         row = {
             "requirement_id": mapping.requirement_id,
             "category": req.get("category", ""),
-            "requirement_text": req.get("requirement_text", "")[:80] + "..." if len(req.get("requirement_text", "")) > 80 else req.get("requirement_text", ""),
+            "requirement_text": req.get("requirement_text", "")[:80] + "..."
+            if len(req.get("requirement_text", "")) > 80
+            else req.get("requirement_text", ""),
             "status": status,
             "confidence": confidence,
             "confidence_level": confidence_level,
@@ -189,21 +193,27 @@ async def map_all_requirements(session_id: str) -> dict[str, Any]:
 
         # Track items needing attention
         if status == "unmapped" or confidence < 0.75:
-            needs_attention.append({
-                "requirement_id": mapping.requirement_id,
-                "category": req.get("category", ""),
-                "issue": "Unmapped" if status == "unmapped" else f"Low confidence ({confidence:.0%})",
-                "recommendation": "Requires manual document assignment" if status == "unmapped" else "Review suggested mapping before confirming",
-            })
+            needs_attention.append(
+                {
+                    "requirement_id": mapping.requirement_id,
+                    "category": req.get("category", ""),
+                    "issue": "Unmapped" if status == "unmapped" else f"Low confidence ({confidence:.0%})",
+                    "recommendation": "Requires manual document assignment"
+                    if status == "unmapped"
+                    else "Review suggested mapping before confirming",
+                }
+            )
 
     # Build document summary
     doc_summary = []
     for doc in documents:
-        doc_summary.append({
-            "id": doc["document_id"],
-            "filename": doc.get("filename", doc["document_id"]),
-            "type": doc.get("classification", "unknown"),
-        })
+        doc_summary.append(
+            {
+                "id": doc["document_id"],
+                "filename": doc.get("filename", doc["document_id"]),
+                "type": doc.get("classification", "unknown"),
+            }
+        )
 
     return {
         "session_id": session_id,
@@ -503,11 +513,13 @@ async def get_mapping_matrix(session_id: str) -> dict[str, Any]:
     # Build document info
     doc_info = []
     for doc in documents:
-        doc_info.append({
-            "id": doc["document_id"],
-            "name": doc.get("filename", doc["document_id"])[:25],
-            "type": doc.get("classification", "unknown"),
-        })
+        doc_info.append(
+            {
+                "id": doc["document_id"],
+                "name": doc.get("filename", doc["document_id"])[:25],
+                "type": doc.get("classification", "unknown"),
+            }
+        )
 
     # Build matrix rows
     matrix_rows = []
@@ -539,16 +551,20 @@ async def get_mapping_matrix(session_id: str) -> dict[str, Any]:
             else:
                 doc_mappings[doc["id"]] = "·"
 
-        matrix_rows.append({
-            "requirement_id": req_id,
-            "category": req_data.get("category", ""),
-            "brief": req_data.get("requirement_text", "")[:50] + "..." if len(req_data.get("requirement_text", "")) > 50 else req_data.get("requirement_text", ""),
-            "status": status,
-            "confidence": confidence,
-            "status_icon": status_icon,
-            "doc_mappings": doc_mappings,
-            "mapped_documents": mapped_docs,
-        })
+        matrix_rows.append(
+            {
+                "requirement_id": req_id,
+                "category": req_data.get("category", ""),
+                "brief": req_data.get("requirement_text", "")[:50] + "..."
+                if len(req_data.get("requirement_text", "")) > 50
+                else req_data.get("requirement_text", ""),
+                "status": status,
+                "confidence": confidence,
+                "status_icon": status_icon,
+                "doc_mappings": doc_mappings,
+                "mapped_documents": mapped_docs,
+            }
+        )
 
     # Calculate summary
     total = len(matrix_rows)
@@ -618,10 +634,13 @@ async def confirm_all_mappings(
     state_manager.write_json("mappings.json", mappings_data)
 
     # Update session to indicate mappings are confirmed
-    state_manager.update_json("session.json", {
-        "workflow_progress.mappings_confirmed": True,
-        "statistics.mappings_confirmed": total_confirmed,
-    })
+    state_manager.update_json(
+        "session.json",
+        {
+            "workflow_progress.mappings_confirmed": True,
+            "statistics.mappings_confirmed": total_confirmed,
+        },
+    )
 
     return {
         "session_id": session_id,

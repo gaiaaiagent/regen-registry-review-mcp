@@ -88,8 +88,7 @@ def safe_unlink(path: Path, force: bool = False) -> None:
 
     if not force and not is_safe_to_delete(path):
         raise UnsafeDeleteError(
-            f"REFUSED: Cannot delete '{path}' - not in safe location (/tmp/). "
-            f"This file appears to be production data."
+            f"REFUSED: Cannot delete '{path}' - not in safe location (/tmp/). This file appears to be production data."
         )
 
     if path.exists():

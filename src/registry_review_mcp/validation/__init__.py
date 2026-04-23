@@ -8,9 +8,9 @@ The coordinator orchestrates all layers and produces ValidationResult.
 """
 
 from .coordinator import validate_session
-from .structural import run_structural_checks
 from .cross_document import run_cross_document_checks
 from .llm_synthesis import run_llm_synthesis
+from .structural import run_structural_checks
 
 __all__ = [
     "validate_session",

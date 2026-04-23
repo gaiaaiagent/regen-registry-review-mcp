@@ -146,14 +146,11 @@ def _extract_xlsx(filepath: Path) -> tuple[str, int, int, int]:
         table_md = _rows_to_markdown(headers, data_rows)
         char_truncated_count: int | None = None
         if len(table_md) > MAX_CHARS_PER_SHEET:
-            table_md, char_truncated_count = _truncate_table_by_chars(
-                headers, data_rows, MAX_CHARS_PER_SHEET
-            )
+            table_md, char_truncated_count = _truncate_table_by_chars(headers, data_rows, MAX_CHARS_PER_SHEET)
         section = f'--- Sheet "{name}" ({idx} of {sheet_count}) ---\n\n{table_md}'
         if truncated:
             section += (
-                f"\n\n*Truncated by row cap: showing first {MAX_ROWS_PER_SHEET:,} "
-                f"of {len(all_rows) - 1:,} data rows*"
+                f"\n\n*Truncated by row cap: showing first {MAX_ROWS_PER_SHEET:,} of {len(all_rows) - 1:,} data rows*"
             )
         if char_truncated_count is not None:
             section += (
@@ -202,14 +199,11 @@ def _extract_csv(filepath: Path) -> tuple[str, int, int, int]:
     table_md = _rows_to_markdown(headers, data_rows)
     char_truncated_count: int | None = None
     if len(table_md) > MAX_CHARS_PER_SHEET:
-        table_md, char_truncated_count = _truncate_table_by_chars(
-            headers, data_rows, MAX_CHARS_PER_SHEET
-        )
+        table_md, char_truncated_count = _truncate_table_by_chars(headers, data_rows, MAX_CHARS_PER_SHEET)
     section = f'--- Sheet "{name}" (1 of 1) ---\n\n{table_md}'
     if truncated:
         section += (
-            f"\n\n*Truncated by row cap: showing first {MAX_ROWS_PER_SHEET:,} "
-            f"of {len(all_rows) - 1:,} data rows*"
+            f"\n\n*Truncated by row cap: showing first {MAX_ROWS_PER_SHEET:,} of {len(all_rows) - 1:,} data rows*"
         )
     if char_truncated_count is not None:
         section += (
@@ -293,9 +287,6 @@ async def extract_spreadsheet(filepath: str) -> dict[str, Any]:
         "page_count": sheet_count,  # compatibility with PDF-centric code
     }
 
-    logger.info(
-        f"Extracted {file_path.name}: {sheet_count} sheet(s), "
-        f"{row_count:,} rows, {len(markdown):,} chars"
-    )
+    logger.info(f"Extracted {file_path.name}: {sheet_count} sheet(s), {row_count:,} rows, {len(markdown):,} chars")
 
     return result

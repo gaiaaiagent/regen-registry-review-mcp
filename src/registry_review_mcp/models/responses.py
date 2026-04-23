@@ -8,10 +8,12 @@ Target: Consolidate 15 MCP tools with inconsistent responses
 Benefit: Type-safe, predictable API responses
 """
 
-from typing import Any, Literal
 from datetime import datetime
-from .base import BaseModel
+from typing import Any, Literal
+
 from pydantic import Field
+
+from .base import BaseModel
 
 
 class ToolResponse(BaseModel):
@@ -39,28 +41,15 @@ class ToolResponse(BaseModel):
             )
     """
 
-    status: Literal["success", "error", "partial"] = Field(
-        description="Operation status"
-    )
-    message: str = Field(
-        description="Human-readable message describing the result"
-    )
-    data: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Tool-specific result data"
-    )
+    status: Literal["success", "error", "partial"] = Field(description="Operation status")
+    message: str = Field(description="Human-readable message describing the result")
+    data: dict[str, Any] = Field(default_factory=dict, description="Tool-specific result data")
     metadata: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Optional metadata (timestamps, IDs, counts, etc.)"
+        default_factory=dict, description="Optional metadata (timestamps, IDs, counts, etc.)"
     )
 
     @classmethod
-    def success(
-        cls,
-        message: str,
-        data: dict[str, Any] | None = None,
-        **metadata: Any
-    ) -> "ToolResponse":
+    def success(cls, message: str, data: dict[str, Any] | None = None, **metadata: Any) -> "ToolResponse":
         """Create a success response.
 
         Args:
@@ -71,20 +60,10 @@ class ToolResponse(BaseModel):
         Returns:
             ToolResponse with status="success"
         """
-        return cls(
-            status="success",
-            message=message,
-            data=data or {},
-            metadata=metadata
-        )
+        return cls(status="success", message=message, data=data or {}, metadata=metadata)
 
     @classmethod
-    def error(
-        cls,
-        message: str,
-        error_details: dict[str, Any] | None = None,
-        **metadata: Any
-    ) -> "ToolResponse":
+    def error(cls, message: str, error_details: dict[str, Any] | None = None, **metadata: Any) -> "ToolResponse":
         """Create an error response.
 
         Args:
@@ -95,20 +74,10 @@ class ToolResponse(BaseModel):
         Returns:
             ToolResponse with status="error"
         """
-        return cls(
-            status="error",
-            message=message,
-            data=error_details or {},
-            metadata=metadata
-        )
+        return cls(status="error", message=message, data=error_details or {}, metadata=metadata)
 
     @classmethod
-    def partial(
-        cls,
-        message: str,
-        data: dict[str, Any] | None = None,
-        **metadata: Any
-    ) -> "ToolResponse":
+    def partial(cls, message: str, data: dict[str, Any] | None = None, **metadata: Any) -> "ToolResponse":
         """Create a partial success response.
 
         Use this when an operation partially succeeded but had some failures.
@@ -121,12 +90,7 @@ class ToolResponse(BaseModel):
         Returns:
             ToolResponse with status="partial"
         """
-        return cls(
-            status="partial",
-            message=message,
-            data=data or {},
-            metadata=metadata
-        )
+        return cls(status="partial", message=message, data=data or {}, metadata=metadata)
 
     def to_json(self) -> str:
         """Serialize to JSON string.

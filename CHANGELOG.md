@@ -2,6 +2,89 @@
 
 All notable changes to the Registry Review MCP Server are documented here.
 
+## [2.5.0] - 2026-04-22
+
+Phase F productionizes the pipeline: model swap away from the slow GPT-OSS
+endpoint, accepted-evidence schema-match gate for the over-scoring bias,
+CI/CD workflows, release workflow with PyPI trusted publishing, and a
+standalone HTML reviewer preview so humans can override verdicts without
+editing JSON.
+
+### Changed
+
+- **Cache key now tracks the executor model.** Before Phase F, the cache
+  key embedded `settings.get_active_llm_model()` (the Anthropic id)
+  regardless of which backend actually served the call, so swapping
+  between GPT-OSS / Gemma / Qwen silently reused a single cache entry.
+  The new `settings.get_active_executor_model()` helper resolves the
+  actual backend's model id; cache entries now differ per-model.
+- **Cache key includes `PROMPT_VERSION`.** Any extractor-prompt change
+  bumps `evidence_tools.PROMPT_VERSION` and automatically invalidates
+  stale entries — no manual cache wipe needed.
+- **Response cache TTL 7d → 30d.** Prompts change at release cadence
+  (weekly, not daily); longer TTL means regression re-runs never burn
+  cache unnecessarily.
+- **Status determination requires schema match.** The classifier now
+  promotes a requirement to `covered` only when at least one snippet
+  has BOTH `confidence > 0.8` AND `schema_match=True`. Topical
+  snippets that fail the accepted-evidence schema check land in
+  `partial` instead of `covered` — the Phase E synthetic-mixed-verdict
+  fixture's 13% over-scoring bias is closed by construction.
+
+### Added
+
+- **`EvidenceSnippet.schema_match: bool`** — defaults to True for
+  back-compat with legacy cached responses and manual construction
+  paths. New LLM responses set it explicitly via the tightened prompt.
+- **Extractor prompt schema-check instruction** in
+  `build_type_aware_prompt` — tells the LLM when to set
+  `schema_match: true` vs `false` and why the distinction matters.
+- **`settings.get_active_executor_model()`** — backend-aware model
+  resolution for cache correctness.
+- **`PROMPT_VERSION`** module constant in `evidence_tools.py`
+  (currently `"v2.5.0"`) — bump whenever any extractor prompt changes
+  output.
+- **`.github/workflows/ci.yml`** — fast suite + ruff lint/format on
+  every push, matrix across Python 3.11 + 3.12.
+- **`.github/workflows/regression.yml`** — regression suite on every
+  PR to main; LLM response cache hydrated from `actions/cache@v4`.
+- **`.github/workflows/nightly.yml`** — cross-model full-matrix run
+  at 03:00 PDT, per-model cache namespacing.
+- **`.github/workflows/release.yml`** — tag-push → fast suite → build
+  → PyPI trusted publishing → GitHub Release.
+- **`.pre-commit-config.yaml`** — ruff + fast suite locally before
+  every commit.
+- **`docs/RELEASING.md`** — release checklist + PyPI trusted publishing
+  one-time setup + rollback guidance.
+- **`docs/CACHING.md`** — cache key semantics, invalidation patterns,
+  CI integration, debugging recipes.
+- **`tests/test_prompt_tuning_calibration.py`** — 18 tests covering
+  `EvidenceSnippet.schema_match` defaults, prompt-template instrumentation,
+  status determination logic with schema-match gate, `PROMPT_VERSION`
+  discipline, and cache-key independence for both model and prompt
+  version changes.
+- **Reviewer preview (`src/registry_review_mcp/reviewer/preview.py`)** +
+  Jinja2 template at `templates/review-preview.html.j2`. Renders a
+  self-contained HTML dossier with override dropdowns, reviewer
+  comments, and an Export-to-overrides.json button.
+- **`tests/test_reviewer_preview.py`** — 13 tests for the reviewer
+  preview renderer covering basics, snippet rendering (schema_match
+  warning tag), override UX, file I/O, and defensive coercion.
+
+### Phase F0 — model-swap sweep
+
+- **Qwen 3.6 35B A3B rejected.** F0.1 smoke test hit Cloudflare 524
+  timeouts on a trivial payload (378s wall-clock, 0 snippets returned
+  after multiple retries). Endpoint is unhealthy; revisit in Phase G+.
+- **Gemma 4 31B IT** passes smoke in 3.56s (vs GPT-OSS 4.46s on the same
+  call). Full Burton / Rockscape / CSSCP sweep results documented in
+  `phase-f/diffs/cross-model-sweep-*.md`.
+
+### Performance
+
+- TTL extension from 7d to 30d means `regression.yml` PR runs stay
+  warm across entire release cycles, not just within one sprint.
+
 ## [2.4.0] - 2026-04-22
 
 Phase E ports the Phase D two-layer cap pattern from spreadsheets to PDFs,

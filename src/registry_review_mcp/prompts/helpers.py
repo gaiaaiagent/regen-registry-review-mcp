@@ -78,17 +78,11 @@ def format_session_list(sessions: list[dict], empty_message: str | None = None) 
     if not sessions:
         return empty_message or "  (none)"
 
-    return "\n".join([
-        f"  • {s['session_id']} - {s.get('project_name', 'Unknown')}"
-        for s in sessions
-    ])
+    return "\n".join([f"  • {s['session_id']} - {s.get('project_name', 'Unknown')}" for s in sessions])
 
 
 async def get_or_select_session(
-    session_id: str | None,
-    project_name: str | None,
-    documents_path: str | None,
-    workflow_name: str
+    session_id: str | None, project_name: str | None, documents_path: str | None, workflow_name: str
 ) -> tuple[str | None, bool, list[TextContent] | None]:
     """Get session ID or auto-select most recent, with error handling.
 
@@ -119,16 +113,18 @@ async def get_or_select_session(
     if project_name and documents_path:
         try:
             result = await session_tools.create_session(
-                project_name=project_name,
-                documents_path=documents_path,
-                methodology="soil-carbon-v1.2.2"
+                project_name=project_name, documents_path=documents_path, methodology="soil-carbon-v1.2.2"
             )
             return result["session_id"], False, None
         except Exception as e:
-            return None, False, format_error(
-                "Error Creating Session",
-                f"Failed to create session: {str(e)}",
-                "Please check your inputs and try again."
+            return (
+                None,
+                False,
+                format_error(
+                    "Error Creating Session",
+                    f"Failed to create session: {str(e)}",
+                    "Please check your inputs and try again.",
+                ),
             )
 
     # Case 3: No parameters - try to use most recent session
@@ -142,10 +138,10 @@ No review sessions found. You can either:
 
 ## Option 1: Provide Project Details (Recommended)
 
-`/{workflow_name.lower().replace(' ', '-')} Your Project Name, /absolute/path/to/documents`
+`/{workflow_name.lower().replace(" ", "-")} Your Project Name, /absolute/path/to/documents`
 
 **Example:**
-`/{workflow_name.lower().replace(' ', '-')} Botany Farm 2022-2023, /home/ygg/Workspace/RegenAI/regen-registry-review-mcp/examples/22-23`
+`/{workflow_name.lower().replace(" ", "-")} Botany Farm 2022-2023, /home/ygg/Workspace/RegenAI/regen-registry-review-mcp/examples/22-23`
 
 This will create a new session and run the workflow in one step!
 
@@ -182,18 +178,13 @@ async def validate_session_exists(session_id: str, workflow_name: str) -> list[T
         return format_error(
             "Session Not Found",
             f"Session ID: {session_id}\n\nThis session does not exist.",
-            f"Available sessions:\n\n{session_list}\n\nCreate a new session using /initialize."
+            f"Available sessions:\n\n{session_list}\n\nCreate a new session using /initialize.",
         )
 
     return None
 
 
-def format_workflow_header(
-    stage: str,
-    session_id: str,
-    project_name: str,
-    auto_selected: bool = False
-) -> str:
+def format_workflow_header(stage: str, session_id: str, project_name: str, auto_selected: bool = False) -> str:
     """Format standard workflow stage header.
 
     Args:

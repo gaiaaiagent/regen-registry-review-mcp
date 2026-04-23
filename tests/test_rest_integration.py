@@ -410,14 +410,16 @@ class TestFilenameSanitization:
         assert _sanitize_filename("document.pdf") == "document.pdf"
 
     def test_dot_file_rejected(self):
-        from registry_review_mcp.tools.upload_tools import _sanitize_filename
         import pytest
+
+        from registry_review_mcp.tools.upload_tools import _sanitize_filename
         with pytest.raises(ValueError):
             _sanitize_filename(".bashrc")
 
     def test_empty_rejected(self):
-        from registry_review_mcp.tools.upload_tools import _sanitize_filename
         import pytest
+
+        from registry_review_mcp.tools.upload_tools import _sanitize_filename
         with pytest.raises(ValueError):
             _sanitize_filename("")
 

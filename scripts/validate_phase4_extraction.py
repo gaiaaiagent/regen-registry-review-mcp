@@ -16,9 +16,8 @@ Usage:
 import asyncio
 import json
 import sys
-from pathlib import Path
 from datetime import datetime
-from typing import Any
+from pathlib import Path
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -27,12 +26,11 @@ from anthropic import AsyncAnthropic
 
 from registry_review_mcp.config.settings import settings
 from registry_review_mcp.prompts.unified_analysis import (
-    build_unified_analysis_prompt,
-    UnifiedAnalysisResult,
-    ProjectMetadata,
     PriorReviewStatus,
+    ProjectMetadata,
+    UnifiedAnalysisResult,
+    build_unified_analysis_prompt,
 )
-
 
 # Ground truth for Botany Farm (CORRECTED from actual document)
 # NOTE: Previous assumptions were wrong - project is in UK, not Iowa

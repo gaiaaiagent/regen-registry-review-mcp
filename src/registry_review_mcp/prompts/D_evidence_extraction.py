@@ -1,12 +1,12 @@
 """Evidence extraction workflow - Stage 4 of registry review."""
 
+from ..models.errors import SessionNotFoundError
 from ..tools import session_tools
 from ..tools.evidence_tools import extract_all_evidence
-from ..models.errors import SessionNotFoundError
 from .helpers import (
     format_error,
-    format_workflow_header,
     format_next_steps_section,
+    format_workflow_header,
 )
 
 
@@ -74,35 +74,37 @@ Run document discovery first: `/document-discovery {session_id}`
         header = format_workflow_header("Evidence Extraction", session_id, project_name)
 
         # Build coverage summary
-        total = results['requirements_total']
-        covered = results['requirements_covered']
-        partial = results['requirements_partial']
-        missing = results['requirements_missing']
-        coverage_pct = results['overall_coverage'] * 100
+        total = results["requirements_total"]
+        covered = results["requirements_covered"]
+        partial = results["requirements_partial"]
+        missing = results["requirements_missing"]
+        coverage_pct = results["overall_coverage"] * 100
 
         content = f"""## ✅ Evidence Extraction Complete
 
 **Coverage Summary:**
-- ✅ Covered: {covered}/{total} ({covered/total*100:.1f}%)
-- ⚠️  Partial: {partial}/{total} ({partial/total*100:.1f}%)
-- ❌ Missing: {missing}/{total} ({missing/total*100:.1f}%)
+- ✅ Covered: {covered}/{total} ({covered / total * 100:.1f}%)
+- ⚠️  Partial: {partial}/{total} ({partial / total * 100:.1f}%)
+- ❌ Missing: {missing}/{total} ({missing / total * 100:.1f}%)
 - **Overall Coverage: {coverage_pct:.1f}%**
 
 All requirements have been mapped to documents and evidence extracted.
 Results saved to evidence.json.
 """
 
-        next_steps = format_next_steps_section([
-            "Review coverage statistics above",
-            "Run cross-validation: `/cross-validation`",
-            f"Or examine specific requirements: `map_requirement {session_id} REQ-###`"
-        ])
+        next_steps = format_next_steps_section(
+            [
+                "Review coverage statistics above",
+                "Run cross-validation: `/cross-validation`",
+                f"Or examine specific requirements: `map_requirement {session_id} REQ-###`",
+            ]
+        )
 
         return header + content + next_steps
 
     except Exception as e:
-        return str(format_error(
-            "Evidence Extraction Failed",
-            f"An error occurred: {str(e)}",
-            "Please check the session and try again."
-        )[0].text)
+        return str(
+            format_error(
+                "Evidence Extraction Failed", f"An error occurred: {str(e)}", "Please check the session and try again."
+            )[0].text
+        )

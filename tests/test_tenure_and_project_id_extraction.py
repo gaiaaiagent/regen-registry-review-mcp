@@ -1,8 +1,8 @@
 """Integration tests for land tenure and project ID extraction with real API calls."""
 
-import pytest
 import time
-from pathlib import Path
+
+import pytest
 
 from registry_review_mcp.config.settings import settings
 from registry_review_mcp.extractors.llm_extractors import (
@@ -12,11 +12,10 @@ from registry_review_mcp.extractors.llm_extractors import (
 
 # Import factory infrastructure
 from tests.factories import (
-    unique_doc_name,
-    create_llm_mock_response,
     create_llm_client_mock,
+    create_llm_mock_response,
+    unique_doc_name,
 )
-
 
 pytestmark = [
     pytest.mark.expensive,

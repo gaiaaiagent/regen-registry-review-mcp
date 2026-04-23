@@ -5,9 +5,9 @@ from mcp.types import TextContent
 from ..models.validation import ValidationResult
 from ..utils.state import StateManager
 from .helpers import (
-    text_content,
-    format_workflow_header,
     format_next_steps_section,
+    format_workflow_header,
+    text_content,
 )
 
 
@@ -50,7 +50,9 @@ Then proceed through the workflow stages.""")
     manager = StateManager(session_id)
 
     if not manager.exists("session.json"):
-        sessions_list = "\n".join(f"- `{s['session_id']}`: {s['project_name']}" for s in StateManager(None).list_sessions())
+        sessions_list = "\n".join(
+            f"- `{s['session_id']}`: {s['project_name']}" for s in StateManager(None).list_sessions()
+        )
         return text_content(f"""# ❌ Error: Session Not Found
 
 Session `{session_id}` does not exist.
@@ -71,7 +73,9 @@ Use an existing session ID or create a new one:
     # Check if cross-validation has been run
     if not manager.exists("validation.json"):
         header = format_workflow_header("Human Review", session_id, project_name, auto_selected)
-        message = header + """## ⚠️ Cross-Validation Not Run
+        message = (
+            header
+            + """## ⚠️ Cross-Validation Not Run
 
 You need to run cross-validation before human review.
 
@@ -82,6 +86,7 @@ Run Stage 4 first:
 `/cross-validation`
 
 This will validate dates, land tenure, and project IDs across documents."""
+        )
         return text_content(message)
 
     # Load validation results
@@ -94,20 +99,22 @@ This will validate dates, land tenure, and project IDs across documents."""
     # Date alignment flags
     for val in validation.date_alignments:
         if val.flagged_for_review:
-            flagged_items.append({
-                "type": "Date Alignment",
-                "status": val.status,
-                "message": val.message,
-                "details": f"""**Date 1:** {val.date1.field_name} = {val.date1.value.strftime('%Y-%m-%d')}
+            flagged_items.append(
+                {
+                    "type": "Date Alignment",
+                    "status": val.status,
+                    "message": val.message,
+                    "details": f"""**Date 1:** {val.date1.field_name} = {val.date1.value.strftime("%Y-%m-%d")}
   - Source: {val.date1.source}
   - Confidence: {val.date1.confidence:.0%}
 
-**Date 2:** {val.date2.field_name} = {val.date2.value.strftime('%Y-%m-%d')}
+**Date 2:** {val.date2.field_name} = {val.date2.value.strftime("%Y-%m-%d")}
   - Source: {val.date2.source}
   - Confidence: {val.date2.confidence:.0%}
 
-**Time Difference:** {val.delta_days} days (max allowed: {val.max_allowed_days} days)"""
-            })
+**Time Difference:** {val.delta_days} days (max allowed: {val.max_allowed_days} days)""",
+                }
+            )
 
     # Land tenure flags
     for val in validation.land_tenure:
@@ -121,65 +128,69 @@ This will validate dates, land tenure, and project IDs across documents."""
             )
 
             discrepancies_text = (
-                "\n\n**Discrepancies:**\n"
-                + "\n".join(f"  - {d}" for d in val.discrepancies)
+                "\n\n**Discrepancies:**\n" + "\n".join(f"  - {d}" for d in val.discrepancies)
                 if val.discrepancies
                 else ""
             )
 
-            flagged_items.append({
-                "type": "Land Tenure",
-                "status": val.status,
-                "message": val.message,
-                "details": f"""**Fields Found:**
+            flagged_items.append(
+                {
+                    "type": "Land Tenure",
+                    "status": val.status,
+                    "message": val.message,
+                    "details": f"""**Fields Found:**
 {fields_text}
 
 **Name Similarity:** {val.owner_name_similarity:.0%}
-**Area Consistent:** {'✅ Yes' if val.area_consistent else '❌ No'}
-**Tenure Type Consistent:** {'✅ Yes' if val.tenure_type_consistent else '❌ No'}{discrepancies_text}"""
-            })
+**Area Consistent:** {"✅ Yes" if val.area_consistent else "❌ No"}
+**Tenure Type Consistent:** {"✅ Yes" if val.tenure_type_consistent else "❌ No"}{discrepancies_text}""",
+                }
+            )
 
     # Project ID flags
     for val in validation.project_ids:
         if val.flagged_for_review:
             occurrences_text = "\n".join(
-                f"  - {occ.project_id} in {occ.document_name}"
-                + (f" (Page {occ.page})" if occ.page else "")
+                f"  - {occ.project_id} in {occ.document_name}" + (f" (Page {occ.page})" if occ.page else "")
                 for occ in val.occurrences[:10]
             )
 
             if len(val.occurrences) > 10:
                 occurrences_text += f"\n  - ... and {len(val.occurrences) - 10} more"
 
-            flagged_items.append({
-                "type": "Project ID",
-                "status": val.status,
-                "message": val.message,
-                "details": f"""**Expected Pattern:** `{val.expected_pattern}`
-**Found IDs:** {', '.join(val.found_ids) if val.found_ids else 'None'}
-**Primary ID:** {val.primary_id or 'Not identified'}
+            flagged_items.append(
+                {
+                    "type": "Project ID",
+                    "status": val.status,
+                    "message": val.message,
+                    "details": f"""**Expected Pattern:** `{val.expected_pattern}`
+**Found IDs:** {", ".join(val.found_ids) if val.found_ids else "None"}
+**Primary ID:** {val.primary_id or "Not identified"}
 **Total Occurrences:** {val.total_occurrences} across {val.documents_with_id}/{val.total_documents} documents
 
 **Sample Occurrences:**
-{occurrences_text}"""
-            })
+{occurrences_text}""",
+                }
+            )
 
     # Contradiction flags
     for val in validation.contradictions:
         if val.flagged_for_review:
-            flagged_items.append({
-                "type": "Contradiction",
-                "status": "warning",
-                "message": val.message,
-                "details": f"""**Field:** {val.field_name}
+            flagged_items.append(
+                {
+                    "type": "Contradiction",
+                    "status": "warning",
+                    "message": val.message,
+                    "details": f"""**Field:** {val.field_name}
 **Severity:** {val.severity.upper()}
 
 **Value 1:** {val.value1}
   - Source: {val.source1}
 
 **Value 2:** {val.value2}
-  - Source: {val.source2}"""
-            })
+  - Source: {val.source2}""",
+                }
+            )
 
     # Generate human review report
     if not flagged_items:
@@ -196,29 +207,30 @@ All validation checks passed without requiring human review!
 - **Warnings:** {validation.summary.validations_warning}
 - **Items Flagged:** 0"""
 
-        next_steps = format_next_steps_section([
-            "All validation checks have passed",
-            "Generate the final review report: `/report-generation`",
-            "This will create a comprehensive report of all findings, evidence, and validations"
-        ], "Next Step: Generate Report")
+        next_steps = format_next_steps_section(
+            [
+                "All validation checks have passed",
+                "Generate the final review report: `/report-generation`",
+                "This will create a comprehensive report of all findings, evidence, and validations",
+            ],
+            "Next Step: Generate Report",
+        )
 
         message = header + content + next_steps
     else:
         # Format flagged items
         items_text = ""
         for i, item in enumerate(flagged_items, 1):
-            status_icon = {"pass": "✅", "warning": "⚠️", "fail": "❌"}.get(
-                item["status"], "❓"
-            )
+            status_icon = {"pass": "✅", "warning": "⚠️", "fail": "❌"}.get(item["status"], "❓")
 
             items_text += f"""
 ---
 
-### {i}. {item['type']} - {status_icon} {item['status'].upper()}
+### {i}. {item["type"]} - {status_icon} {item["status"].upper()}
 
-**Issue:** {item['message']}
+**Issue:** {item["message"]}
 
-{item['details']}
+{item["details"]}
 
 **Action Required:**
 - Review the evidence above
@@ -250,14 +262,22 @@ These items require your expert judgment to determine whether they represent act
 
 {items_text}"""
 
-        next_steps = format_next_steps_section([
-            "Document your decisions - Note any actions needed (clarifications, corrections)",
-            "Update session notes if needed (use `update_session` tool)",
-            "Generate the final report: `/report-generation`"
-        ], "Next Steps")
+        next_steps = format_next_steps_section(
+            [
+                "Document your decisions - Note any actions needed (clarifications, corrections)",
+                "Update session notes if needed (use `update_session` tool)",
+                "Generate the final report: `/report-generation`",
+            ],
+            "Next Steps",
+        )
 
-        message = header + content + next_steps + """\n
+        message = (
+            header
+            + content
+            + next_steps
+            + """\n
 **Note:** This human review stage ensures expert judgment on ambiguous or inconsistent information before making a final registration decision."""
+        )
 
     # Mark human_review stage as completed
     session = manager.read_json("session.json")

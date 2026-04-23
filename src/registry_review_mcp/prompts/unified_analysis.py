@@ -18,13 +18,15 @@ import json
 import logging
 import re
 from typing import Any
-from pydantic import BaseModel, Field
 
+from pydantic import BaseModel, Field
 
 # === Response Schema ===
 
+
 class EvidenceSnippet(BaseModel):
     """Evidence snippet with citation."""
+
     text: str = Field(description="Evidence text (50-500 words, include sufficient context for verification)")
     page: int | None = Field(description="Page number (1-indexed)")
     section: str | None = Field(description="Section header")
@@ -33,6 +35,7 @@ class EvidenceSnippet(BaseModel):
 
 class MappedDocument(BaseModel):
     """Document mapped to requirement."""
+
     document_id: str
     document_name: str
     relevance_score: float = Field(ge=0.0, le=1.0)
@@ -40,6 +43,7 @@ class MappedDocument(BaseModel):
 
 class RequirementEvidence(BaseModel):
     """Evidence for a single requirement."""
+
     requirement_id: str
     status: str = Field(description="covered | partial | missing")
     confidence: float = Field(ge=0.0, le=1.0)
@@ -50,6 +54,7 @@ class RequirementEvidence(BaseModel):
 
 class ExtractedField(BaseModel):
     """Structured field extraction with citation."""
+
     field_name: str
     field_value: str
     source_document: str
@@ -59,6 +64,7 @@ class ExtractedField(BaseModel):
 
 class ValidationCheck(BaseModel):
     """Cross-document validation result."""
+
     check_type: str = Field(description="date_alignment | land_tenure | project_id")
     status: str = Field(description="pass | warning | fail")
     message: str
@@ -67,6 +73,7 @@ class ValidationCheck(BaseModel):
 
 class ProjectMetadata(BaseModel):
     """Extracted project metadata (replaces metadata_extractors.py)."""
+
     project_id: str | None = Field(description="Project ID (e.g., C06-4997, VCS1234)")
     proponent: str | None = Field(description="Project developer/proponent name")
     crediting_period_start: str | None = Field(description="Crediting period start date")
@@ -81,6 +88,7 @@ class ProjectMetadata(BaseModel):
 
 class PriorReviewStatus(BaseModel):
     """Prior review detection result (replaces prior_review_detector.py)."""
+
     has_prior_review: bool = Field(description="Whether prior review exists")
     review_id: str | None = Field(description="Prior review identifier")
     review_outcome: str | None = Field(description="approved | conditional | rejected | pending")
@@ -248,9 +256,7 @@ def format_requirements(requirements: list[dict[str, Any]]) -> str:
 
 
 def build_unified_analysis_prompt(
-    documents: list[dict[str, Any]],
-    markdown_contents: dict[str, str],
-    requirements: list[dict[str, Any]]
+    documents: list[dict[str, Any]], markdown_contents: dict[str, str], requirements: list[dict[str, Any]]
 ) -> str:
     """Build complete analysis prompt.
 
@@ -462,6 +468,7 @@ You MUST return your analysis as JSON matching this EXACT schema.
 
 # === LLM Call Function ===
 
+
 async def analyze_with_llm(
     documents: list[dict[str, Any]],
     markdown_contents: dict[str, str],
@@ -511,7 +518,7 @@ async def analyze_with_llm(
         # Try to extract JSON if wrapped in markdown code block
         if result_text.strip().startswith("```"):
             # Extract content between ```json and ```
-            json_match = re.search(r'```(?:json)?\s*\n(.*?)\n```', result_text, re.DOTALL)
+            json_match = re.search(r"```(?:json)?\s*\n(.*?)\n```", result_text, re.DOTALL)
             if json_match:
                 result_text = json_match.group(1)
             else:
@@ -527,11 +534,7 @@ async def analyze_with_llm(
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse LLM response. First 2000 chars:\n{result_text[:2000]}")
         raise DocumentExtractionError(
-            f"Failed to parse LLM response as JSON: {str(e)}",
-            details={"response_preview": result_text[:1000]}
+            f"Failed to parse LLM response as JSON: {str(e)}", details={"response_preview": result_text[:1000]}
         )
     except Exception as e:
-        raise DocumentExtractionError(
-            f"LLM analysis failed: {str(e)}",
-            details={"error_type": type(e).__name__}
-        )
+        raise DocumentExtractionError(f"LLM analysis failed: {str(e)}", details={"error_type": type(e).__name__})

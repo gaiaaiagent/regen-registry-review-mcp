@@ -1,0 +1,82 @@
+name: Regression
+
+# Phase F2 — full regression suite. Runs the per-model baseline matrix
+# (Burton + Rockscape + synthetic-mixed-verdict-1 × GPT-OSS + Gemma 4)
+# against the live TELUS gateway. Dominated by wall-clock wait on the
+# gateway; the LLM response cache (keyed on executor model + PROMPT_VERSION,
+# see Phase F4) is hydrated from a GitHub Actions cache so re-runs only
+# re-execute the subset that actually changed.
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    # Nightly run via cron — overlaps with ``nightly.yml`` but that workflow
+    # runs the FULL matrix including CSSCP coverage; this scheduled run is
+    # the PR-gate version, kept warm so first-PR-after-release isn't cold.
+    - cron: "0 10 * * *"
+
+concurrency:
+  group: regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regression:
+    name: regression-suite
+    runs-on: ubuntu-latest
+    # 120 min generous ceiling — typical warm run is under 30 min; cold run
+    # against a newly-invalidated PROMPT_VERSION can approach 90 min.
+    timeout-minutes: 120
+    env:
+      TELUS_GPT_OSS_URL: ${{ secrets.TELUS_GPT_OSS_URL }}
+      TELUS_GPT_OSS_KEY: ${{ secrets.TELUS_GPT_OSS_KEY }}
+      TELUS_GEMMA_URL: ${{ secrets.TELUS_GEMMA_URL }}
+      TELUS_GEMMA_KEY: ${{ secrets.TELUS_GEMMA_KEY }}
+      # Phase E throttle — bounds concurrency across the whole process so
+      # the gateway never sees more than N parallel calls regardless of how
+      # many requirements are extracted in parallel.
+      LLM_MAX_CONCURRENT: "4"
+      LLM_MIN_INTERVAL_MS: "100"
+      REGISTRY_REVIEW_LLM_BACKEND: "openai"
+      REGISTRY_REVIEW_ENVIRONMENT: "production"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Restore LLM response cache
+        id: llm-cache
+        uses: actions/cache@v4
+        with:
+          # Cache lives at this path because ``settings.llm_cache_dir``
+          # resolves to ``$XDG_CACHE_HOME/registry-review-mcp/llm`` which
+          # defaults to ``~/.cache`` on GH runners.
+          path: ~/.cache/registry-review-mcp/llm
+          # Key bound to source changes under src/: any extractor change
+          # evicts cache. Restore-keys let us re-use older caches as a
+          # warm seed when the key misses.
+          key: llm-cache-${{ runner.os }}-${{ hashFiles('src/registry_review_mcp/**/*.py') }}
+          restore-keys: |
+            llm-cache-${{ runner.os }}-
+
+      - name: Regression suite (baseline gate)
+        run: uv run pytest -m regression -q tests/evaluation/ --junit-xml=regression.xml
+
+      - name: Upload regression report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-report
+          path: |
+            regression.xml
+            tests/evaluation/baselines/
+          if-no-files-found: warn

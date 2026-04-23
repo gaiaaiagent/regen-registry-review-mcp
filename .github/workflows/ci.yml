@@ -1,0 +1,53 @@
+name: CI
+
+# Fast suite on every push + pull request. Runs in ~5-15 seconds once the uv
+# cache is warm — no secrets, no external calls. Designed to be the cheapest
+# possible gate so contributors get feedback without waiting on the regression
+# matrix.
+#
+# Scope: ``src/`` only for lint + format. Phase F inherited a legacy test
+# tree + top-level scripts with ~80 files needing format adjustments; that
+# cleanup is a dedicated Phase G hygiene sweep. The CI gate is narrow so it
+# green-lights from day one and tightens progressively.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fast-tests:
+    name: fast-suite (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Ruff lint (src/ + tests/)
+        run: uv run ruff check src/ tests/
+
+      - name: Ruff format check (src/ only)
+        run: uv run ruff format --check src/
+
+      - name: Fast suite
+        # pytest.ini pins the default markers to skip expensive + regression
+        # suites. Contributors should never need to override this.
+        run: uv run pytest -q

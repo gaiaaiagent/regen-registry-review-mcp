@@ -1,12 +1,8 @@
 """Tests for LLM-powered field extraction (Phase 4.2)."""
 
-import json
-from pathlib import Path
-from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from registry_review_mcp.config.settings import settings
 from registry_review_mcp.extractors.llm_extractors import (
     DateExtractor,
     ExtractedField,
@@ -183,9 +179,9 @@ class TestBoundaryAwareChunking:
 
     def test_boundary_aware_splits_at_paragraph(self, monkeypatch):
         """Test that chunking prefers paragraph boundaries."""
-        from registry_review_mcp.extractors.llm_extractors import DateExtractor
         from registry_review_mcp.config.settings import Settings
         from registry_review_mcp.extractors import llm_extractors as llm_module
+        from registry_review_mcp.extractors.llm_extractors import DateExtractor
 
         # Create new settings with valid chunk sizes (must be >= 10000)
         new_settings = Settings(
@@ -214,9 +210,9 @@ class TestBoundaryAwareChunking:
 
     def test_boundary_aware_splits_at_sentence(self, monkeypatch):
         """Test that chunking falls back to sentence boundaries."""
-        from registry_review_mcp.extractors.llm_extractors import DateExtractor
         from registry_review_mcp.config.settings import Settings
         from registry_review_mcp.extractors import llm_extractors as llm_module
+        from registry_review_mcp.extractors.llm_extractors import DateExtractor
 
         # Create new settings with valid chunk sizes (must be >= 10000)
         new_settings = Settings(
@@ -249,9 +245,9 @@ class TestBoundaryAwareChunking:
 
     def test_boundary_aware_fallback_to_char(self, monkeypatch):
         """Test that chunking falls back gracefully when no boundaries found."""
-        from registry_review_mcp.extractors.llm_extractors import DateExtractor
         from registry_review_mcp.config.settings import Settings
         from registry_review_mcp.extractors import llm_extractors as llm_module
+        from registry_review_mcp.extractors.llm_extractors import DateExtractor
 
         # Create new settings with valid chunk sizes (must be >= 10000)
         new_settings = Settings(
